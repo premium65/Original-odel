@@ -1,3 +1,5 @@
+attached_assets/
+*.zip
 v.local/
 .config/
 .cache/
