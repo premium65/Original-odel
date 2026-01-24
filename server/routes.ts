@@ -130,12 +130,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Invalid username or password" });
       }
 
-      // Check admin privileges
-      const isAdminValue = user.isAdmin ?? user.is_admin;
-      if (Number(isAdminValue) !== 1) {
-        return res.status(403).json({ error: "Access denied. Admin privileges required." });
-      }
-
       // CRITICAL: Only allow active users to login
       if (user.status !== "active") {
         if (user.status === "pending") {
@@ -152,7 +146,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Return user info (without password)
       const { password: _, ...userWithoutPassword } = user;
-      console.log("Admin login successful, returning user:", JSON.stringify(userWithoutPassword));
+      console.log("Login successful, returning user:", JSON.stringify(userWithoutPassword));
       res.json(userWithoutPassword);
     } catch (error) {
       console.error("Login error:", error);
