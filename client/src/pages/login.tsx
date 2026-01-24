@@ -1,4 +1,4 @@
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,7 +19,6 @@ const loginSchema = z.object({
 type LoginForm = z.infer<typeof loginSchema>;
 
 export default function Login() {
-  const [, setLocation] = useLocation();
   const { toast } = useToast();
 
   const form = useForm<LoginForm>({
@@ -36,6 +35,7 @@ export default function Login() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
+        credentials: "include",
       });
 
       if (!response.ok) {
@@ -44,18 +44,16 @@ export default function Login() {
       }
 
       const user = await response.json();
-      
+
       toast({
         title: "Welcome back!",
         description: `Logged in as ${user.username}`,
       });
 
-      // Redirect based on user role
-      if (user.isAdmin === 1) {
-        setLocation("/admin");
-      } else {
-        setLocation("/dashboard");
-      }
+      setTimeout(() => {
+        window.location.href = user.isAdmin === 1 ? "/admin" : "/dashboard";
+      }, 500);
+
     } catch (error: any) {
       toast({
         title: "Login Failed",
@@ -67,14 +65,8 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4 relative">
-      {/* Background image with overlay */}
-      <div 
-        className="absolute inset-0 bg-cover bg-center"
-        style={{ background: loginBgStyle }}
-      />
+      <div className="absolute inset-0 bg-cover bg-center" style={{ background: loginBgStyle }} />
       <div className="absolute inset-0 bg-black/40" />
-      
-      {/* Content */}
       <div className="relative z-10 w-full max-w-md">
         <div className="text-center mb-8">
           <Link href="/">
@@ -84,13 +76,10 @@ export default function Login() {
             </span>
           </Link>
         </div>
-
         <Card>
           <CardHeader>
             <CardTitle className="text-2xl">Welcome Back</CardTitle>
-            <CardDescription>
-              Sign in to your account to continue
-            </CardDescription>
+            <CardDescription>Sign in to your account to continue</CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
@@ -102,17 +91,12 @@ export default function Login() {
                     <FormItem>
                       <FormLabel>Username</FormLabel>
                       <FormControl>
-                        <Input
-                          placeholder="Enter your username"
-                          data-testid="input-username"
-                          {...field}
-                        />
+                        <Input placeholder="Enter your username" data-testid="input-username" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-
                 <FormField
                   control={form.control}
                   name="password"
@@ -120,35 +104,21 @@ export default function Login() {
                     <FormItem>
                       <FormLabel>Password</FormLabel>
                       <FormControl>
-                        <Input
-                          type="password"
-                          placeholder="Enter your password"
-                          data-testid="input-password"
-                          {...field}
-                        />
+                        <Input type="password" placeholder="Enter your password" data-testid="input-password" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={form.formState.isSubmitting}
-                  data-testid="button-submit-login"
-                >
+                <Button type="submit" className="w-full" disabled={form.formState.isSubmitting} data-testid="button-submit-login">
                   {form.formState.isSubmitting ? "Signing in..." : "Sign In"}
                 </Button>
               </form>
             </Form>
-
             <div className="mt-6 text-center text-sm">
               <span className="text-muted-foreground">Don't have an account? </span>
               <Link href="/register" data-testid="link-register">
-                <span className="text-primary hover:underline cursor-pointer">
-                  Create one
-                </span>
+                <span className="text-primary hover:underline cursor-pointer">Create one</span>
               </Link>
             </div>
           </CardContent>
