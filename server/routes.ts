@@ -36,6 +36,9 @@ function getNumericUserId(sessionUserId: string | undefined): number | undefined
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // ⭐ CRITICAL FIX: Trust proxy for secure cookies behind Render's reverse proxy
+  app.set('trust proxy', 1);
+
   // CORS middleware
   app.use(
     cors({
@@ -53,7 +56,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       cookie: {
         secure: process.env.NODE_ENV === "production",
         httpOnly: true,
-        sameSite: "lax", // FIXED: Changed from "none" to "lax" for same-domain
+        sameSite: "lax",
         maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
       },
     })
