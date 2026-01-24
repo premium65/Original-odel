@@ -10,6 +10,7 @@ import path from "path";
 import fs from "fs";
 import { mongoStorage } from "./mongoStorage";
 import { isMongoConnected } from "./mongoConnection";
+import cors from "cors";
 
 const SALT_ROUNDS = 10;
 
@@ -35,6 +36,14 @@ function getNumericUserId(sessionUserId: string | undefined): number | undefined
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // CORS middleware
+  app.use(
+    cors({
+      origin: process.env.CORS_ORIGIN || "https://odelads.online",
+      credentials: true,
+    })
+  );
+
   // Session middleware
   app.use(
     session({
@@ -44,6 +53,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       cookie: {
         secure: process.env.NODE_ENV === "production",
         httpOnly: true,
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
         maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
       },
     })
