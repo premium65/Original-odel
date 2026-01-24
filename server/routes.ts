@@ -42,7 +42,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // CORS middleware
   app.use(
     cors({
-      origin: process.env.CORS_ORIGIN || "https://odelads.online",
+      origin: true, // Allow same-origin requests
       credentials: true,
     })
   );
@@ -53,8 +53,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       secret: process.env.SESSION_SECRET || "your-secret-key-change-in-production",
       resave: false,
       saveUninitialized: false,
+      proxy: true, // ⭐ CRITICAL: Trust the reverse proxy for secure cookies
       cookie: {
-        secure: process.env.NODE_ENV === "production",
+        secure: true, // ⭐ FIXED: Always true on Render (HTTPS)
         httpOnly: true,
         sameSite: "lax",
         maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
