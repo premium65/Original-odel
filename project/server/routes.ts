@@ -32,6 +32,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Session middleware
   app.use(
     session({
+            proxy: true,
       secret: process.env.SESSION_SECRET || "your-secret-key-change-in-production",
       resave: false,
       saveUninitialized: false,
