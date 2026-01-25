@@ -1,7 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertUserSchema, insertRatingSchema, insertAdSchema } from "@shared/schema";
+import { insertUserSchema, insertRatingSchema, insertAdSchema, slideshowItems, siteSettings, defaultColorSettings } from "@shared/schema";
+import { db } from "./db";
+import { eq, asc } from "drizzle-orm";
 import session from "express-session";
 import { z } from "zod";
 import bcrypt from "bcrypt";
@@ -26,33 +28,35 @@ declare module "express-session" {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-    // Trust proxy for production (Render)
-    app.set("trust proxy", 1);
-  
+  // Trust proxy for production (Render)
+  app.set("trust proxy", 1);
+
   // Session middleware
   app.use(
     session({
-            proxy: true,
+      proxy: true,
       secret: process.env.SESSION_SECRET || "your-secret-key-change-in-production",
       resave: false,
       saveUninitialized: false,
       cookie: {
         secure: process.env.NODE_ENV === "production",
         httpOnly: true,
-                sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
         maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
       },
     })
   );
 
-  // Auth endpoints
+  // ============================================
+  // AUTH ENDPOINTS
+  // ============================================
+
   app.post("/api/auth/register", async (req, res) => {
     try {
       console.log("Registration request received:", JSON.stringify(req.body));
       const data = insertUserSchema.parse(req.body);
       console.log("Parsed registration data:", data);
 
-      // Check if username or email already exists
       const existingUsername = await storage.getUserByUsername(data.username);
       if (existingUsername) {
         console.log("Username already exists:", data.username);
@@ -65,15 +69,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).send("Email already exists");
       }
 
-      // Hash password and create user
       const hashedPassword = await hashPassword(data.password);
       console.log("Creating user with data:", data);
       const user = await storage.createUser({
         ...data,
         password: hashedPassword,
       });
-      console.log("User created successfully:", user.id, user.username);
 
+      console.log("User created successfully:", user.id, user.username);
       res.json({ success: true, userId: user.id });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -98,7 +101,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).send("Invalid username or password");
       }
 
-      // CRITICAL: Only allow active users to login
       if (user.status !== "active") {
         if (user.status === "pending") {
           return res.status(403).send("Your account is pending admin approval");
@@ -108,10 +110,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).send("Account access denied");
       }
 
-      // Set session
       req.session.userId = user.id;
-
-      // Return user info (without password)
       const { password: _, ...userWithoutPassword } = user;
       res.json(userWithoutPassword);
     } catch (error) {
@@ -140,7 +139,320 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(userWithoutPassword);
   });
 
-  // Rating endpoints
+  // ============================================
+  // SLIDESHOW API (PUBLIC)
+  // ============================================
+
+  // Get active slideshow items (public)
+  app.get("/api/slideshow", async (req, res) => {
+    try {
+      const items = await db
+        .select()
+        .from(slideshowItems)
+        .where(eq(slideshowItems.isActive, true))
+        .orderBy(asc(slideshowItems.order));
+      res.json(items);
+    } catch (error) {
+      console.error("Error fetching slideshow items:", error);
+      res.status(500).json({ error: "Failed to fetch slideshow items" });
+    }
+  });
+
+  // ============================================
+  // SITE SETTINGS API (PUBLIC)
+  // ============================================
+
+  // Get all site settings (public - for colors)
+  app.get("/api/settings", async (req, res) => {
+    try {
+      const settings = await db.select().from(siteSettings);
+      
+      // Convert to key-value object
+      const settingsObj: Record<string, string> = {};
+      settings.forEach((s) => {
+        settingsObj[s.settingKey] = s.settingValue;
+      });
+      
+      res.json(settingsObj);
+    } catch (error) {
+      console.error("Error fetching settings:", error);
+      res.status(500).json({ error: "Failed to fetch settings" });
+    }
+  });
+
+  // ============================================
+  // ADMIN SLIDESHOW API
+  // ============================================
+
+  // Get all slideshow items (admin - includes inactive)
+  app.get("/api/admin/slideshow", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).send("Not authenticated");
+      }
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).send("Admin access required");
+      }
+
+      const items = await db
+        .select()
+        .from(slideshowItems)
+        .orderBy(asc(slideshowItems.order));
+      res.json(items);
+    } catch (error) {
+      console.error("Error fetching slideshow items:", error);
+      res.status(500).json({ error: "Failed to fetch slideshow items" });
+    }
+  });
+
+  // Create slideshow item (admin)
+  app.post("/api/admin/slideshow", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).send("Not authenticated");
+      }
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).send("Admin access required");
+      }
+
+      const { title, description, imageUrl, linkUrl, buttonText, order, isActive } = req.body;
+      
+      const [newItem] = await db
+        .insert(slideshowItems)
+        .values({
+          title,
+          description,
+          imageUrl,
+          linkUrl,
+          buttonText,
+          order: order || 0,
+          isActive: isActive !== false,
+        })
+        .returning();
+      
+      res.json(newItem);
+    } catch (error) {
+      console.error("Error creating slideshow item:", error);
+      res.status(500).json({ error: "Failed to create slideshow item" });
+    }
+  });
+
+  // Update slideshow item (admin)
+  app.put("/api/admin/slideshow/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).send("Not authenticated");
+      }
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).send("Admin access required");
+      }
+
+      const { id } = req.params;
+      const { title, description, imageUrl, linkUrl, buttonText, order, isActive } = req.body;
+      
+      const [updatedItem] = await db
+        .update(slideshowItems)
+        .set({
+          title,
+          description,
+          imageUrl,
+          linkUrl,
+          buttonText,
+          order,
+          isActive,
+          updatedAt: new Date(),
+        })
+        .where(eq(slideshowItems.id, parseInt(id)))
+        .returning();
+      
+      if (!updatedItem) {
+        return res.status(404).json({ error: "Slideshow item not found" });
+      }
+      
+      res.json(updatedItem);
+    } catch (error) {
+      console.error("Error updating slideshow item:", error);
+      res.status(500).json({ error: "Failed to update slideshow item" });
+    }
+  });
+
+  // Delete slideshow item (admin)
+  app.delete("/api/admin/slideshow/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).send("Not authenticated");
+      }
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).send("Admin access required");
+      }
+
+      const { id } = req.params;
+      
+      const [deletedItem] = await db
+        .delete(slideshowItems)
+        .where(eq(slideshowItems.id, parseInt(id)))
+        .returning();
+      
+      if (!deletedItem) {
+        return res.status(404).json({ error: "Slideshow item not found" });
+      }
+      
+      res.json({ success: true, deleted: deletedItem });
+    } catch (error) {
+      console.error("Error deleting slideshow item:", error);
+      res.status(500).json({ error: "Failed to delete slideshow item" });
+    }
+  });
+
+  // ============================================
+  // ADMIN SITE SETTINGS API
+  // ============================================
+
+  // Get all settings (admin)
+  app.get("/api/admin/settings", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).send("Not authenticated");
+      }
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).send("Admin access required");
+      }
+
+      const settings = await db.select().from(siteSettings);
+      res.json(settings);
+    } catch (error) {
+      console.error("Error fetching settings:", error);
+      res.status(500).json({ error: "Failed to fetch settings" });
+    }
+  });
+
+  // Update single setting (admin)
+  app.put("/api/admin/settings/:key", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).send("Not authenticated");
+      }
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).send("Admin access required");
+      }
+
+      const { key } = req.params;
+      const { value } = req.body;
+      
+      const [updatedSetting] = await db
+        .update(siteSettings)
+        .set({ settingValue: value, updatedAt: new Date() })
+        .where(eq(siteSettings.settingKey, key))
+        .returning();
+      
+      if (!updatedSetting) {
+        // Create if not exists
+        const [newSetting] = await db
+          .insert(siteSettings)
+          .values({
+            settingKey: key,
+            settingValue: value,
+            category: "custom",
+          })
+          .returning();
+        return res.json(newSetting);
+      }
+      
+      res.json(updatedSetting);
+    } catch (error) {
+      console.error("Error updating setting:", error);
+      res.status(500).json({ error: "Failed to update setting" });
+    }
+  });
+
+  // Bulk update settings (admin)
+  app.put("/api/admin/settings", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).send("Not authenticated");
+      }
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).send("Admin access required");
+      }
+
+      const { settings } = req.body; // Array of { key, value }
+      
+      for (const setting of settings) {
+        await db
+          .update(siteSettings)
+          .set({ settingValue: setting.value, updatedAt: new Date() })
+          .where(eq(siteSettings.settingKey, setting.key));
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error updating settings:", error);
+      res.status(500).json({ error: "Failed to update settings" });
+    }
+  });
+
+  // Initialize default settings (admin)
+  app.post("/api/admin/settings/init", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).send("Not authenticated");
+      }
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).send("Admin access required");
+      }
+
+      // Check if settings already exist
+      const existing = await db.select().from(siteSettings);
+      
+      if (existing.length === 0) {
+        // Insert default color settings
+        await db.insert(siteSettings).values(defaultColorSettings);
+        res.json({ success: true, message: "Default settings initialized" });
+      } else {
+        res.json({ success: true, message: "Settings already exist" });
+      }
+    } catch (error) {
+      console.error("Error initializing settings:", error);
+      res.status(500).json({ error: "Failed to initialize settings" });
+    }
+  });
+
+  // Reset settings to default (admin)
+  app.post("/api/admin/settings/reset", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).send("Not authenticated");
+      }
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).send("Admin access required");
+      }
+
+      // Delete all color settings
+      await db.delete(siteSettings).where(eq(siteSettings.category, "colors"));
+      
+      // Re-insert defaults
+      await db.insert(siteSettings).values(defaultColorSettings);
+      
+      res.json({ success: true, message: "Settings reset to default" });
+    } catch (error) {
+      console.error("Error resetting settings:", error);
+      res.status(500).json({ error: "Failed to reset settings" });
+    }
+  });
+
+  // ============================================
+  // RATING ENDPOINTS
+  // ============================================
+
   app.post("/api/ratings", async (req, res) => {
     try {
       if (!req.session.userId) {
@@ -154,7 +466,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const data = insertRatingSchema.parse(req.body);
 
-      // Verify target user exists
       const targetUser = await storage.getUserByUsername(data.targetUsername);
       if (!targetUser) {
         return res.status(404).send("Target user not found");
@@ -189,16 +500,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Ads endpoints
+  // ============================================
+  // ADS ENDPOINTS
+  // ============================================
+
   app.get("/api/ads", async (req, res) => {
     try {
       const ads = await storage.getAllAds();
-      
-      // If user is authenticated, include their click history
+
       if (req.session.userId) {
         const userClicks = await storage.getUserAdClicks(req.session.userId);
-        
-        // Create a map of ad ID to last click time
         const clickMap = new Map<number, Date>();
         userClicks.forEach(click => {
           const existing = clickMap.get(click.adId);
@@ -206,16 +517,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             clickMap.set(click.adId, new Date(click.clickedAt));
           }
         });
-        
-        // Add lastClickedAt to each ad
+
         const adsWithClicks = ads.map(ad => ({
           ...ad,
           lastClickedAt: clickMap.get(ad.id)?.toISOString() || null,
         }));
-        
+
         return res.json(adsWithClicks);
       }
-      
+
       res.json(ads);
     } catch (error) {
       console.error("Fetch ads error:", error);
@@ -253,33 +563,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).send("Ad not found");
       }
 
-      // Get user to check for restrictions
       const user = await storage.getUser(req.session.userId);
       if (!user) {
         return res.status(404).send("User not found");
       }
 
-      // Check if user has an active restriction
       if (user.restrictionAdsLimit !== null && user.restrictionAdsLimit !== undefined) {
-        // Check if user has reached the restriction limit BEFORE processing
         if (user.restrictedAdsCompleted >= user.restrictionAdsLimit) {
-          return res.status(403).json({ 
+          return res.status(403).json({
             error: "restriction_limit_reached",
             message: `You have reached the maximum of ${user.restrictionAdsLimit} ads allowed under restriction.`
           });
         }
 
-        // Record click
         const click = await storage.recordAdClick(req.session.userId, adId);
-        
-        // Increment restricted ads counter AFTER successful click
         await storage.incrementRestrictedAds(req.session.userId);
-        
-        // Under restriction: commission goes to Milestone Reward only
+
         const commission = user.restrictionCommission || ad.price;
         await storage.addMilestoneReward(req.session.userId, commission);
-        
-        // Update ongoing milestone (reduce pending amount)
+
         const currentOngoing = parseFloat(user.ongoingMilestone || "0");
         const commissionValue = parseFloat(commission);
         const newOngoing = Math.max(0, currentOngoing - commissionValue);
@@ -287,40 +589,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (newOngoing > 0) {
           await storage.addUserFieldValue(req.session.userId, "ongoingMilestone", newOngoing.toFixed(2));
         }
-        
-        // Increment total ads completed counter
+
         await storage.incrementAdsCompleted(req.session.userId);
-        
-        res.json({ 
-          success: true, 
-          click, 
+
+        res.json({
+          success: true,
+          click,
           earnings: commission,
           restricted: true,
           restrictedCount: (user.restrictedAdsCompleted || 0) + 1,
           restrictionLimit: user.restrictionAdsLimit
         });
       } else {
-        // Normal ad click (no restriction)
-        // Record click
         const click = await storage.recordAdClick(req.session.userId, adId);
-        
-        // Add commission to milestone reward (total ad earnings tracker)
         await storage.addMilestoneReward(req.session.userId, ad.price);
-        
-        // Add commission to milestone amount (withdrawable balance)
         await storage.addMilestoneAmount(req.session.userId, ad.price);
-        
-        // Increment total ads completed counter
         await storage.incrementAdsCompleted(req.session.userId);
-        
-        // Get total clicks to check if this is the first ad
+
         const totalClicks = await storage.getUserAdClickCount(req.session.userId);
-        
-        // Reset destination amount to 0 after first ad
         if (totalClicks === 1) {
           await storage.resetDestinationAmount(req.session.userId);
         }
-        
+
         res.json({ success: true, click, earnings: ad.price, restricted: false });
       }
     } catch (error) {
@@ -329,7 +619,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin endpoints
+  // ============================================
+  // ADMIN USER ENDPOINTS
+  // ============================================
+
   app.get("/api/admin/users", async (req, res) => {
     try {
       if (!req.session.userId) {
@@ -342,13 +635,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const users = await storage.getAllUsers();
-      
-      // Disable caching to ensure fresh data after mutations
       res.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
       res.set("Pragma", "no-cache");
       res.set("Expires", "0");
-      
-      // Remove passwords from response
+
       const usersWithoutPasswords = users.map(({ password, ...user }) => user);
       res.json(usersWithoutPasswords);
     } catch (error) {
@@ -370,6 +660,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const userId = parseInt(req.params.userId);
       const user = await storage.getUser(userId);
+
       if (!user) {
         return res.status(404).send("User not found");
       }
@@ -413,7 +704,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Ratings endpoints
+  // ============================================
+  // ADMIN RATINGS ENDPOINTS
+  // ============================================
+
   app.get("/api/admin/ratings", async (req, res) => {
     try {
       if (!req.session.userId) {
@@ -446,6 +740,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const ratingId = parseInt(req.params.ratingId);
       const result = await storage.deleteRating(ratingId);
+
       if (!result) {
         return res.status(404).send("Rating not found");
       }
@@ -457,7 +752,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Withdrawal endpoints
+  // ============================================
+  // WITHDRAWAL ENDPOINTS
+  // ============================================
+
   app.post("/api/withdrawals", async (req, res) => {
     try {
       if (!req.session.userId) {
@@ -465,7 +763,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { amount, bankDetails } = req.body;
-      
+
       if (!amount || parseFloat(amount) <= 0) {
         return res.status(400).send("Invalid amount");
       }
@@ -496,7 +794,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin withdrawal endpoints
+  // ============================================
+  // ADMIN WITHDRAWAL ENDPOINTS
+  // ============================================
+
   app.get("/api/admin/withdrawals", async (req, res) => {
     try {
       if (!req.session.userId) {
@@ -576,7 +877,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin deposit endpoint
+  // ============================================
+  // ADMIN DEPOSIT ENDPOINT
+  // ============================================
+
   app.post("/api/admin/users/:userId/deposit", async (req, res) => {
     try {
       if (!req.session.userId) {
@@ -608,7 +912,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Configure multer for file uploads
+  // ============================================
+  // MULTER CONFIG FOR FILE UPLOADS
+  // ============================================
+
   const uploadDir = path.join(process.cwd(), "attached_assets", "ad_images");
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
@@ -624,7 +931,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cb(null, uniqueName);
       },
     }),
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+    limits: { fileSize: 5 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
       const allowedTypes = /jpeg|jpg|png|gif|webp/;
       const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
@@ -637,7 +944,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   });
 
-  // Admin ad management endpoints
+  // ============================================
+  // ADMIN AD MANAGEMENT ENDPOINTS
+  // ============================================
+
   app.post("/api/admin/ads", upload.single("image"), async (req, res) => {
     try {
       if (!req.session.userId) {
@@ -702,9 +1012,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let imageUrl = existingAd.imageUrl;
 
-      // If new image is uploaded, delete old one and use new one
       if (req.file) {
-        // Delete old image
         if (existingAd.imageUrl) {
           const oldFilePath = path.join(process.cwd(), existingAd.imageUrl);
           if (fs.existsSync(oldFilePath)) {
@@ -747,7 +1055,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).send("Ad not found");
       }
 
-      // Delete the image file if it exists
       if (ad.imageUrl) {
         const filePath = path.join(process.cwd(), ad.imageUrl);
         if (fs.existsSync(filePath)) {
@@ -767,7 +1074,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Premium management endpoints
+  // ============================================
+  // ADMIN PREMIUM MANAGEMENT ENDPOINTS
+  // ============================================
+
   app.post("/api/admin/users/:userId/reset", async (req, res) => {
     try {
       if (!req.session.userId) {
@@ -782,7 +1092,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = parseInt(req.params.userId);
       const { field } = req.body;
 
-      // Reset the specified field to 0
       const updatedUser = await storage.resetUserField(userId, field);
       if (!updatedUser) {
         return res.status(404).send("User not found");
@@ -892,7 +1201,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Set user restriction
+  // ============================================
+  // ADMIN RESTRICTION ENDPOINTS
+  // ============================================
+
   app.post("/api/admin/users/:userId/restrict", async (req, res) => {
     try {
       if (!req.session.userId) {
@@ -933,7 +1245,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Remove user restriction
   app.post("/api/admin/users/:userId/unrestrict", async (req, res) => {
     try {
       if (!req.session.userId) {
@@ -946,6 +1257,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const userId = parseInt(req.params.userId);
+
       const updatedUser = await storage.removeUserRestriction(userId);
       if (!updatedUser) {
         return res.status(404).send("User not found");
