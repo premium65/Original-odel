@@ -82,13 +82,13 @@ function MediaSlideshow() {
   const mediaItems = [
     {
       type: "image",
-      src: "/slide-fashion-male.png",
+      src: "https://raw.githubusercontent.com/premium65/GameSitePro/main/client/public/slide-fashion-male.png",
       title: "RATING ADS",
       description: "The Stage Is Set - Start Earning Today"
     },
     {
       type: "image",
-      src: "/slide-fashion-female.png",
+      src: "https://raw.githubusercontent.com/premium65/GameSitePro/main/client/public/slide-fashion-female.png",
       title: "RATING ADS",
       description: "The Stage Is Set - Join Our Community"
     },
