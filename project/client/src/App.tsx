@@ -23,6 +23,8 @@ import AdminDeposits from "@/pages/admin/deposits";
 import AdminCommission from "@/pages/admin/commission";
 import AdminSocialMedia from "@/pages/admin/social-media";
 import AdminAdmins from "@/pages/admin/admins";
+import AdminSlideshow from "@/pages/admin/admin-slideshow";
+import AdminThemeSettings from "@/pages/admin/admin-theme-settings";
 import Features from "@/pages/features";
 import PointsPage from "@/pages/points";
 import WithdrawPage from "@/pages/withdraw";
@@ -40,6 +42,7 @@ function Router() {
       <Route path="/withdraw" component={WithdrawPage} />
       <Route path="/wallet" component={WalletPage} />
       <Route path="/points" component={PointsPage} />
+
       <Route path="/admin">
         <AdminLayout>
           <AdminDashboard />
@@ -105,6 +108,17 @@ function Router() {
           <AdminAdmins />
         </AdminLayout>
       </Route>
+      <Route path="/admin/slideshow">
+        <AdminLayout>
+          <AdminSlideshow />
+        </AdminLayout>
+      </Route>
+      <Route path="/admin/theme-settings">
+        <AdminLayout>
+          <AdminThemeSettings />
+        </AdminLayout>
+      </Route>
+
       <Route component={NotFound} />
     </Switch>
   );
