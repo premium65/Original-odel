@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { registerPremiumRoutes } from "./premiumRoutes";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertUserSchema, insertRatingSchema, insertAdSchema } from "@shared/schema";
@@ -1019,6 +1020,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  registerPremiumRoutes(app);
   const httpServer = createServer(app);
   return httpServer;
 }
