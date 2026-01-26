@@ -1,15 +1,17 @@
 import type { Express } from "express";
+import { registerPremiumRoutes } from "./premiumRoutes";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertUserSchema, insertRatingSchema, insertAdSchema, slideshowItems, siteSettings, defaultColorSettings } from "@shared/schema";
-import { db } from "./db";
-import { eq, asc } from "drizzle-orm";
+import { insertUserSchema, insertRatingSchema, insertAdSchema } from "@shared/schema";
 import session from "express-session";
 import { z } from "zod";
 import bcrypt from "bcrypt";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { mongoStorage } from "./mongoStorage";
+import { isMongoConnected } from "./mongoConnection";
+import cors from "cors";
 
 const SALT_ROUNDS = 10;
 
@@ -23,40 +25,53 @@ async function verifyPassword(password: string, hash: string): Promise<boolean> 
 
 declare module "express-session" {
   interface SessionData {
-    userId?: number;
+    userId?: string;
   }
 }
 
+// Helper to get numeric userId for PostgreSQL storage
+function getNumericUserId(sessionUserId: string | undefined): number | undefined {
+  if (!sessionUserId) return undefined;
+  const num = Number(sessionUserId);
+  return isNaN(num) ? undefined : num;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Trust proxy for production (Render)
-  app.set("trust proxy", 1);
+  // ⭐ CRITICAL FIX: Trust proxy for secure cookies behind Render's reverse proxy
+  app.set('trust proxy', 1);
+
+  // CORS middleware
+  app.use(
+    cors({
+      origin: true, // Allow same-origin requests
+      credentials: true,
+    })
+  );
 
   // Session middleware
   app.use(
     session({
-      proxy: true,
       secret: process.env.SESSION_SECRET || "your-secret-key-change-in-production",
       resave: false,
       saveUninitialized: false,
+      proxy: true, // ⭐ CRITICAL: Trust the reverse proxy for secure cookies
       cookie: {
-        secure: process.env.NODE_ENV === "production",
+        secure: true, // ⭐ FIXED: Always true on Render (HTTPS)
         httpOnly: true,
-        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+        sameSite: "lax",
         maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
       },
     })
   );
 
-  // ============================================
-  // AUTH ENDPOINTS
-  // ============================================
-
+  // Auth endpoints
   app.post("/api/auth/register", async (req, res) => {
     try {
       console.log("Registration request received:", JSON.stringify(req.body));
       const data = insertUserSchema.parse(req.body);
       console.log("Parsed registration data:", data);
 
+      // Check if username or email already exists
       const existingUsername = await storage.getUserByUsername(data.username);
       if (existingUsername) {
         console.log("Username already exists:", data.username);
@@ -69,14 +84,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).send("Email already exists");
       }
 
+      // Hash password and create user
       const hashedPassword = await hashPassword(data.password);
       console.log("Creating user with data:", data);
       const user = await storage.createUser({
         ...data,
         password: hashedPassword,
       });
-
       console.log("User created successfully:", user.id, user.username);
+
       res.json({ success: true, userId: user.id });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -93,29 +109,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { username, password } = req.body;
 
       if (!username || !password) {
-        return res.status(400).send("Username and password are required");
+        return res.status(400).json({ error: "Username and password are required" });
       }
 
-      const user = await storage.getUserByUsername(username);
-      if (!user || !(await verifyPassword(password, user.password))) {
-        return res.status(401).send("Invalid username or password");
+      let user: any = null;
+
+      // Try MongoDB first if connected
+      if (isMongoConnected()) {
+        console.log("[LOGIN] Using MongoDB for authentication");
+        user = await mongoStorage.getUserByUsername(username);
+      } else {
+        // Fall back to PostgreSQL storage
+        console.log("[LOGIN] Using PostgreSQL for authentication");
+        user = await storage.getUserByUsername(username);
+      }
+      
+      console.log("[LOGIN] User found:", !!user);
+
+      if (!user) {
+        return res.status(401).json({ error: "Invalid username or password" });
       }
 
+      const isPasswordValid = await verifyPassword(password, user.password);
+      if (!isPasswordValid) {
+        return res.status(401).json({ error: "Invalid username or password" });
+      }
+
+      // CRITICAL: Only allow active users to login
       if (user.status !== "active") {
         if (user.status === "pending") {
-          return res.status(403).send("Your account is pending admin approval");
+          return res.status(403).json({ error: "Your account is pending admin approval" });
         } else if (user.status === "frozen") {
-          return res.status(403).send("Your account has been suspended");
+          return res.status(403).json({ error: "Your account has been suspended" });
         }
-        return res.status(403).send("Account access denied");
+        return res.status(403).json({ error: "Account access denied" });
       }
 
-      req.session.userId = user.id;
-      const { password: _, ...userWithoutPassword } = user;
-      res.json(userWithoutPassword);
+      // Set session - handle both id (PostgreSQL) and _id (MongoDB), always store as string
+      const userId = user.id || user._id?.toString();
+      req.session.userId = String(userId);
+
+      // Explicitly save session before responding
+      req.session.save((err) => {
+        if (err) {
+          console.error("Session save error:", err);
+          return res.status(500).json({ error: "Failed to save session" });
+        }
+
+        // Return user info (without password)
+        const { password: _, ...userWithoutPassword } = user;
+        console.log("Login successful, session saved, returning user:", JSON.stringify(userWithoutPassword));
+        res.json(userWithoutPassword);
+      });
+
     } catch (error) {
       console.error("Login error:", error);
-      res.status(500).send("Login failed");
+      res.status(500).json({ error: "Login failed" });
     }
   });
 
@@ -130,7 +179,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(401).send("Not authenticated");
     }
 
-    const user = await storage.getUser(req.session.userId);
+    let user: any = null;
+
+    // Try MongoDB first if connected
+    if (isMongoConnected()) {
+      console.log("[AUTH/ME] Using MongoDB, userId:", req.session.userId);
+      user = await mongoStorage.getUser(req.session.userId);
+    } else {
+      console.log("[AUTH/ME] Using PostgreSQL, userId:", req.session.userId);
+      const numericId = getNumericUserId(req.session.userId);
+      if (numericId) {
+        user = await storage.getUser(numericId);
+      }
+    }
+
     if (!user) {
       return res.status(404).send("User not found");
     }
@@ -139,333 +201,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(userWithoutPassword);
   });
 
-  // ============================================
-  // SLIDESHOW API (PUBLIC)
-  // ============================================
-
-  // Get active slideshow items (public)
-  app.get("/api/slideshow", async (req, res) => {
-    try {
-      const items = await db
-        .select()
-        .from(slideshowItems)
-        .where(eq(slideshowItems.isActive, true))
-        .orderBy(asc(slideshowItems.order));
-      res.json(items);
-    } catch (error) {
-      console.error("Error fetching slideshow items:", error);
-      res.status(500).json({ error: "Failed to fetch slideshow items" });
-    }
-  });
-
-  // ============================================
-  // SITE SETTINGS API (PUBLIC)
-  // ============================================
-
-  // Get all site settings (public - for colors)
-  app.get("/api/settings", async (req, res) => {
-    try {
-      const settings = await db.select().from(siteSettings);
-      
-      // Convert to key-value object
-      const settingsObj: Record<string, string> = {};
-      settings.forEach((s) => {
-        settingsObj[s.settingKey] = s.settingValue;
-      });
-      
-      res.json(settingsObj);
-    } catch (error) {
-      console.error("Error fetching settings:", error);
-      res.status(500).json({ error: "Failed to fetch settings" });
-    }
-  });
-
-  // ============================================
-  // ADMIN SLIDESHOW API
-  // ============================================
-
-  // Get all slideshow items (admin - includes inactive)
-  app.get("/api/admin/slideshow", async (req, res) => {
-    try {
-      if (!req.session.userId) {
-        return res.status(401).send("Not authenticated");
-      }
-      const currentUser = await storage.getUser(req.session.userId);
-      if (!currentUser || currentUser.isAdmin !== 1) {
-        return res.status(403).send("Admin access required");
-      }
-
-      const items = await db
-        .select()
-        .from(slideshowItems)
-        .orderBy(asc(slideshowItems.order));
-      res.json(items);
-    } catch (error) {
-      console.error("Error fetching slideshow items:", error);
-      res.status(500).json({ error: "Failed to fetch slideshow items" });
-    }
-  });
-
-  // Create slideshow item (admin)
-  app.post("/api/admin/slideshow", async (req, res) => {
-    try {
-      if (!req.session.userId) {
-        return res.status(401).send("Not authenticated");
-      }
-      const currentUser = await storage.getUser(req.session.userId);
-      if (!currentUser || currentUser.isAdmin !== 1) {
-        return res.status(403).send("Admin access required");
-      }
-
-      const { title, description, imageUrl, linkUrl, buttonText, order, isActive } = req.body;
-      
-      const [newItem] = await db
-        .insert(slideshowItems)
-        .values({
-          title,
-          description,
-          imageUrl,
-          linkUrl,
-          buttonText,
-          order: order || 0,
-          isActive: isActive !== false,
-        })
-        .returning();
-      
-      res.json(newItem);
-    } catch (error) {
-      console.error("Error creating slideshow item:", error);
-      res.status(500).json({ error: "Failed to create slideshow item" });
-    }
-  });
-
-  // Update slideshow item (admin)
-  app.put("/api/admin/slideshow/:id", async (req, res) => {
-    try {
-      if (!req.session.userId) {
-        return res.status(401).send("Not authenticated");
-      }
-      const currentUser = await storage.getUser(req.session.userId);
-      if (!currentUser || currentUser.isAdmin !== 1) {
-        return res.status(403).send("Admin access required");
-      }
-
-      const { id } = req.params;
-      const { title, description, imageUrl, linkUrl, buttonText, order, isActive } = req.body;
-      
-      const [updatedItem] = await db
-        .update(slideshowItems)
-        .set({
-          title,
-          description,
-          imageUrl,
-          linkUrl,
-          buttonText,
-          order,
-          isActive,
-          updatedAt: new Date(),
-        })
-        .where(eq(slideshowItems.id, parseInt(id)))
-        .returning();
-      
-      if (!updatedItem) {
-        return res.status(404).json({ error: "Slideshow item not found" });
-      }
-      
-      res.json(updatedItem);
-    } catch (error) {
-      console.error("Error updating slideshow item:", error);
-      res.status(500).json({ error: "Failed to update slideshow item" });
-    }
-  });
-
-  // Delete slideshow item (admin)
-  app.delete("/api/admin/slideshow/:id", async (req, res) => {
-    try {
-      if (!req.session.userId) {
-        return res.status(401).send("Not authenticated");
-      }
-      const currentUser = await storage.getUser(req.session.userId);
-      if (!currentUser || currentUser.isAdmin !== 1) {
-        return res.status(403).send("Admin access required");
-      }
-
-      const { id } = req.params;
-      
-      const [deletedItem] = await db
-        .delete(slideshowItems)
-        .where(eq(slideshowItems.id, parseInt(id)))
-        .returning();
-      
-      if (!deletedItem) {
-        return res.status(404).json({ error: "Slideshow item not found" });
-      }
-      
-      res.json({ success: true, deleted: deletedItem });
-    } catch (error) {
-      console.error("Error deleting slideshow item:", error);
-      res.status(500).json({ error: "Failed to delete slideshow item" });
-    }
-  });
-
-  // ============================================
-  // ADMIN SITE SETTINGS API
-  // ============================================
-
-  // Get all settings (admin)
-  app.get("/api/admin/settings", async (req, res) => {
-    try {
-      if (!req.session.userId) {
-        return res.status(401).send("Not authenticated");
-      }
-      const currentUser = await storage.getUser(req.session.userId);
-      if (!currentUser || currentUser.isAdmin !== 1) {
-        return res.status(403).send("Admin access required");
-      }
-
-      const settings = await db.select().from(siteSettings);
-      res.json(settings);
-    } catch (error) {
-      console.error("Error fetching settings:", error);
-      res.status(500).json({ error: "Failed to fetch settings" });
-    }
-  });
-
-  // Update single setting (admin)
-  app.put("/api/admin/settings/:key", async (req, res) => {
-    try {
-      if (!req.session.userId) {
-        return res.status(401).send("Not authenticated");
-      }
-      const currentUser = await storage.getUser(req.session.userId);
-      if (!currentUser || currentUser.isAdmin !== 1) {
-        return res.status(403).send("Admin access required");
-      }
-
-      const { key } = req.params;
-      const { value } = req.body;
-      
-      const [updatedSetting] = await db
-        .update(siteSettings)
-        .set({ settingValue: value, updatedAt: new Date() })
-        .where(eq(siteSettings.settingKey, key))
-        .returning();
-      
-      if (!updatedSetting) {
-        // Create if not exists
-        const [newSetting] = await db
-          .insert(siteSettings)
-          .values({
-            settingKey: key,
-            settingValue: value,
-            category: "custom",
-          })
-          .returning();
-        return res.json(newSetting);
-      }
-      
-      res.json(updatedSetting);
-    } catch (error) {
-      console.error("Error updating setting:", error);
-      res.status(500).json({ error: "Failed to update setting" });
-    }
-  });
-
-  // Bulk update settings (admin)
-  app.put("/api/admin/settings", async (req, res) => {
-    try {
-      if (!req.session.userId) {
-        return res.status(401).send("Not authenticated");
-      }
-      const currentUser = await storage.getUser(req.session.userId);
-      if (!currentUser || currentUser.isAdmin !== 1) {
-        return res.status(403).send("Admin access required");
-      }
-
-      const { settings } = req.body; // Array of { key, value }
-      
-      for (const setting of settings) {
-        await db
-          .update(siteSettings)
-          .set({ settingValue: setting.value, updatedAt: new Date() })
-          .where(eq(siteSettings.settingKey, setting.key));
-      }
-      
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Error updating settings:", error);
-      res.status(500).json({ error: "Failed to update settings" });
-    }
-  });
-
-  // Initialize default settings (admin)
-  app.post("/api/admin/settings/init", async (req, res) => {
-    try {
-      if (!req.session.userId) {
-        return res.status(401).send("Not authenticated");
-      }
-      const currentUser = await storage.getUser(req.session.userId);
-      if (!currentUser || currentUser.isAdmin !== 1) {
-        return res.status(403).send("Admin access required");
-      }
-
-      // Check if settings already exist
-      const existing = await db.select().from(siteSettings);
-      
-      if (existing.length === 0) {
-        // Insert default color settings
-        await db.insert(siteSettings).values(defaultColorSettings);
-        res.json({ success: true, message: "Default settings initialized" });
-      } else {
-        res.json({ success: true, message: "Settings already exist" });
-      }
-    } catch (error) {
-      console.error("Error initializing settings:", error);
-      res.status(500).json({ error: "Failed to initialize settings" });
-    }
-  });
-
-  // Reset settings to default (admin)
-  app.post("/api/admin/settings/reset", async (req, res) => {
-    try {
-      if (!req.session.userId) {
-        return res.status(401).send("Not authenticated");
-      }
-      const currentUser = await storage.getUser(req.session.userId);
-      if (!currentUser || currentUser.isAdmin !== 1) {
-        return res.status(403).send("Admin access required");
-      }
-
-      // Delete all color settings
-      await db.delete(siteSettings).where(eq(siteSettings.category, "colors"));
-      
-      // Re-insert defaults
-      await db.insert(siteSettings).values(defaultColorSettings);
-      
-      res.json({ success: true, message: "Settings reset to default" });
-    } catch (error) {
-      console.error("Error resetting settings:", error);
-      res.status(500).json({ error: "Failed to reset settings" });
-    }
-  });
-
-  // ============================================
-  // RATING ENDPOINTS
-  // ============================================
-
+  // Rating endpoints
   app.post("/api/ratings", async (req, res) => {
     try {
       if (!req.session.userId) {
         return res.status(401).send("Not authenticated");
       }
 
-      const currentUser = await storage.getUser(req.session.userId);
+      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
       if (!currentUser || currentUser.status !== "active") {
         return res.status(403).send("You must have an active account to submit ratings");
       }
 
       const data = insertRatingSchema.parse(req.body);
 
+      // Verify target user exists
       const targetUser = await storage.getUserByUsername(data.targetUsername);
       if (!targetUser) {
         return res.status(404).send("Target user not found");
@@ -473,7 +223,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const rating = await storage.createRating({
         ...data,
-        userId: req.session.userId,
+        userId: getNumericUserId(req.session.userId)!,
       });
 
       res.json(rating);
@@ -492,7 +242,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).send("Not authenticated");
       }
 
-      const ratings = await storage.getRatingsByUser(req.session.userId);
+      const ratings = await storage.getRatingsByUser(getNumericUserId(req.session.userId)!);
       res.json(ratings);
     } catch (error) {
       console.error("Fetch ratings error:", error);
@@ -500,16 +250,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ============================================
-  // ADS ENDPOINTS
-  // ============================================
-
+  // Ads endpoints
   app.get("/api/ads", async (req, res) => {
     try {
       const ads = await storage.getAllAds();
-
+      
+      // If user is authenticated, include their click history
       if (req.session.userId) {
-        const userClicks = await storage.getUserAdClicks(req.session.userId);
+        const userClicks = await storage.getUserAdClicks(getNumericUserId(req.session.userId)!);
+        
+        // Create a map of ad ID to last click time
         const clickMap = new Map<number, Date>();
         userClicks.forEach(click => {
           const existing = clickMap.get(click.adId);
@@ -517,15 +267,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             clickMap.set(click.adId, new Date(click.clickedAt));
           }
         });
-
+        
+        // Add lastClickedAt to each ad
         const adsWithClicks = ads.map(ad => ({
           ...ad,
           lastClickedAt: clickMap.get(ad.id)?.toISOString() || null,
         }));
-
+        
         return res.json(adsWithClicks);
       }
-
+      
       res.json(ads);
     } catch (error) {
       console.error("Fetch ads error:", error);
@@ -539,7 +290,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).send("Not authenticated");
       }
 
-      const count = await storage.getUserAdClickCount(req.session.userId);
+      const count = await storage.getUserAdClickCount(getNumericUserId(req.session.userId)!);
       res.json({ count });
     } catch (error) {
       console.error("Fetch ad click count error:", error);
@@ -563,54 +314,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).send("Ad not found");
       }
 
-      const user = await storage.getUser(req.session.userId);
+      // Get user to check for restrictions
+      const user = await storage.getUser(getNumericUserId(req.session.userId)!);
       if (!user) {
         return res.status(404).send("User not found");
       }
 
+      // Check if user has an active restriction
       if (user.restrictionAdsLimit !== null && user.restrictionAdsLimit !== undefined) {
+        // Check if user has reached the restriction limit BEFORE processing
         if (user.restrictedAdsCompleted >= user.restrictionAdsLimit) {
-          return res.status(403).json({
+          return res.status(403).json({ 
             error: "restriction_limit_reached",
             message: `You have reached the maximum of ${user.restrictionAdsLimit} ads allowed under restriction.`
           });
         }
 
-        const click = await storage.recordAdClick(req.session.userId, adId);
-        await storage.incrementRestrictedAds(req.session.userId);
-
+        // Record click
+        const click = await storage.recordAdClick(getNumericUserId(req.session.userId)!, adId);
+        
+        // Increment restricted ads counter AFTER successful click
+        await storage.incrementRestrictedAds(getNumericUserId(req.session.userId)!);
+        
+        // Under restriction: commission goes to Milestone Reward only
         const commission = user.restrictionCommission || ad.price;
-        await storage.addMilestoneReward(req.session.userId, commission);
-
+        await storage.addMilestoneReward(getNumericUserId(req.session.userId)!, commission);
+        
+        // Update ongoing milestone (reduce pending amount)
         const currentOngoing = parseFloat(user.ongoingMilestone || "0");
         const commissionValue = parseFloat(commission);
         const newOngoing = Math.max(0, currentOngoing - commissionValue);
-        await storage.resetUserField(req.session.userId, "ongoingMilestone");
+        await storage.resetUserField(getNumericUserId(req.session.userId)!, "ongoingMilestone");
         if (newOngoing > 0) {
-          await storage.addUserFieldValue(req.session.userId, "ongoingMilestone", newOngoing.toFixed(2));
+          await storage.addUserFieldValue(getNumericUserId(req.session.userId)!, "ongoingMilestone", newOngoing.toFixed(2));
         }
-
-        await storage.incrementAdsCompleted(req.session.userId);
-
-        res.json({
-          success: true,
-          click,
+        
+        // Increment total ads completed counter
+        await storage.incrementAdsCompleted(getNumericUserId(req.session.userId)!);
+        
+        res.json({ 
+          success: true, 
+          click, 
           earnings: commission,
           restricted: true,
           restrictedCount: (user.restrictedAdsCompleted || 0) + 1,
           restrictionLimit: user.restrictionAdsLimit
         });
       } else {
-        const click = await storage.recordAdClick(req.session.userId, adId);
-        await storage.addMilestoneReward(req.session.userId, ad.price);
-        await storage.addMilestoneAmount(req.session.userId, ad.price);
-        await storage.incrementAdsCompleted(req.session.userId);
-
-        const totalClicks = await storage.getUserAdClickCount(req.session.userId);
+        // Normal ad click (no restriction)
+        // Record click
+        const click = await storage.recordAdClick(getNumericUserId(req.session.userId)!, adId);
+        
+        // Add commission to milestone reward (total ad earnings tracker)
+        await storage.addMilestoneReward(getNumericUserId(req.session.userId)!, ad.price);
+        
+        // Add commission to milestone amount (withdrawable balance)
+        await storage.addMilestoneAmount(getNumericUserId(req.session.userId)!, ad.price);
+        
+        // Increment total ads completed counter
+        await storage.incrementAdsCompleted(getNumericUserId(req.session.userId)!);
+        
+        // Get total clicks to check if this is the first ad
+        const totalClicks = await storage.getUserAdClickCount(getNumericUserId(req.session.userId)!);
+        
+        // Reset destination amount to 0 after first ad
         if (totalClicks === 1) {
-          await storage.resetDestinationAmount(req.session.userId);
+          await storage.resetDestinationAmount(getNumericUserId(req.session.userId)!);
         }
-
+        
         res.json({ success: true, click, earnings: ad.price, restricted: false });
       }
     } catch (error) {
@@ -619,26 +390,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ============================================
-  // ADMIN USER ENDPOINTS
-  // ============================================
-
+  // Admin endpoints
   app.get("/api/admin/users", async (req, res) => {
     try {
       if (!req.session.userId) {
         return res.status(401).send("Not authenticated");
       }
 
-      const currentUser = await storage.getUser(req.session.userId);
+      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
       if (!currentUser || currentUser.isAdmin !== 1) {
         return res.status(403).send("Admin access required");
       }
 
       const users = await storage.getAllUsers();
+      
+      // Disable caching to ensure fresh data after mutations
       res.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
       res.set("Pragma", "no-cache");
       res.set("Expires", "0");
-
+      
+      // Remove passwords from response
       const usersWithoutPasswords = users.map(({ password, ...user }) => user);
       res.json(usersWithoutPasswords);
     } catch (error) {
@@ -653,14 +424,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).send("Not authenticated");
       }
 
-      const currentUser = await storage.getUser(req.session.userId);
+      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
       if (!currentUser || currentUser.isAdmin !== 1) {
         return res.status(403).send("Admin access required");
       }
 
       const userId = parseInt(req.params.userId);
       const user = await storage.getUser(userId);
-
       if (!user) {
         return res.status(404).send("User not found");
       }
@@ -679,7 +449,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).send("Not authenticated");
       }
 
-      const currentUser = await storage.getUser(req.session.userId);
+      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
       if (!currentUser || currentUser.isAdmin !== 1) {
         return res.status(403).send("Admin access required");
       }
@@ -704,17 +474,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ============================================
-  // ADMIN RATINGS ENDPOINTS
-  // ============================================
-
+  // Ratings endpoints
   app.get("/api/admin/ratings", async (req, res) => {
     try {
       if (!req.session.userId) {
         return res.status(401).send("Not authenticated");
       }
 
-      const currentUser = await storage.getUser(req.session.userId);
+      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
       if (!currentUser || currentUser.isAdmin !== 1) {
         return res.status(403).send("Admin access required");
       }
@@ -733,14 +500,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).send("Not authenticated");
       }
 
-      const currentUser = await storage.getUser(req.session.userId);
+      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
       if (!currentUser || currentUser.isAdmin !== 1) {
         return res.status(403).send("Admin access required");
       }
 
       const ratingId = parseInt(req.params.ratingId);
       const result = await storage.deleteRating(ratingId);
-
       if (!result) {
         return res.status(404).send("Rating not found");
       }
@@ -752,10 +518,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ============================================
-  // WITHDRAWAL ENDPOINTS
-  // ============================================
-
+  // Withdrawal endpoints
   app.post("/api/withdrawals", async (req, res) => {
     try {
       if (!req.session.userId) {
@@ -763,7 +526,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { amount, bankDetails } = req.body;
-
+      
       if (!amount || parseFloat(amount) <= 0) {
         return res.status(400).send("Invalid amount");
       }
@@ -772,7 +535,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).send("Bank details are required");
       }
 
-      const withdrawal = await storage.createWithdrawal(req.session.userId, amount, bankDetails);
+      const withdrawal = await storage.createWithdrawal(getNumericUserId(req.session.userId)!, amount, bankDetails);
       res.json(withdrawal);
     } catch (error: any) {
       console.error("Create withdrawal error:", error);
@@ -786,7 +549,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).send("Not authenticated");
       }
 
-      const withdrawals = await storage.getUserWithdrawals(req.session.userId);
+      const withdrawals = await storage.getUserWithdrawals(getNumericUserId(req.session.userId)!);
       res.json(withdrawals);
     } catch (error) {
       console.error("Fetch withdrawals error:", error);
@@ -794,17 +557,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ============================================
-  // ADMIN WITHDRAWAL ENDPOINTS
-  // ============================================
-
+  // Admin withdrawal endpoints
   app.get("/api/admin/withdrawals", async (req, res) => {
     try {
       if (!req.session.userId) {
         return res.status(401).send("Not authenticated");
       }
 
-      const currentUser = await storage.getUser(req.session.userId);
+      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
       if (!currentUser || currentUser.isAdmin !== 1) {
         return res.status(403).send("Admin access required");
       }
@@ -823,7 +583,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).send("Not authenticated");
       }
 
-      const currentUser = await storage.getUser(req.session.userId);
+      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
       if (!currentUser || currentUser.isAdmin !== 1) {
         return res.status(403).send("Admin access required");
       }
@@ -842,13 +602,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).send("Not authenticated");
       }
 
-      const currentUser = await storage.getUser(req.session.userId);
+      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
       if (!currentUser || currentUser.isAdmin !== 1) {
         return res.status(403).send("Admin access required");
       }
 
       const id = parseInt(req.params.id);
-      const withdrawal = await storage.approveWithdrawal(id, req.session.userId);
+      const withdrawal = await storage.approveWithdrawal(id, getNumericUserId(req.session.userId)!);
       res.json(withdrawal);
     } catch (error: any) {
       console.error("Approve withdrawal error:", error);
@@ -862,14 +622,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).send("Not authenticated");
       }
 
-      const currentUser = await storage.getUser(req.session.userId);
+      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
       if (!currentUser || currentUser.isAdmin !== 1) {
         return res.status(403).send("Admin access required");
       }
 
       const id = parseInt(req.params.id);
       const { notes } = req.body;
-      const withdrawal = await storage.rejectWithdrawal(id, req.session.userId, notes || "");
+      const withdrawal = await storage.rejectWithdrawal(id, getNumericUserId(req.session.userId)!, notes || "");
       res.json(withdrawal);
     } catch (error: any) {
       console.error("Reject withdrawal error:", error);
@@ -877,17 +637,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ============================================
-  // ADMIN DEPOSIT ENDPOINT
-  // ============================================
-
+  // Admin deposit endpoint
   app.post("/api/admin/users/:userId/deposit", async (req, res) => {
     try {
       if (!req.session.userId) {
         return res.status(401).send("Not authenticated");
       }
 
-      const currentUser = await storage.getUser(req.session.userId);
+      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
       if (!currentUser || currentUser.isAdmin !== 1) {
         return res.status(403).send("Admin access required");
       }
@@ -912,10 +669,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ============================================
-  // MULTER CONFIG FOR FILE UPLOADS
-  // ============================================
-
+  // Configure multer for file uploads
   const uploadDir = path.join(process.cwd(), "attached_assets", "ad_images");
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
@@ -931,7 +685,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cb(null, uniqueName);
       },
     }),
-    limits: { fileSize: 5 * 1024 * 1024 },
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
     fileFilter: (req, file, cb) => {
       const allowedTypes = /jpeg|jpg|png|gif|webp/;
       const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
@@ -944,17 +698,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   });
 
-  // ============================================
-  // ADMIN AD MANAGEMENT ENDPOINTS
-  // ============================================
-
+  // Admin ad management endpoints
   app.post("/api/admin/ads", upload.single("image"), async (req, res) => {
     try {
       if (!req.session.userId) {
         return res.status(401).send("Not authenticated");
       }
 
-      const currentUser = await storage.getUser(req.session.userId);
+      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
       if (!currentUser || currentUser.isAdmin !== 1) {
         return res.status(403).send("Admin access required");
       }
@@ -992,7 +743,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).send("Not authenticated");
       }
 
-      const currentUser = await storage.getUser(req.session.userId);
+      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
       if (!currentUser || currentUser.isAdmin !== 1) {
         return res.status(403).send("Admin access required");
       }
@@ -1012,7 +763,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let imageUrl = existingAd.imageUrl;
 
+      // If new image is uploaded, delete old one and use new one
       if (req.file) {
+        // Delete old image
         if (existingAd.imageUrl) {
           const oldFilePath = path.join(process.cwd(), existingAd.imageUrl);
           if (fs.existsSync(oldFilePath)) {
@@ -1043,7 +796,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).send("Not authenticated");
       }
 
-      const currentUser = await storage.getUser(req.session.userId);
+      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
       if (!currentUser || currentUser.isAdmin !== 1) {
         return res.status(403).send("Admin access required");
       }
@@ -1055,6 +808,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).send("Ad not found");
       }
 
+      // Delete the image file if it exists
       if (ad.imageUrl) {
         const filePath = path.join(process.cwd(), ad.imageUrl);
         if (fs.existsSync(filePath)) {
@@ -1074,17 +828,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ============================================
-  // ADMIN PREMIUM MANAGEMENT ENDPOINTS
-  // ============================================
-
+  // Premium management endpoints
   app.post("/api/admin/users/:userId/reset", async (req, res) => {
     try {
       if (!req.session.userId) {
         return res.status(401).send("Not authenticated");
       }
 
-      const currentUser = await storage.getUser(req.session.userId);
+      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
       if (!currentUser || currentUser.isAdmin !== 1) {
         return res.status(403).send("Admin access required");
       }
@@ -1092,6 +843,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = parseInt(req.params.userId);
       const { field } = req.body;
 
+      // Reset the specified field to 0
       const updatedUser = await storage.resetUserField(userId, field);
       if (!updatedUser) {
         return res.status(404).send("User not found");
@@ -1111,7 +863,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).send("Not authenticated");
       }
 
-      const currentUser = await storage.getUser(req.session.userId);
+      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
       if (!currentUser || currentUser.isAdmin !== 1) {
         return res.status(403).send("Admin access required");
       }
@@ -1142,7 +894,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).send("Not authenticated");
       }
 
-      const currentUser = await storage.getUser(req.session.userId);
+      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
       if (!currentUser || currentUser.isAdmin !== 1) {
         return res.status(403).send("Admin access required");
       }
@@ -1174,7 +926,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).send("Not authenticated");
       }
 
-      const currentUser = await storage.getUser(req.session.userId);
+      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
       if (!currentUser || currentUser.isAdmin !== 1) {
         return res.status(403).send("Admin access required");
       }
@@ -1201,17 +953,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ============================================
-  // ADMIN RESTRICTION ENDPOINTS
-  // ============================================
-
+  // Set user restriction
   app.post("/api/admin/users/:userId/restrict", async (req, res) => {
     try {
       if (!req.session.userId) {
         return res.status(401).send("Not authenticated");
       }
 
-      const currentUser = await storage.getUser(req.session.userId);
+      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
       if (!currentUser || currentUser.isAdmin !== 1) {
         return res.status(403).send("Admin access required");
       }
@@ -1245,19 +994,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Remove user restriction
   app.post("/api/admin/users/:userId/unrestrict", async (req, res) => {
     try {
       if (!req.session.userId) {
         return res.status(401).send("Not authenticated");
       }
 
-      const currentUser = await storage.getUser(req.session.userId);
+      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
       if (!currentUser || currentUser.isAdmin !== 1) {
         return res.status(403).send("Admin access required");
       }
 
       const userId = parseInt(req.params.userId);
-
       const updatedUser = await storage.removeUserRestriction(userId);
       if (!updatedUser) {
         return res.status(404).send("User not found");
@@ -1271,6 +1020,165 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+
+  // =============================================
+  // SITE SETTINGS API ROUTES (CMS)
+  // =============================================
+
+  // Get all settings by category
+  app.get("/api/admin/settings/:category", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).send("Not authenticated");
+      }
+      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).send("Admin access required");
+      }
+      const { category } = req.params;
+      const settings = await storage.getSettingsByCategory(category);
+      const result: Record<string, string> = {};
+      settings.forEach((s: any) => {
+        result[s.setting_key] = s.setting_value || "";
+      });
+      res.json(result);
+    } catch (error) {
+      console.error("Fetch settings error:", error);
+      res.status(500).send("Failed to fetch settings");
+    }
+  });
+
+  // Update settings by category (bulk)
+  app.put("/api/admin/settings/:category", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).send("Not authenticated");
+      }
+      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).send("Admin access required");
+      }
+      const { category } = req.params;
+      const settings = req.body;
+      
+      for (const [key, value] of Object.entries(settings)) {
+        await storage.upsertSetting(category, key, value as string);
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Update settings error:", error);
+      res.status(500).send("Failed to update settings");
+    }
+  });
+
+  // Get slideshow images
+  app.get("/api/admin/slideshow", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).send("Not authenticated");
+      }
+      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).send("Admin access required");
+      }
+      const page = (req.query.page as string) || "home";
+      const images = await storage.getSlideshowImages(page);
+      res.json(images);
+    } catch (error) {
+      console.error("Fetch slideshow error:", error);
+      res.status(500).send("Failed to fetch slideshow images");
+    }
+  });
+
+  // Add slideshow image
+  app.post("/api/admin/slideshow", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).send("Not authenticated");
+      }
+      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).send("Admin access required");
+      }
+      const { title, image_url, link_url, page } = req.body;
+      const result = await storage.addSlideshowImage(title || "", image_url, link_url || "", page || "home");
+      res.json({ id: result.id, success: true });
+    } catch (error) {
+      console.error("Add slideshow error:", error);
+      res.status(500).send("Failed to add slideshow image");
+    }
+  });
+
+  // Update slideshow image
+  app.put("/api/admin/slideshow/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).send("Not authenticated");
+      }
+      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).send("Admin access required");
+      }
+      const { id } = req.params;
+      const { title, image_url, link_url, display_order, is_active } = req.body;
+      await storage.updateSlideshowImage(parseInt(id), title, image_url, link_url, display_order ?? 0, is_active ?? 1);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Update slideshow error:", error);
+      res.status(500).send("Failed to update slideshow image");
+    }
+  });
+
+  // Delete slideshow image
+  app.delete("/api/admin/slideshow/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).send("Not authenticated");
+      }
+      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).send("Admin access required");
+      }
+      await storage.deleteSlideshowImage(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Delete slideshow error:", error);
+      res.status(500).send("Failed to delete slideshow image");
+    }
+  });
+
+  // =============================================
+  // PUBLIC SETTINGS API (no auth required)
+  // =============================================
+
+  // Get public settings
+  app.get("/api/settings/public", async (_req, res) => {
+    try {
+      const settings = await storage.getPublicSettings();
+      const result: Record<string, Record<string, string>> = {};
+      settings.forEach((s: any) => {
+        if (!result[s.category]) result[s.category] = {};
+        result[s.category][s.setting_key] = s.setting_value || "";
+      });
+      res.json(result);
+    } catch (error) {
+      console.error("Fetch public settings error:", error);
+      res.status(500).send("Failed to fetch settings");
+    }
+  });
+
+  // Get public slideshow
+  app.get("/api/slideshow/:page", async (req, res) => {
+    try {
+      const images = await storage.getActiveSlideshowImages(req.params.page);
+      res.json(images);
+    } catch (error) {
+      console.error("Fetch public slideshow error:", error);
+      res.status(500).send("Failed to fetch slideshow");
+    }
+  });
+
+  registerPremiumRoutes(app);
   const httpServer = createServer(app);
   return httpServer;
 }
