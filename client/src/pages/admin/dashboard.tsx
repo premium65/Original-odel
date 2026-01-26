@@ -1,309 +1,153 @@
-import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  Users, Eye, DollarSign, Wallet, UserCheck, Clock, 
-  ChevronRight, Zap, Target, Crown, AlertCircle, UserPlus, PiggyBank,
-  TrendingUp, ArrowUpRight
-} from "lucide-react";
-import { Link } from "wouter";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Users, Calendar, DollarSign, TrendingDown, TrendingUp } from "lucide-react";
+import type { User, Withdrawal } from "@shared/schema";
 
 interface DashboardStats {
   totalUsers: number;
-  activeUsers: number;
-  pendingUsers: number;
-  totalAdsViewed: number;
-  totalCommission: number;
-  totalWithdraw: number;
-  totalDeposit: number;
-  activeMilestones: number;
-  premiumUsers: number;
-  pendingWithdrawals: number;
-}
-
-interface RecentUser {
-  _id: string;
-  username: string;
-  email: string;
-  status: string;
-  balance: number;
-  createdAt: string;
+  totalBookings: number;
+  totalCommission: string;
+  totalWithdraw: string;
+  totalDeposit: string;
 }
 
 export default function AdminDashboard() {
-  const [currentDate, setCurrentDate] = useState("");
-
-  useEffect(() => {
-    const now = new Date();
-    setCurrentDate(now.toLocaleDateString('en-US', { 
-      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
-    }));
-  }, []);
-
-  // Fetch dashboard stats - FIXED API PATH
-  const { data: stats } = useQuery<DashboardStats>({
-    queryKey: ["/api/admin/dashboard/stats"],
-    queryFn: async () => {
-      const res = await fetch("/api/admin/dashboard/stats", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch stats");
-      return res.json();
-    },
+  const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
+    queryKey: ["/api/admin/users"],
   });
 
-  // Fetch recent users - FIXED API PATH
-  const { data: recentUsers } = useQuery<RecentUser[]>({
-    queryKey: ["/api/admin/users/recent"],
-    queryFn: async () => {
-      const res = await fetch("/api/admin/users/recent", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch users");
-      return res.json();
-    },
+  const { data: withdrawals = [], isLoading: withdrawalsLoading } = useQuery<Withdrawal[]>({
+    queryKey: ["/api/admin/withdrawals"],
   });
 
-  const kpiCards = [
-    { 
-      title: "Total Users", 
-      value: stats?.totalUsers || 0, 
-      subtitle: `${stats?.activeUsers || 0} active, ${stats?.pendingUsers || 0} pending`,
-      change: "↗ 12% from last week",
-      icon: Users, 
-      gradient: "from-[#10b981] to-[#059669]" 
-    },
-    { 
-      title: "Total Ads Viewed", 
-      value: (stats?.totalAdsViewed || 0).toLocaleString(), 
-      subtitle: "All time clicks",
-      change: "↗ 8% from last week",
-      icon: Eye, 
-      gradient: "from-[#3b82f6] to-[#2563eb]" 
-    },
-    { 
-      title: "Total Commission", 
-      value: `₹${(stats?.totalCommission || 0).toLocaleString()}`, 
-      subtitle: "Earnings distributed",
-      change: "↗ 23% from last week",
-      icon: DollarSign, 
-      gradient: "from-[#8b5cf6] to-[#7c3aed]" 
-    },
-    { 
-      title: "Total Withdraw", 
-      value: `₹${(stats?.totalWithdraw || 0).toLocaleString()}`, 
-      subtitle: "₹0.00 pending",
-      icon: Wallet, 
-      gradient: "from-[#f59e0b] to-[#d97706]" 
-    },
-    { 
-      title: "Total Deposit", 
-      value: `₹${(stats?.totalDeposit || 0).toLocaleString()}`, 
-      subtitle: "User balances",
-      icon: PiggyBank, 
-      gradient: "from-[#ec4899] to-[#db2777]" 
-    },
-    { 
-      title: "Active Users", 
-      value: stats?.activeUsers || 0, 
-      subtitle: `${stats?.totalUsers ? Math.round(((stats?.activeUsers || 0) / stats.totalUsers) * 100) : 0}% of total`,
-      icon: UserCheck, 
-      gradient: "from-[#06b6d4] to-[#0891b2]" 
-    },
+  const stats: DashboardStats = {
+    totalUsers: users.length,
+    totalBookings: 0,
+    totalCommission: users.reduce((sum, user) => sum + parseFloat(user.milestoneReward || "0"), 0).toFixed(2),
+    totalWithdraw: withdrawals
+      .filter(w => w.status === 'approved')
+      .reduce((sum, w) => sum + parseFloat(w.amount), 0)
+      .toFixed(2),
+    totalDeposit: users.reduce((sum, user) => sum + parseFloat(user.milestoneAmount || "0"), 0).toFixed(2),
+  };
+
+  const isLoading = usersLoading || withdrawalsLoading;
+
+  const statCards = [
+    { title: "TOTAL USERS", value: stats.totalUsers.toString(), icon: Users, color: "from-blue-500 to-blue-600" },
+    { title: "TOTAL BOOKING", value: stats.totalBookings.toString(), icon: Calendar, color: "from-purple-500 to-purple-600" },
+    { title: "TOTAL COMMISSION", value: parseFloat(stats.totalCommission).toLocaleString('en-IN', { minimumFractionDigits: 2 }), icon: DollarSign, color: "from-amber-500 to-orange-600" },
+    { title: "TOTAL WITHDRAW", value: parseFloat(stats.totalWithdraw).toLocaleString('en-IN', { minimumFractionDigits: 2 }), icon: TrendingDown, color: "from-red-500 to-red-600" },
+    { title: "TOTAL DEPOSIT", value: parseFloat(stats.totalDeposit).toLocaleString('en-IN', { minimumFractionDigits: 2 }), icon: TrendingUp, color: "from-green-500 to-green-600" },
   ];
 
-  const quickStats = [
-    { label: "Active Milestones", value: stats?.activeMilestones || 0, icon: Target, gradient: "from-[#10b981] to-[#059669]" },
-    { label: "Premium Users", value: stats?.premiumUsers || 0, icon: Crown, gradient: "from-[#8b5cf6] to-[#7c3aed]" },
-    { label: "Pending Withdrawals", value: stats?.pendingWithdrawals || 0, icon: Clock, gradient: "from-[#f59e0b] to-[#d97706]" },
-    { label: "Pending Approvals", value: stats?.pendingUsers || 0, icon: AlertCircle, gradient: "from-[#ef4444] to-[#dc2626]" },
-  ];
+  const pendingUsers = users.filter(u => u.status === 'pending').slice(0, 4);
+  const pendingWithdrawals = withdrawals.filter(w => w.status === 'pending').slice(0, 4);
 
-  const avatarColors = [
-    "from-[#06b6d4] to-[#0891b2]",
-    "from-[#f59e0b] to-[#d97706]",
-    "from-[#ec4899] to-[#db2777]",
-    "from-[#8b5cf6] to-[#7c3aed]",
-    "from-[#10b981] to-[#059669]",
-  ];
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <p className="text-muted-foreground">Loading dashboard...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-          <p className="text-[#6b7280] mt-1">Welcome back! Here's what's happening today.</p>
-        </div>
-        <div className="text-right">
-          <p className="text-[#6b7280] text-sm">Last updated</p>
-          <p className="text-white font-semibold">{currentDate}</p>
-        </div>
+        <h1 className="text-3xl font-bold" style={{ color: '#B8936B' }}>Dashboard</h1>
+        <p className="text-muted-foreground">Hello, welcome to HolidayInn!</p>
       </div>
 
-      {/* KPI Section Title */}
-      <div className="bg-[#1a2332] border border-[#2a3a4d] rounded-xl p-4">
-        <h3 className="text-[#10b981] font-semibold text-sm flex items-center gap-2">
-          <TrendingUp className="w-4 h-4" /> KEY PERFORMANCE INDICATORS (KPIs)
-        </h3>
-      </div>
-
-      {/* KPI Cards Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        {kpiCards.map((card, i) => (
-          <div 
-            key={i} 
-            className={`bg-gradient-to-br ${card.gradient} rounded-xl p-4 text-white relative overflow-hidden shadow-lg hover:scale-105 transition-all cursor-pointer`}
-          >
-            <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-white/10 rounded-full" />
-            <div className="absolute top-3 right-3 w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-              <card.icon className="w-5 h-5" />
-            </div>
-            <h4 className="text-[10px] font-semibold uppercase tracking-wider opacity-90">{card.title}</h4>
-            <p className="text-2xl font-bold mt-2">{card.value}</p>
-            <p className="text-[10px] opacity-80 mt-1">{card.subtitle}</p>
-            {card.change && (
-              <p className="text-[10px] mt-2 flex items-center gap-1 opacity-90">
-                <ArrowUpRight className="w-3 h-3" /> {card.change}
-              </p>
-            )}
-          </div>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        {statCards.map((stat, index) => (
+          <Card key={index} className="bg-card border">
+            <CardContent className="p-6">
+              <div className="flex flex-col items-center text-center space-y-2">
+                <div className={`p-3 rounded-full bg-gradient-to-br ${stat.color}`}>
+                  <stat.icon className="h-6 w-6 text-white" />
+                </div>
+                <div className="text-3xl font-bold" style={{ color: '#B8936B' }}>{stat.value}</div>
+                <p className="text-sm text-muted-foreground uppercase tracking-wide">{stat.title}</p>
+              </div>
+            </CardContent>
+          </Card>
         ))}
       </div>
 
-      {/* Action & Activity Feed */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* High Priority Actions */}
-        <Card className="bg-[#1a2332] border-[#2a3a4d]">
-          <CardHeader className="border-b border-[#2a3a4d] bg-gradient-to-r from-[#ef4444]/20 to-transparent">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-white flex items-center gap-2 text-base">
-                <Clock className="w-5 h-5 text-[#ef4444]" /> High Priority Actions
-              </CardTitle>
-              <span className="px-3 py-1 bg-[#ef4444]/20 text-[#ef4444] rounded-full text-xs font-semibold">
-                {(stats?.pendingUsers || 0) + (stats?.pendingWithdrawals || 0)} pending
-              </span>
-            </div>
-          </CardHeader>
-          <CardContent className="p-4 space-y-3">
-            {/* Pending Users */}
-            <Link href="/admin/pending">
-              <div className="flex items-center justify-between p-4 bg-[#0f1419] rounded-xl border border-[#2a3a4d] hover:border-[#3a4a5d] transition-all cursor-pointer group">
-                <div className="flex items-center gap-4">
-                  <div className="w-11 h-11 bg-[#10b981]/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-all">
-                    <UserPlus className="w-5 h-5 text-[#10b981]" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-white">{stats?.pendingUsers || 0} Pending Users</h4>
-                    <p className="text-[#6b7280] text-sm">Awaiting approval</p>
-                  </div>
+      <div>
+        <h2 className="text-xl font-semibold mb-4" style={{ color: '#B8936B' }}>High Priority Assignments</h2>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {pendingUsers.map((user) => (
+            <Card key={`user-${user.id}`} className="bg-amber-50 dark:bg-amber-950/20">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardDescription className="text-xs">{new Date(user.registeredAt).toLocaleDateString()}</CardDescription>
+                  <Users className="h-4 w-4 text-amber-600" />
                 </div>
-                <span className="text-[#10b981] text-sm font-medium flex items-center gap-1">
-                  Review <ChevronRight className="w-4 h-4" />
-                </span>
-              </div>
-            </Link>
-
-            {/* Withdrawal Requests */}
-            <Link href="/admin/withdrawals">
-              <div className="flex items-center justify-between p-4 bg-[#0f1419] rounded-xl border border-[#2a3a4d] hover:border-[#3a4a5d] transition-all cursor-pointer group">
-                <div className="flex items-center gap-4">
-                  <div className="w-11 h-11 bg-[#f59e0b]/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-all">
-                    <Wallet className="w-5 h-5 text-[#f59e0b]" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-white">{stats?.pendingWithdrawals || 0} Withdrawal Requests</h4>
-                    <p className="text-[#6b7280] text-sm">Pending approval</p>
-                  </div>
-                </div>
-                <span className="text-[#f59e0b] text-sm font-medium flex items-center gap-1">
-                  Review <ChevronRight className="w-4 h-4" />
-                </span>
-              </div>
-            </Link>
-
-            {/* Active Milestones */}
-            <Link href="/admin/premium-manage">
-              <div className="flex items-center justify-between p-4 bg-[#0f1419] rounded-xl border border-[#2a3a4d] hover:border-[#3a4a5d] transition-all cursor-pointer group">
-                <div className="flex items-center gap-4">
-                  <div className="w-11 h-11 bg-[#8b5cf6]/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-all">
-                    <Target className="w-5 h-5 text-[#8b5cf6]" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-white flex items-center gap-2">
-                      {stats?.activeMilestones || 0} Active Milestones
-                      <span className="px-1.5 py-0.5 text-[8px] bg-[#ef4444] text-white rounded font-bold">NEW</span>
-                    </h4>
-                    <p className="text-[#6b7280] text-sm">Premium users in progress</p>
-                  </div>
-                </div>
-                <span className="text-[#8b5cf6] text-sm font-medium flex items-center gap-1">
-                  Manage <ChevronRight className="w-4 h-4" />
-                </span>
-              </div>
-            </Link>
-          </CardContent>
-        </Card>
-
-        {/* Recent Users */}
-        <Card className="bg-[#1a2332] border-[#2a3a4d]">
-          <CardHeader className="border-b border-[#2a3a4d] bg-gradient-to-r from-[#3b82f6]/20 to-transparent">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-white flex items-center gap-2 text-base">
-                <Zap className="w-5 h-5 text-[#3b82f6]" /> Recent Users
-              </CardTitle>
-              <Link href="/admin/users">
-                <span className="text-[#10b981] text-sm cursor-pointer hover:underline">View all</span>
-              </Link>
-            </div>
-          </CardHeader>
-          <CardContent className="p-4">
-            {recentUsers && recentUsers.length > 0 ? (
-              recentUsers.map((user, i) => (
-                <div 
-                  key={user._id} 
-                  className={`flex items-center justify-between py-4 ${i !== (recentUsers.length - 1) ? 'border-b border-[#2a3a4d]' : ''}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-11 h-11 rounded-full bg-gradient-to-br ${avatarColors[i % avatarColors.length]} flex items-center justify-center text-white font-bold shadow-lg`}>
-                      {user.username.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-white">{user.username}</h4>
-                      <p className="text-[#6b7280] text-sm">@{user.username}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
-                      user.status === 'active' ? 'bg-[#10b981]/20 text-[#10b981]' : 'bg-[#f59e0b]/20 text-[#f59e0b]'
-                    }`}>
-                      {user.status}
-                    </span>
-                    <p className="text-[#9ca3af] text-sm mt-1">₹{user.balance?.toLocaleString() || '0'}</p>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="text-[#6b7280] text-center py-4">No recent users</p>
-            )}
-          </CardContent>
-        </Card>
+                <CardTitle className="text-base">User Approval Required</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground line-clamp-3">
+                  New user <strong>{user.fullName}</strong> (@{user.username}) is waiting for account approval.
+                </p>
+              </CardContent>
+            </Card>
+          ))}
+          {pendingUsers.length === 0 && pendingWithdrawals.length === 0 && (
+            <Card className="bg-green-50 dark:bg-green-950/20">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">All Clear!</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">No pending approvals required.</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {quickStats.map((stat, i) => (
-          <div 
-            key={i} 
-            className="bg-[#1a2332] border border-[#2a3a4d] rounded-xl p-4 hover:border-[#3a4a5d] transition-all cursor-pointer"
-          >
-            <div className="flex items-center gap-3">
-              <div className={`w-12 h-12 bg-gradient-to-br ${stat.gradient} rounded-xl flex items-center justify-center shadow-lg`}>
-                <stat.icon className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <p className="text-[#6b7280] text-xs">{stat.label}</p>
-                <p className="text-white text-xl font-bold">{stat.value}</p>
-              </div>
+      <div>
+        <h2 className="text-xl font-semibold mb-4" style={{ color: '#B8936B' }}>Recent Users</h2>
+        <Card>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-muted/50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">User</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Email</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Status</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Registered</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Commission</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {users.slice(0, 5).map((user) => (
+                    <tr key={user.id} className="hover:bg-muted/50">
+                      <td className="px-4 py-3">
+                        <div>
+                          <p className="font-medium">{user.fullName}</p>
+                          <p className="text-sm text-muted-foreground">@{user.username}</p>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm">{user.email}</td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 rounded-full text-xs ${
+                          user.status === 'active' ? 'bg-green-100 text-green-700' :
+                          user.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-red-100 text-red-700'
+                        }`}>{user.status}</span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">{new Date(user.registeredAt).toLocaleDateString()}</td>
+                      <td className="px-4 py-3 text-sm font-medium">₹ {parseFloat(user.milestoneReward || "0").toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </div>
-        ))}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
