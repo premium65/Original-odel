@@ -7,10 +7,9 @@ import {
 } from "@/components/ui/sidebar";
 import { 
   LayoutDashboard, Users, Star, Crown, Calendar, BookOpen, TrendingUp,
-  CreditCard, DollarSign, UserCog, Target, UserCheck, ChevronDown, ChevronRight,
-  Globe, Phone, Mail, MessageCircle, Info, FileText, Shield,
-  Home, ShoppingBag, Image, Type, Palette, Settings, Megaphone, Receipt,
-  Gem, Building, Wallet, Percent, Clock, UserCog as AdminIcon
+  ChevronDown, ChevronRight, Globe, Phone, Mail, MessageCircle, 
+  FileText, Shield, Home, Image, Type, Palette, Settings, Megaphone, 
+  Receipt, Gem, Building, Wallet, Percent, Clock, UserCog
 } from "lucide-react";
 
 interface MenuItem {
@@ -50,7 +49,7 @@ const menuGroups: MenuGroup[] = [
     items: [
       { title: "All Users", url: "/admin/users", icon: Users },
       { title: "Pending Users", url: "/admin/pending", icon: Clock },
-      { title: "Admins", url: "/admin/admins", icon: AdminIcon },
+      { title: "Admins", url: "/admin/admins", icon: UserCog },
     ]
   },
   { 
@@ -83,14 +82,9 @@ const menuGroups: MenuGroup[] = [
     icon: Globe, 
     color: "from-[#ec4899] to-[#db2777]",
     isNew: true,
-    items: [
-      { title: "Phone", url: "/admin/social-media", icon: Phone },
-      { title: "Email", url: "/admin/social-media", icon: Mail },
-      { title: "WhatsApp", url: "/admin/social-media", icon: MessageCircle },
-      { title: "About Us", url: "/admin/social-media", icon: Building },
-      { title: "Terms", url: "/admin/social-media", icon: FileText },
-      { title: "Privacy", url: "/admin/social-media", icon: Shield },
-    ]
+    single: true,
+    url: "/admin/social-media",
+    items: []
   },
   { 
     label: "SITE CONTENT", 
@@ -98,12 +92,9 @@ const menuGroups: MenuGroup[] = [
     icon: Globe, 
     color: "from-[#8b5cf6] to-[#7c3aed]",
     isNew: true,
-    items: [
-      { title: "Home Page", url: "/admin/content/home", icon: Home },
-      { title: "Dashboard Page", url: "/admin/content/dashboard", icon: LayoutDashboard },
-      { title: "Slideshow Images", url: "/admin/content/slideshow", icon: Image },
-      { title: "Text & Labels", url: "/admin/content/text", icon: Type },
-    ]
+    single: true,
+    url: "/admin/site-content",
+    items: []
   },
   { 
     label: "APPEARANCE", 
@@ -111,10 +102,9 @@ const menuGroups: MenuGroup[] = [
     icon: Settings, 
     color: "from-[#ef4444] to-[#dc2626]",
     isNew: true,
-    items: [
-      { title: "Theme Colors", url: "/admin/appearance/theme", icon: Palette },
-      { title: "Logo & Branding", url: "/admin/appearance/logo", icon: Image },
-    ]
+    single: true,
+    url: "/admin/appearance",
+    items: []
   },
 ];
 
@@ -158,6 +148,9 @@ export function AdminSidebar() {
                 >
                   <span className="text-lg">{group.emoji}</span>
                   <span className="text-sm font-semibold">{group.label}</span>
+                  {group.isNew && (
+                    <span className="px-1.5 py-0.5 text-[8px] bg-[#ef4444] text-white rounded font-bold ml-auto">NEW</span>
+                  )}
                 </button>
               </Link>
             ) : (
