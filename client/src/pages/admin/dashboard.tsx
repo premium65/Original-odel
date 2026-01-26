@@ -140,7 +140,7 @@ export default function AdminDashboard() {
                         }`}>{user.status}</span>
                       </td>
                       <td className="px-4 py-3 text-sm text-muted-foreground">{new Date(user.registeredAt).toLocaleDateString()}</td>
-                      <td className="px-4 py-3 text-sm font-medium">₹ {parseFloat(user.milestoneReward || "0").toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                      <td className="px-4 py-3 text-sm font-medium">Rs. {parseFloat(user.milestoneReward || "0").toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                     </tr>
                   ))}
                 </tbody>
