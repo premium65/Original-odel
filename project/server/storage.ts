@@ -1,7 +1,7 @@
 // Referenced from javascript_database integration blueprint for DatabaseStorage pattern
-import { users, ratings, ads, adClicks, withdrawals, type User, type InsertUser, type Rating, type InsertRating, type Ad, type AdClick, type InsertAd, type InsertAdClick, type Withdrawal, type InsertWithdrawal } from "@shared/schema";
+import { users, ratings, ads, adClicks, withdrawals, siteSettings, slideshowImages, type User, type InsertUser, type Rating, type InsertRating, type Ad, type AdClick, type InsertAd, type InsertAdClick, type Withdrawal, type InsertWithdrawal } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, and, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -240,8 +240,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   async resetUserField(userId: number, field: string): Promise<User | undefined> {
-    // Map field names to database columns
-    // Note: 'booking' resets both totalAdsCompleted AND restrictedAdsCompleted
     const fieldMap: Record<string, any> = {
       'booking': { totalAdsCompleted: 0, restrictedAdsCompleted: 0 },
       'points': { milestoneAmount: '0.00' },
@@ -256,7 +254,6 @@ export class DatabaseStorage implements IStorage {
       throw new Error(`Invalid field: ${field}`);
     }
 
-    // If resetting booking, also delete all ad click history so ads become available again
     if (field === 'booking') {
       await db.delete(adClicks).where(eq(adClicks.userId, userId));
     }
@@ -269,21 +266,18 @@ export class DatabaseStorage implements IStorage {
     return user || undefined;
   }
 
-  // Reset milestone reward for all users (called by daily cron job)
   async resetAllMilestoneRewards(): Promise<void> {
     await db
       .update(users)
       .set({
         milestoneReward: '0.00',
       })
-      .where(sql`1=1`); // Update all users
+      .where(sql`1=1`);
   }
 
   async addUserFieldValue(userId: number, field: string, amount: string): Promise<User | undefined> {
-    // Map field names to database columns - SET value directly, not increment
     const numValue = parseFloat(amount);
     
-    // Validate points maximum of 100
     if (field === 'points' && numValue > 100) {
       throw new Error('Points cannot exceed 100');
     }
@@ -340,7 +334,6 @@ export class DatabaseStorage implements IStorage {
 
   // Restriction operations
   async setUserRestriction(userId: number, adsLimit: number, deposit: string, commission: string, pendingAmount?: string): Promise<User | undefined> {
-    // Validate numeric inputs
     const depositNum = parseFloat(deposit);
     const commissionNum = parseFloat(commission);
     const pendingNum = pendingAmount ? parseFloat(pendingAmount) : depositNum;
@@ -352,11 +345,9 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Invalid commission amount");
     }
     
-    // Check if user already has a restriction (to differentiate CREATE vs EDIT)
     const existingUser = await this.getUser(userId);
     const isEditing = existingUser && existingUser.restrictionAdsLimit !== null && existingUser.restrictionAdsLimit !== undefined;
     
-    // Build update object based on create vs edit mode
     const updateData: any = {
       restrictionAdsLimit: adsLimit,
       restrictionDeposit: depositNum.toFixed(2),
@@ -364,13 +355,10 @@ export class DatabaseStorage implements IStorage {
       ongoingMilestone: pendingNum.toFixed(2),
     };
     
-    // Only modify these fields when CREATING a new restriction (not editing)
     if (!isEditing) {
       updateData.restrictedAdsCompleted = 0;
-      // Deduct deposit from Milestone Amount (creates negative balance)
       updateData.milestoneAmount = sql`${users.milestoneAmount} - ${depositNum}::numeric`;
     }
-    // When editing: preserve restrictedAdsCompleted and milestoneAmount
     
     const [user] = await db
       .update(users)
@@ -408,7 +396,6 @@ export class DatabaseStorage implements IStorage {
 
   // Withdrawal operations
   async createWithdrawal(userId: number, amount: string, bankDetails: { fullName: string; accountNumber: string; bankName: string; branch: string }): Promise<Withdrawal> {
-    // First check if user has enough balance
     const user = await this.getUser(userId);
     if (!user) {
       throw new Error("User not found");
@@ -421,7 +408,6 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Insufficient balance");
     }
     
-    // Create withdrawal request with bank details
     const [withdrawal] = await db
       .insert(withdrawals)
       .values({ 
@@ -457,7 +443,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   async approveWithdrawal(id: number, adminId: number): Promise<Withdrawal | undefined> {
-    // Get withdrawal
     const [withdrawal] = await db.select().from(withdrawals).where(eq(withdrawals.id, id));
     if (!withdrawal) {
       throw new Error("Withdrawal not found");
@@ -467,7 +452,6 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Withdrawal already processed");
     }
 
-    // Update user's balance (deduct from milestone amount)
     await db
       .update(users)
       .set({
@@ -475,7 +459,6 @@ export class DatabaseStorage implements IStorage {
       })
       .where(eq(users.id, withdrawal.userId));
 
-    // Approve withdrawal
     const [updated] = await db
       .update(withdrawals)
       .set({
@@ -502,6 +485,91 @@ export class DatabaseStorage implements IStorage {
       .returning();
     
     return updated || undefined;
+  }
+
+  // =============================================
+  // SITE SETTINGS METHODS (CMS)
+  // =============================================
+
+  async getSettingsByCategory(category: string): Promise<any[]> {
+    return await db
+      .select({
+        setting_key: siteSettings.settingKey,
+        setting_value: siteSettings.settingValue,
+      })
+      .from(siteSettings)
+      .where(eq(siteSettings.category, category));
+  }
+
+  async upsertSetting(category: string, key: string, value: string): Promise<void> {
+    // Try to update first
+    const existing = await db
+      .select()
+      .from(siteSettings)
+      .where(and(eq(siteSettings.category, category), eq(siteSettings.settingKey, key)));
+    
+    if (existing.length > 0) {
+      await db
+        .update(siteSettings)
+        .set({ settingValue: value, updatedAt: new Date() })
+        .where(and(eq(siteSettings.category, category), eq(siteSettings.settingKey, key)));
+    } else {
+      await db.insert(siteSettings).values({
+        category,
+        settingKey: key,
+        settingValue: value,
+      });
+    }
+  }
+
+  async getPublicSettings(): Promise<any[]> {
+    return await db
+      .select({
+        category: siteSettings.category,
+        setting_key: siteSettings.settingKey,
+        setting_value: siteSettings.settingValue,
+      })
+      .from(siteSettings)
+      .where(inArray(siteSettings.category, ['contact', 'branding', 'theme', 'home', 'legal']));
+  }
+
+  // =============================================
+  // SLIDESHOW METHODS (CMS)
+  // =============================================
+
+  async getSlideshowImages(page: string): Promise<any[]> {
+    return await db
+      .select()
+      .from(slideshowImages)
+      .where(eq(slideshowImages.page, page))
+      .orderBy(slideshowImages.displayOrder);
+  }
+
+  async getActiveSlideshowImages(page: string): Promise<any[]> {
+    return await db
+      .select()
+      .from(slideshowImages)
+      .where(and(eq(slideshowImages.page, page), eq(slideshowImages.isActive, 1)))
+      .orderBy(slideshowImages.displayOrder);
+  }
+
+  async addSlideshowImage(title: string, imageUrl: string, linkUrl: string, page: string): Promise<{ id: number }> {
+    const [result] = await db
+      .insert(slideshowImages)
+      .values({ title, imageUrl, linkUrl, page })
+      .returning({ id: slideshowImages.id });
+    return result;
+  }
+
+  async updateSlideshowImage(id: number, title: string, imageUrl: string, linkUrl: string, displayOrder: number, isActive: number): Promise<void> {
+    await db
+      .update(slideshowImages)
+      .set({ title, imageUrl, linkUrl, displayOrder, isActive })
+      .where(eq(slideshowImages.id, id));
+  }
+
+  async deleteSlideshowImage(id: number): Promise<void> {
+    await db.delete(slideshowImages).where(eq(slideshowImages.id, id));
   }
 }
 
