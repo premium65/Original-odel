@@ -8,23 +8,17 @@ import {
 import { 
   LayoutDashboard, Users, Star, Crown, Calendar, BookOpen, TrendingUp,
   CreditCard, DollarSign, UserCog, Target, UserCheck, ChevronDown, ChevronRight,
-  Globe, Phone, Mail, MessageCircle, Info, FileText, Shield, FileQuestion,
+  Globe, Phone, Mail, MessageCircle, Info, FileText, Shield,
   Home, ShoppingBag, Image, Type, Palette, Settings, Megaphone, Receipt,
-  Gem, ExternalLink, Building, Wallet, Percent, UserShield, Clock
+  Gem, Building, Wallet, Percent, UserShield, Clock
 } from "lucide-react";
 
 interface MenuItem {
   title: string;
-  url?: string;
+  url: string;
   icon: any;
   isNew?: boolean;
   hasGoldBadge?: boolean;
-}
-
-interface SubGroup {
-  title: string;
-  icon: any;
-  items: MenuItem[];
 }
 
 interface MenuGroup {
@@ -33,7 +27,7 @@ interface MenuGroup {
   icon: any;
   color: string;
   isNew?: boolean;
-  items?: (MenuItem | SubGroup)[];
+  items: MenuItem[];
   single?: boolean;
   url?: string;
 }
@@ -45,7 +39,8 @@ const menuGroups: MenuGroup[] = [
     icon: Home, 
     color: "from-[#10b981] to-[#059669]", 
     single: true,
-    url: "/admin"
+    url: "/admin",
+    items: []
   },
   { 
     label: "USER MANAGEMENT", 
@@ -89,25 +84,12 @@ const menuGroups: MenuGroup[] = [
     color: "from-[#ec4899] to-[#db2777]",
     isNew: true,
     items: [
-      { 
-        title: "Contact Us", 
-        icon: Phone,
-        items: [
-          { title: "Phone", url: "/admin/contact/phone", icon: Phone },
-          { title: "Email", url: "/admin/contact/email", icon: Mail },
-          { title: "WhatsApp", url: "/admin/contact/whatsapp", icon: MessageCircle },
-          { title: "Telegram", url: "/admin/contact/telegram", icon: MessageCircle },
-        ]
-      } as SubGroup,
-      { 
-        title: "Info", 
-        icon: Info,
-        items: [
-          { title: "About Us", url: "/admin/info/about", icon: Building },
-          { title: "Terms & Conditions", url: "/admin/info/terms", icon: FileText },
-          { title: "Privacy Policy", url: "/admin/info/privacy", icon: Shield },
-        ]
-      } as SubGroup,
+      { title: "Phone", url: "/admin/social-media", icon: Phone },
+      { title: "Email", url: "/admin/social-media", icon: Mail },
+      { title: "WhatsApp", url: "/admin/social-media", icon: MessageCircle },
+      { title: "About Us", url: "/admin/social-media", icon: Building },
+      { title: "Terms", url: "/admin/social-media", icon: FileText },
+      { title: "Privacy", url: "/admin/social-media", icon: Shield },
     ]
   },
   { 
@@ -136,14 +118,9 @@ const menuGroups: MenuGroup[] = [
   },
 ];
 
-function isSubGroup(item: MenuItem | SubGroup): item is SubGroup {
-  return 'items' in item && Array.isArray(item.items);
-}
-
 export function AdminSidebar() {
   const [location] = useLocation();
   const [expandedGroups, setExpandedGroups] = useState<string[]>(["USER MANAGEMENT", "TRANSACTION", "ADS MANAGEMENT"]);
-  const [expandedSubGroups, setExpandedSubGroups] = useState<string[]>([]);
 
   const toggleGroup = (label: string) => {
     setExpandedGroups(prev => 
@@ -151,13 +128,7 @@ export function AdminSidebar() {
     );
   };
 
-  const toggleSubGroup = (title: string) => {
-    setExpandedSubGroups(prev => 
-      prev.includes(title) ? prev.filter(g => g !== title) : [...prev, title]
-    );
-  };
-
-  const isActive = (url: string | undefined) => url && location === url;
+  const isActive = (url: string) => location === url;
 
   return (
     <Sidebar className="bg-gradient-to-b from-[#1a2332] to-[#141c27] border-r border-[#2a3a4d]">
@@ -177,7 +148,6 @@ export function AdminSidebar() {
         {menuGroups.map((group) => (
           <div key={group.label} className="mb-1">
             {group.single ? (
-              /* 🏠 Dashboard - Always Visible & Highlighted */
               <Link href={group.url || "/admin"}>
                 <button
                   className={`w-full px-4 py-3.5 rounded-xl flex items-center gap-3 transition-all bg-gradient-to-r ${group.color} text-white shadow-lg hover:shadow-xl hover:scale-[1.02]`}
@@ -187,7 +157,6 @@ export function AdminSidebar() {
                 </button>
               </Link>
             ) : (
-              /* Menu Groups with Items */
               <>
                 <button
                   onClick={() => toggleGroup(group.label)}
@@ -210,78 +179,31 @@ export function AdminSidebar() {
                   }
                 </button>
 
-                {/* Expanded Items */}
                 <div className={`overflow-hidden transition-all duration-300 ${
                   expandedGroups.includes(group.label) ? "max-h-[600px] mt-1" : "max-h-0"
                 }`}>
                   <div className="ml-4 pl-3 border-l border-[#2a3a4d] space-y-0.5 py-1">
-                    {group.items?.map((item) => (
-                      isSubGroup(item) ? (
-                        /* SubGroup (Contact Us, Info) */
-                        <div key={item.title}>
-                          <button
-                            onClick={() => toggleSubGroup(item.title)}
-                            className={`w-full px-3 py-2 rounded-lg flex items-center justify-between text-sm transition-all ${
-                              expandedSubGroups.includes(item.title)
-                                ? "bg-[#2a3a4d]/50 text-[#10b981]"
-                                : "text-[#9ca3af] hover:text-white hover:bg-[#2a3a4d]/30"
-                            }`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <item.icon className="w-4 h-4" />
-                              {item.title}
-                            </div>
-                            {expandedSubGroups.includes(item.title)
-                              ? <ChevronDown className="w-3 h-3" />
-                              : <ChevronRight className="w-3 h-3" />
-                            }
-                          </button>
-                          
-                          {/* SubGroup Items */}
-                          <div className={`overflow-hidden transition-all duration-300 ${
-                            expandedSubGroups.includes(item.title) ? "max-h-48" : "max-h-0"
-                          }`}>
-                            <div className="ml-4 pl-3 border-l border-[#2a3a4d] space-y-0.5 py-1">
-                              {item.items.map((subItem) => (
-                                <Link key={subItem.title} href={subItem.url || "#"}>
-                                  <button
-                                    className={`w-full px-3 py-1.5 rounded-lg flex items-center gap-2 text-xs transition-all ${
-                                      isActive(subItem.url)
-                                        ? "bg-[#10b981]/20 text-[#10b981]"
-                                        : "text-[#6b7280] hover:text-white hover:bg-[#2a3a4d]/30"
-                                    }`}
-                                  >
-                                    <subItem.icon className="w-3 h-3" />
-                                    {subItem.title}
-                                  </button>
-                                </Link>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        /* Regular Menu Item */
-                        <Link key={item.title} href={item.url || "#"}>
-                          <button
-                            className={`w-full px-3 py-2 rounded-lg flex items-center gap-2 text-sm transition-all ${
-                              isActive(item.url)
-                                ? "bg-[#10b981]/20 text-[#10b981] font-medium"
-                                : "text-[#9ca3af] hover:text-white hover:bg-[#2a3a4d]/30"
-                            }`}
-                          >
-                            <item.icon className={`w-4 h-4 ${item.hasGoldBadge ? "text-[#f59e0b]" : ""}`} />
-                            <span className="flex-1 text-left">{item.title}</span>
-                            {item.hasGoldBadge && (
-                              <Star className="w-3 h-3 text-[#f59e0b] fill-[#f59e0b]" />
-                            )}
-                            {item.isNew && (
-                              <span className="px-1.5 py-0.5 text-[8px] bg-[#ef4444] text-white rounded font-bold">
-                                NEW
-                              </span>
-                            )}
-                          </button>
-                        </Link>
-                      )
+                    {group.items.map((item) => (
+                      <Link key={item.title} href={item.url}>
+                        <button
+                          className={`w-full px-3 py-2 rounded-lg flex items-center gap-2 text-sm transition-all ${
+                            isActive(item.url)
+                              ? "bg-[#10b981]/20 text-[#10b981] font-medium"
+                              : "text-[#9ca3af] hover:text-white hover:bg-[#2a3a4d]/30"
+                          }`}
+                        >
+                          <item.icon className={`w-4 h-4 ${item.hasGoldBadge ? "text-[#f59e0b]" : ""}`} />
+                          <span className="flex-1 text-left">{item.title}</span>
+                          {item.hasGoldBadge && (
+                            <Star className="w-3 h-3 text-[#f59e0b] fill-[#f59e0b]" />
+                          )}
+                          {item.isNew && (
+                            <span className="px-1.5 py-0.5 text-[8px] bg-[#ef4444] text-white rounded font-bold">
+                              NEW
+                            </span>
+                          )}
+                        </button>
+                      </Link>
                     ))}
                   </div>
                 </div>
