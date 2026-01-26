@@ -20,6 +20,7 @@ import AdminWithdrawals from "@/pages/admin/withdrawals";
 import AdminAds from "@/pages/admin/ads";
 import AdminTransactions from "@/pages/admin/transactions";
 import AdminPremium from "@/pages/admin/premium";
+import AdminPremiumManage from "@/pages/admin/premium-manage";
 import AdminDeposits from "@/pages/admin/deposits";
 import AdminCommission from "@/pages/admin/commission";
 import AdminSocialMedia from "@/pages/admin/social-media";
@@ -87,6 +88,11 @@ function Router() {
       <Route path="/admin/premium">
         <AdminLayout>
           <AdminPremium />
+        </AdminLayout>
+      </Route>
+      <Route path="/admin/premium-manage">
+        <AdminLayout>
+          <AdminPremiumManage />
         </AdminLayout>
       </Route>
       <Route path="/admin/deposits">
