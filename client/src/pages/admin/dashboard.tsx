@@ -56,7 +56,7 @@ export default function AdminDashboard() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold" style={{ color: '#B8936B' }}>Dashboard</h1>
-        <p className="text-muted-foreground">Hello, welcome to HolidayInn!</p>
+        <p className="text-muted-foreground">Hello, welcome to OdelAD'S!</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
