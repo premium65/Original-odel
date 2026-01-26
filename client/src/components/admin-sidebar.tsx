@@ -1,217 +1,303 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarHeader,
-} from "@/components/ui/sidebar";
 import { 
-  LayoutDashboard, Users, Star, Crown, Calendar, BookOpen, TrendingUp,
-  CreditCard, DollarSign, UserCog, Target, UserCheck, ChevronDown, ChevronRight,
-  Globe, Phone, Mail, MessageCircle, Info, FileText, Shield,
-  Home, ShoppingBag, Image, Type, Palette, Settings, Megaphone, Receipt,
-  Gem, Building, Wallet, Percent, UserShield, Clock
+  LayoutDashboard,
+  Users,
+  UserCheck,
+  UserCog,
+  ShieldCheck,
+  CreditCard,
+  Star,
+  Crown,
+  FileText,
+  Wallet,
+  PiggyBank,
+  Percent,
+  Megaphone,
+  Globe,
+  Phone,
+  Mail,
+  MessageCircle,
+  Send,
+  Info,
+  FileQuestion,
+  Shield,
+  Layout,
+  Home,
+  SlidersHorizontal,
+  Image,
+  Type,
+  Palette,
+  ImageIcon,
+  ChevronDown,
+  ChevronRight,
+  LogOut
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface MenuItem {
-  title: string;
-  url: string;
-  icon: any;
-  isNew?: boolean;
-  hasGoldBadge?: boolean;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  path?: string;
+  badge?: string;
+  badgeColor?: string;
+  children?: MenuItem[];
 }
 
 interface MenuGroup {
-  label: string;
-  emoji: string;
-  icon: any;
-  color: string;
-  isNew?: boolean;
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
+  gradient: string;
+  badge?: string;
   items: MenuItem[];
-  single?: boolean;
-  url?: string;
 }
 
-const menuGroups: MenuGroup[] = [
-  { 
-    label: "Dashboard", 
-    emoji: "🏠",
-    icon: Home, 
-    color: "from-[#10b981] to-[#059669]", 
-    single: true,
-    url: "/admin",
-    items: []
-  },
-  { 
-    label: "USER MANAGEMENT", 
-    emoji: "👤",
-    icon: Users, 
-    color: "from-[#06b6d4] to-[#0891b2]",
+const menuStructure: MenuGroup[] = [
+  {
+    title: "USER MANAGEMENT",
+    icon: Users,
+    gradient: "from-blue-500 to-cyan-500",
     items: [
-      { title: "All Users", url: "/admin/users", icon: Users },
-      { title: "Pending Users", url: "/admin/pending", icon: Clock },
-      { title: "Admins", url: "/admin/admins", icon: UserShield },
+      { label: "All Users", icon: Users, path: "/admin/users" },
+      { label: "Pending Users", icon: UserCheck, path: "/admin/pending" },
+      { label: "Admins", icon: ShieldCheck, path: "/admin/admins" },
     ]
   },
-  { 
-    label: "TRANSACTION", 
-    emoji: "📋",
-    icon: Receipt, 
-    color: "from-[#f59e0b] to-[#d97706]",
+  {
+    title: "TRANSACTION",
+    icon: CreditCard,
+    gradient: "from-amber-500 to-orange-500",
     items: [
-      { title: "Users", url: "/admin/transaction-users", icon: Users },
-      { title: "Premium Manage", url: "/admin/premium-manage", icon: Crown, hasGoldBadge: true },
-      { title: "Premium", url: "/admin/premium", icon: Gem, hasGoldBadge: true, isNew: true },
-      { title: "Transaction Details", url: "/admin/transactions", icon: TrendingUp },
-      { title: "Withdraw List", url: "/admin/withdrawals", icon: BookOpen },
-      { title: "Deposit Details", url: "/admin/deposits", icon: Wallet },
-      { title: "Commission", url: "/admin/commission", icon: Percent },
+      { label: "Users", icon: UserCog, path: "/admin/transaction-users" },
+      { label: "Premium Manage", icon: Star, path: "/admin/premium-manage", badge: "⭐", badgeColor: "text-amber-400" },
+      { label: "Premium", icon: Crown, path: "/admin/premium", badge: "⭐", badgeColor: "text-amber-400" },
+      { label: "Transaction Details", icon: FileText, path: "/admin/transactions" },
+      { label: "Withdraw List", icon: Wallet, path: "/admin/withdrawals" },
+      { label: "Deposit Details", icon: PiggyBank, path: "/admin/deposits" },
+      { label: "Commission", icon: Percent, path: "/admin/commission" },
     ]
   },
-  { 
-    label: "ADS MANAGEMENT", 
-    emoji: "📢",
-    icon: Megaphone, 
-    color: "from-[#3b82f6] to-[#2563eb]",
+  {
+    title: "ADS MANAGEMENT",
+    icon: Megaphone,
+    gradient: "from-purple-500 to-pink-500",
     items: [
-      { title: "Manage Ads", url: "/admin/ads", icon: Calendar },
+      { label: "Manage Ads", icon: Megaphone, path: "/admin/ads" },
     ]
   },
-  { 
-    label: "SOCIAL MEDIA", 
-    emoji: "🌐",
-    icon: Globe, 
-    color: "from-[#ec4899] to-[#db2777]",
-    isNew: true,
+  {
+    title: "SOCIAL MEDIA",
+    icon: Globe,
+    gradient: "from-green-500 to-emerald-500",
+    badge: "NEW",
     items: [
-      { title: "Phone", url: "/admin/social-media", icon: Phone },
-      { title: "Email", url: "/admin/social-media", icon: Mail },
-      { title: "WhatsApp", url: "/admin/social-media", icon: MessageCircle },
-      { title: "About Us", url: "/admin/social-media", icon: Building },
-      { title: "Terms", url: "/admin/social-media", icon: FileText },
-      { title: "Privacy", url: "/admin/social-media", icon: Shield },
+      { 
+        label: "Contact Us", 
+        icon: Phone,
+        children: [
+          { label: "Phone", icon: Phone, path: "/admin/contact/phone" },
+          { label: "Email", icon: Mail, path: "/admin/contact/email" },
+          { label: "WhatsApp", icon: MessageCircle, path: "/admin/contact/whatsapp" },
+          { label: "Telegram", icon: Send, path: "/admin/contact/telegram" },
+        ]
+      },
+      { 
+        label: "Info", 
+        icon: Info,
+        children: [
+          { label: "About Us", icon: Info, path: "/admin/info/about" },
+          { label: "Terms & Conditions", icon: FileQuestion, path: "/admin/info/terms" },
+          { label: "Privacy Policy", icon: Shield, path: "/admin/info/privacy" },
+        ]
+      },
     ]
   },
-  { 
-    label: "SITE CONTENT", 
-    emoji: "🧩",
-    icon: Globe, 
-    color: "from-[#8b5cf6] to-[#7c3aed]",
-    isNew: true,
+  {
+    title: "SITE CONTENT",
+    icon: Layout,
+    gradient: "from-indigo-500 to-violet-500",
+    badge: "NEW",
     items: [
-      { title: "Home Page", url: "/admin/content/home", icon: Home },
-      { title: "Dashboard Page", url: "/admin/content/dashboard", icon: LayoutDashboard },
-      { title: "Slideshow Images", url: "/admin/content/slideshow", icon: Image },
-      { title: "Text & Labels", url: "/admin/content/text", icon: Type },
+      { label: "Home Page", icon: Home, path: "/admin/content/home" },
+      { label: "Dashboard Page", icon: SlidersHorizontal, path: "/admin/content/dashboard" },
+      { label: "Slideshow Images", icon: Image, path: "/admin/slideshow" },
+      { label: "Text & Labels", icon: Type, path: "/admin/content/text" },
     ]
   },
-  { 
-    label: "APPEARANCE", 
-    emoji: "⚙️",
-    icon: Settings, 
-    color: "from-[#ef4444] to-[#dc2626]",
-    isNew: true,
+  {
+    title: "APPEARANCE",
+    icon: Palette,
+    gradient: "from-rose-500 to-red-500",
+    badge: "NEW",
     items: [
-      { title: "Theme Colors", url: "/admin/appearance/theme", icon: Palette },
-      { title: "Logo & Branding", url: "/admin/appearance/logo", icon: Image },
+      { label: "Theme Colors", icon: Palette, path: "/admin/theme-settings" },
+      { label: "Logo & Branding", icon: ImageIcon, path: "/admin/branding" },
     ]
   },
 ];
 
-export function AdminSidebar() {
+export default function AdminSidebar() {
   const [location] = useLocation();
-  const [expandedGroups, setExpandedGroups] = useState<string[]>(["USER MANAGEMENT", "TRANSACTION", "ADS MANAGEMENT"]);
+  const [expandedGroups, setExpandedGroups] = useState<string[]>(["USER MANAGEMENT", "TRANSACTION"]);
+  const [expandedSubmenus, setExpandedSubmenus] = useState<string[]>([]);
 
-  const toggleGroup = (label: string) => {
+  const toggleGroup = (title: string) => {
     setExpandedGroups(prev => 
-      prev.includes(label) ? prev.filter(g => g !== label) : [...prev, label]
+      prev.includes(title) 
+        ? prev.filter(g => g !== title)
+        : [...prev, title]
     );
   };
 
-  const isActive = (url: string) => location === url;
+  const toggleSubmenu = (label: string) => {
+    setExpandedSubmenus(prev => 
+      prev.includes(label) 
+        ? prev.filter(s => s !== label)
+        : [...prev, label]
+    );
+  };
+
+  const isActive = (path?: string) => path && location === path;
+
+  const renderMenuItem = (item: MenuItem, depth: number = 0) => {
+    const hasChildren = item.children && item.children.length > 0;
+    const isExpanded = expandedSubmenus.includes(item.label);
+    const active = isActive(item.path);
+
+    if (hasChildren) {
+      return (
+        <div key={item.label}>
+          <button
+            onClick={() => toggleSubmenu(item.label)}
+            className={cn(
+              "w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors",
+              "text-gray-400 hover:text-white hover:bg-white/5"
+            )}
+            style={{ paddingLeft: `${12 + depth * 16}px` }}
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-gray-600">
+                {depth === 0 ? "├─" : "│  ├─"}
+              </span>
+              <item.icon className="h-4 w-4" />
+              <span>{item.label}</span>
+            </div>
+            {isExpanded ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
+          </button>
+          {isExpanded && (
+            <div className="ml-4">
+              {item.children!.map(child => renderMenuItem(child, depth + 1))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <Link key={item.path} href={item.path || "#"}>
+        <div
+          className={cn(
+            "flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer",
+            active 
+              ? "bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-400 border-l-2 border-amber-500" 
+              : "text-gray-400 hover:text-white hover:bg-white/5"
+          )}
+          style={{ paddingLeft: `${12 + depth * 16}px` }}
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-gray-600">
+              {depth === 0 ? "├─" : "│  ├─"}
+            </span>
+            <item.icon className="h-4 w-4" />
+            <span>{item.label}</span>
+          </div>
+          {item.badge && (
+            <span className={cn("text-lg", item.badgeColor || "text-amber-400")}>
+              {item.badge}
+            </span>
+          )}
+        </div>
+      </Link>
+    );
+  };
 
   return (
-    <Sidebar className="bg-gradient-to-b from-[#1a2332] to-[#141c27] border-r border-[#2a3a4d]">
-      <SidebarHeader className="p-5 border-b border-[#2a3a4d]">
+    <div className="w-64 bg-[#0d0d1a] border-r border-gray-800 min-h-screen flex flex-col">
+      {/* Logo */}
+      <div className="p-4 border-b border-gray-800">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#f59e0b] to-[#eab308] flex items-center justify-center shadow-lg">
-            <Star className="h-5 w-5 text-white" />
+          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+            <span className="text-white font-bold text-lg">O</span>
           </div>
           <div>
-            <span className="text-lg font-bold text-white block">RATING</span>
-            <span className="text-[10px] text-[#6b7280] uppercase tracking-widest">Ads Admin</span>
+            <h1 className="text-white font-bold">OdelADS</h1>
+            <p className="text-gray-500 text-xs">Admin Panel</p>
           </div>
         </div>
-      </SidebarHeader>
-      
-      <SidebarContent className="bg-transparent py-3 px-2 overflow-y-auto">
-        {menuGroups.map((group) => (
-          <div key={group.label} className="mb-1">
-            {group.single ? (
-              <Link href={group.url || "/admin"}>
-                <button
-                  className={`w-full px-4 py-3.5 rounded-xl flex items-center gap-3 transition-all bg-gradient-to-r ${group.color} text-white shadow-lg hover:shadow-xl hover:scale-[1.02]`}
-                >
-                  <group.icon className="w-5 h-5" />
-                  <span className="text-sm font-semibold">{group.emoji} {group.label}</span>
-                </button>
-              </Link>
-            ) : (
-              <>
-                <button
-                  onClick={() => toggleGroup(group.label)}
-                  className={`w-full px-4 py-3 rounded-xl flex items-center justify-between transition-all ${
-                    expandedGroups.includes(group.label)
-                      ? "text-[#10b981] border-l-2 border-[#10b981] bg-[#10b981]/5"
-                      : "text-[#9ca3af] hover:bg-[#2a3a4d]/50 hover:text-white"
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">{group.emoji}</span>
-                    <span className="text-xs font-semibold uppercase tracking-wider">{group.label}</span>
-                    {group.isNew && (
-                      <span className="px-1.5 py-0.5 text-[8px] bg-[#ef4444] text-white rounded font-bold">NEW</span>
-                    )}
-                  </div>
-                  {expandedGroups.includes(group.label) 
-                    ? <ChevronDown className="w-4 h-4" /> 
-                    : <ChevronRight className="w-4 h-4" />
-                  }
-                </button>
+      </div>
 
-                <div className={`overflow-hidden transition-all duration-300 ${
-                  expandedGroups.includes(group.label) ? "max-h-[600px] mt-1" : "max-h-0"
-                }`}>
-                  <div className="ml-4 pl-3 border-l border-[#2a3a4d] space-y-0.5 py-1">
-                    {group.items.map((item) => (
-                      <Link key={item.title} href={item.url}>
-                        <button
-                          className={`w-full px-3 py-2 rounded-lg flex items-center gap-2 text-sm transition-all ${
-                            isActive(item.url)
-                              ? "bg-[#10b981]/20 text-[#10b981] font-medium"
-                              : "text-[#9ca3af] hover:text-white hover:bg-[#2a3a4d]/30"
-                          }`}
-                        >
-                          <item.icon className={`w-4 h-4 ${item.hasGoldBadge ? "text-[#f59e0b]" : ""}`} />
-                          <span className="flex-1 text-left">{item.title}</span>
-                          {item.hasGoldBadge && (
-                            <Star className="w-3 h-3 text-[#f59e0b] fill-[#f59e0b]" />
-                          )}
-                          {item.isNew && (
-                            <span className="px-1.5 py-0.5 text-[8px] bg-[#ef4444] text-white rounded font-bold">
-                              NEW
-                            </span>
-                          )}
-                        </button>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              </>
+      {/* Navigation */}
+      <nav className="flex-1 p-3 space-y-2 overflow-y-auto">
+        {/* Dashboard - Always visible */}
+        <Link href="/admin">
+          <div
+            className={cn(
+              "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors cursor-pointer",
+              location === "/admin"
+                ? "bg-gradient-to-r from-amber-500 to-orange-600 text-white"
+                : "text-gray-400 hover:text-white hover:bg-white/5"
+            )}
+          >
+            <LayoutDashboard className="h-5 w-5" />
+            <span className="font-medium">Dashboard</span>
+          </div>
+        </Link>
+
+        {/* Menu Groups */}
+        {menuStructure.map(group => (
+          <div key={group.title} className="pt-2">
+            {/* Group Header */}
+            <button
+              onClick={() => toggleGroup(group.title)}
+              className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-500 hover:text-gray-300 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <group.icon className={cn("h-4 w-4 bg-gradient-to-r bg-clip-text", group.gradient)} />
+                <span>{group.title}</span>
+                {group.badge && (
+                  <span className="px-1.5 py-0.5 text-[10px] font-bold bg-green-500/20 text-green-400 rounded">
+                    {group.badge}
+                  </span>
+                )}
+              </div>
+              {expandedGroups.includes(group.title) ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
+              )}
+            </button>
+
+            {/* Group Items */}
+            {expandedGroups.includes(group.title) && (
+              <div className="mt-1 space-y-0.5">
+                {group.items.map(item => renderMenuItem(item))}
+              </div>
             )}
           </div>
         ))}
-      </SidebarContent>
-    </Sidebar>
+      </nav>
+
+      {/* Logout */}
+      <div className="p-3 border-t border-gray-800">
+        <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors">
+          <LogOut className="h-5 w-5" />
+          <span>Logout</span>
+        </button>
+      </div>
+    </div>
   );
 }
