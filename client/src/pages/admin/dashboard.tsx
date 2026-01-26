@@ -1,9 +1,12 @@
-import { useQuery } from '@tanstack/react-query';
+import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
-  Users, Eye, DollarSign, Wallet, UserCheck, Clock, Zap,
-  ArrowUpRight, UserPlus, Crown, Target, AlertCircle, ChevronRight
-} from 'lucide-react';
-import { Link } from 'wouter';
+  Users, Eye, DollarSign, Wallet, UserCheck, Clock, 
+  ChevronRight, Zap, Target, Crown, AlertCircle, UserPlus, PiggyBank,
+  TrendingUp, ArrowUpRight
+} from "lucide-react";
+import { Link } from "wouter";
 
 interface DashboardStats {
   totalUsers: number;
@@ -12,7 +15,6 @@ interface DashboardStats {
   totalAdsViewed: number;
   totalCommission: number;
   totalWithdraw: number;
-  pendingWithdraw: number;
   totalDeposit: number;
   activeMilestones: number;
   premiumUsers: number;
@@ -20,53 +22,110 @@ interface DashboardStats {
 }
 
 interface RecentUser {
-  _id: string;
+  id: number;
   username: string;
   email: string;
   status: string;
-  balance: number;
+  balance: string;
   createdAt: string;
 }
 
 export default function AdminDashboard() {
+  const [currentDate, setCurrentDate] = useState("");
+
+  useEffect(() => {
+    const now = new Date();
+    setCurrentDate(now.toLocaleDateString('en-US', { 
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+    }));
+  }, []);
+
   // Fetch dashboard stats
   const { data: stats } = useQuery<DashboardStats>({
-    queryKey: ['/api/admin/dashboard/stats'],
+    queryKey: ["/api/admin/dashboard-stats"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/dashboard-stats", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch stats");
+      return res.json();
+    },
   });
 
   // Fetch recent users
-  const { data: recentUsers = [] } = useQuery<RecentUser[]>({
-    queryKey: ['/api/admin/users/recent'],
+  const { data: recentUsers } = useQuery<RecentUser[]>({
+    queryKey: ["/api/admin/recent-users"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/recent-users?limit=3", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch users");
+      return res.json();
+    },
   });
 
-  // Default stats if not loaded
-  const dashboardStats = stats || {
-    totalUsers: 0,
-    activeUsers: 0,
-    pendingUsers: 0,
-    totalAdsViewed: 0,
-    totalCommission: 0,
-    totalWithdraw: 0,
-    pendingWithdraw: 0,
-    totalDeposit: 0,
-    activeMilestones: 0,
-    premiumUsers: 0,
-    pendingWithdrawals: 0
-  };
+  const kpiCards = [
+    { 
+      title: "Total Users", 
+      value: stats?.totalUsers || 0, 
+      subtitle: `${stats?.activeUsers || 0} active, ${stats?.pendingUsers || 0} pending`,
+      change: "↗ 12% from last week",
+      icon: Users, 
+      gradient: "from-[#10b981] to-[#059669]" 
+    },
+    { 
+      title: "Total Ads Viewed", 
+      value: (stats?.totalAdsViewed || 0).toLocaleString(), 
+      subtitle: "All time clicks",
+      change: "↗ 8% from last week",
+      icon: Eye, 
+      gradient: "from-[#3b82f6] to-[#2563eb]" 
+    },
+    { 
+      title: "Total Commission", 
+      value: `₹${(stats?.totalCommission || 0).toLocaleString()}`, 
+      subtitle: "Earnings distributed",
+      change: "↗ 23% from last week",
+      icon: DollarSign, 
+      gradient: "from-[#8b5cf6] to-[#7c3aed]" 
+    },
+    { 
+      title: "Total Withdraw", 
+      value: `₹${(stats?.totalWithdraw || 0).toLocaleString()}`, 
+      subtitle: "₹0.00 pending",
+      icon: Wallet, 
+      gradient: "from-[#f59e0b] to-[#d97706]" 
+    },
+    { 
+      title: "Total Deposit", 
+      value: `₹${(stats?.totalDeposit || 0).toLocaleString()}`, 
+      subtitle: "User balances",
+      icon: PiggyBank, 
+      gradient: "from-[#ec4899] to-[#db2777]" 
+    },
+    { 
+      title: "Active Users", 
+      value: stats?.activeUsers || 0, 
+      subtitle: `${stats?.totalUsers ? Math.round((stats.activeUsers / stats.totalUsers) * 100) : 0}% of total`,
+      icon: UserCheck, 
+      gradient: "from-[#06b6d4] to-[#0891b2]" 
+    },
+  ];
 
-  const getAvatarColor = (index: number) => {
-    const colors = [
-      'from-[#06b6d4] to-[#0891b2]',
-      'from-[#f59e0b] to-[#d97706]',
-      'from-[#ec4899] to-[#db2777]',
-      'from-[#8b5cf6] to-[#7c3aed]'
-    ];
-    return colors[index % colors.length];
-  };
+  const quickStats = [
+    { label: "Active Milestones", value: stats?.activeMilestones || 0, icon: Target, gradient: "from-[#10b981] to-[#059669]" },
+    { label: "Premium Users", value: stats?.premiumUsers || 0, icon: Crown, gradient: "from-[#8b5cf6] to-[#7c3aed]" },
+    { label: "Pending Withdrawals", value: stats?.pendingWithdrawals || 0, icon: Clock, gradient: "from-[#f59e0b] to-[#d97706]" },
+    { label: "Pending Approvals", value: stats?.pendingUsers || 0, icon: AlertCircle, gradient: "from-[#ef4444] to-[#dc2626]" },
+  ];
+
+  const avatarColors = [
+    "from-[#06b6d4] to-[#0891b2]",
+    "from-[#f59e0b] to-[#d97706]",
+    "from-[#ec4899] to-[#db2777]",
+    "from-[#8b5cf6] to-[#7c3aed]",
+    "from-[#10b981] to-[#059669]",
+  ];
 
   return (
-    <div className="space-y-6 p-6">
-      {/* Dashboard Header */}
+    <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Dashboard</h1>
@@ -74,113 +133,64 @@ export default function AdminDashboard() {
         </div>
         <div className="text-right">
           <p className="text-[#6b7280] text-sm">Last updated</p>
-          <p className="text-white font-semibold">{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+          <p className="text-white font-semibold">{currentDate}</p>
         </div>
       </div>
 
-      {/* KPI Stats Grid */}
+      {/* KPI Section Title */}
+      <div className="bg-[#1a2332] border border-[#2a3a4d] rounded-xl p-4">
+        <h3 className="text-[#10b981] font-semibold text-sm flex items-center gap-2">
+          <TrendingUp className="w-4 h-4" /> KEY PERFORMANCE INDICATORS (KPIs)
+        </h3>
+      </div>
+
+      {/* KPI Cards Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        {/* Total Users - GREEN */}
-        <div className="bg-gradient-to-br from-[#10b981] to-[#059669] rounded-xl p-4 text-white relative overflow-hidden shadow-lg hover:scale-105 transition-all cursor-pointer">
-          <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-white/10 rounded-full" />
-          <div className="absolute top-3 right-3 w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-            <Users className="w-5 h-5" />
+        {kpiCards.map((card, i) => (
+          <div 
+            key={i} 
+            className={`bg-gradient-to-br ${card.gradient} rounded-xl p-4 text-white relative overflow-hidden shadow-lg hover:scale-105 transition-all cursor-pointer`}
+          >
+            <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-white/10 rounded-full" />
+            <div className="absolute top-3 right-3 w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+              <card.icon className="w-5 h-5" />
+            </div>
+            <h4 className="text-[10px] font-semibold uppercase tracking-wider opacity-90">{card.title}</h4>
+            <p className="text-2xl font-bold mt-2">{card.value}</p>
+            <p className="text-[10px] opacity-80 mt-1">{card.subtitle}</p>
+            {card.change && (
+              <p className="text-[10px] mt-2 flex items-center gap-1 opacity-90">
+                <ArrowUpRight className="w-3 h-3" /> {card.change}
+              </p>
+            )}
           </div>
-          <h4 className="text-xs font-semibold uppercase tracking-wider opacity-90">Total Users</h4>
-          <p className="text-3xl font-bold mt-2">{dashboardStats.totalUsers}</p>
-          <p className="text-xs opacity-80 mt-1">{dashboardStats.activeUsers} active, {dashboardStats.pendingUsers} pending</p>
-          <div className="flex items-center gap-1 mt-2 text-xs">
-            <ArrowUpRight className="w-3 h-3" />
-            <span>Platform health</span>
-          </div>
-        </div>
-
-        {/* Total Ads Viewed - BLUE */}
-        <div className="bg-gradient-to-br from-[#3b82f6] to-[#2563eb] rounded-xl p-4 text-white relative overflow-hidden shadow-lg hover:scale-105 transition-all cursor-pointer">
-          <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-white/10 rounded-full" />
-          <div className="absolute top-3 right-3 w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-            <Eye className="w-5 h-5" />
-          </div>
-          <h4 className="text-xs font-semibold uppercase tracking-wider opacity-90">Total Ads Viewed</h4>
-          <p className="text-3xl font-bold mt-2">{dashboardStats.totalAdsViewed.toLocaleString()}</p>
-          <p className="text-xs opacity-80 mt-1">All time clicks</p>
-          <div className="flex items-center gap-1 mt-2 text-xs">
-            <ArrowUpRight className="w-3 h-3" />
-            <span>8% from last week</span>
-          </div>
-        </div>
-
-        {/* Total Commission - PURPLE */}
-        <div className="bg-gradient-to-br from-[#8b5cf6] to-[#7c3aed] rounded-xl p-4 text-white relative overflow-hidden shadow-lg hover:scale-105 transition-all cursor-pointer">
-          <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-white/10 rounded-full" />
-          <div className="absolute top-3 right-3 w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-            <DollarSign className="w-5 h-5" />
-          </div>
-          <h4 className="text-xs font-semibold uppercase tracking-wider opacity-90">Total Commission</h4>
-          <p className="text-3xl font-bold mt-2">₹{dashboardStats.totalCommission.toLocaleString()}</p>
-          <p className="text-xs opacity-80 mt-1">Earnings distributed</p>
-          <div className="flex items-center gap-1 mt-2 text-xs">
-            <ArrowUpRight className="w-3 h-3" />
-            <span>23% from last week</span>
-          </div>
-        </div>
-
-        {/* Total Withdraw - ORANGE */}
-        <div className="bg-gradient-to-br from-[#f59e0b] to-[#d97706] rounded-xl p-4 text-white relative overflow-hidden shadow-lg hover:scale-105 transition-all cursor-pointer">
-          <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-white/10 rounded-full" />
-          <div className="absolute top-3 right-3 w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-            <Wallet className="w-5 h-5" />
-          </div>
-          <h4 className="text-xs font-semibold uppercase tracking-wider opacity-90">Total Withdraw</h4>
-          <p className="text-3xl font-bold mt-2">₹{dashboardStats.totalWithdraw.toLocaleString()}</p>
-          <p className="text-xs opacity-80 mt-1">₹{dashboardStats.pendingWithdraw.toLocaleString()} pending</p>
-        </div>
-
-        {/* Total Deposit - PINK */}
-        <div className="bg-gradient-to-br from-[#ec4899] to-[#db2777] rounded-xl p-4 text-white relative overflow-hidden shadow-lg hover:scale-105 transition-all cursor-pointer">
-          <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-white/10 rounded-full" />
-          <div className="absolute top-3 right-3 w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-            <DollarSign className="w-5 h-5" />
-          </div>
-          <h4 className="text-xs font-semibold uppercase tracking-wider opacity-90">Total Deposit</h4>
-          <p className="text-3xl font-bold mt-2">₹{dashboardStats.totalDeposit.toLocaleString()}</p>
-          <p className="text-xs opacity-80 mt-1">User balances</p>
-        </div>
-
-        {/* Active Users - TEAL */}
-        <div className="bg-gradient-to-br from-[#06b6d4] to-[#0891b2] rounded-xl p-4 text-white relative overflow-hidden shadow-lg hover:scale-105 transition-all cursor-pointer">
-          <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-white/10 rounded-full" />
-          <div className="absolute top-3 right-3 w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-            <UserCheck className="w-5 h-5" />
-          </div>
-          <h4 className="text-xs font-semibold uppercase tracking-wider opacity-90">Active Users</h4>
-          <p className="text-3xl font-bold mt-2">{dashboardStats.activeUsers}</p>
-          <p className="text-xs opacity-80 mt-1">{dashboardStats.totalUsers > 0 ? Math.round((dashboardStats.activeUsers / dashboardStats.totalUsers) * 100) : 0}% of total</p>
-        </div>
+        ))}
       </div>
 
-      {/* Action & Activity Section */}
+      {/* Action & Activity Feed */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* High Priority Actions */}
-        <div className="bg-[#1a2332] rounded-xl border border-[#2a3a4d] overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#2a3a4d] flex items-center justify-between bg-gradient-to-r from-[#ef4444]/20 to-transparent">
-            <h3 className="font-semibold text-white flex items-center gap-2">
-              <Clock className="w-5 h-5 text-[#ef4444]" /> High Priority Actions
-            </h3>
-            <span className="px-3 py-1 bg-[#ef4444]/20 text-[#ef4444] rounded-full text-xs font-semibold">
-              {(dashboardStats.pendingUsers || 0) + (dashboardStats.pendingWithdrawals || 0)} pending
-            </span>
-          </div>
-          <div className="p-4 space-y-3">
+        <Card className="bg-[#1a2332] border-[#2a3a4d]">
+          <CardHeader className="border-b border-[#2a3a4d] bg-gradient-to-r from-[#ef4444]/20 to-transparent">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-white flex items-center gap-2 text-base">
+                <Clock className="w-5 h-5 text-[#ef4444]" /> High Priority Actions
+              </CardTitle>
+              <span className="px-3 py-1 bg-[#ef4444]/20 text-[#ef4444] rounded-full text-xs font-semibold">
+                {(stats?.pendingUsers || 0) + (stats?.pendingWithdrawals || 0)} pending
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4 space-y-3">
             {/* Pending Users */}
             <Link href="/admin/pending">
-              <div className="flex items-center justify-between p-4 bg-[#0f1419] rounded-xl border border-[#2a3a4d] hover:border-[#3a4a5d] transition-all group cursor-pointer">
+              <div className="flex items-center justify-between p-4 bg-[#0f1419] rounded-xl border border-[#2a3a4d] hover:border-[#3a4a5d] transition-all cursor-pointer group">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-[#10b981]/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-all">
-                    <UserPlus className="w-6 h-6 text-[#10b981]" />
+                  <div className="w-11 h-11 bg-[#10b981]/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-all">
+                    <UserPlus className="w-5 h-5 text-[#10b981]" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-white">{dashboardStats.pendingUsers} Pending Users</h4>
+                    <h4 className="font-semibold text-white">{stats?.pendingUsers || 0} Pending Users</h4>
                     <p className="text-[#6b7280] text-sm">Awaiting approval</p>
                   </div>
                 </div>
@@ -192,13 +202,13 @@ export default function AdminDashboard() {
 
             {/* Withdrawal Requests */}
             <Link href="/admin/withdrawals">
-              <div className="flex items-center justify-between p-4 bg-[#0f1419] rounded-xl border border-[#2a3a4d] hover:border-[#3a4a5d] transition-all group cursor-pointer">
+              <div className="flex items-center justify-between p-4 bg-[#0f1419] rounded-xl border border-[#2a3a4d] hover:border-[#3a4a5d] transition-all cursor-pointer group">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-[#f59e0b]/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-all">
-                    <Wallet className="w-6 h-6 text-[#f59e0b]" />
+                  <div className="w-11 h-11 bg-[#f59e0b]/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-all">
+                    <Wallet className="w-5 h-5 text-[#f59e0b]" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-white">{dashboardStats.pendingWithdrawals} Withdrawal Requests</h4>
+                    <h4 className="font-semibold text-white">{stats?.pendingWithdrawals || 0} Withdrawal Requests</h4>
                     <p className="text-[#6b7280] text-sm">Pending approval</p>
                   </div>
                 </div>
@@ -208,16 +218,16 @@ export default function AdminDashboard() {
               </div>
             </Link>
 
-            {/* Premium Milestones */}
+            {/* Active Milestones */}
             <Link href="/admin/premium-manage">
-              <div className="flex items-center justify-between p-4 bg-[#0f1419] rounded-xl border border-[#2a3a4d] hover:border-[#3a4a5d] transition-all group cursor-pointer">
+              <div className="flex items-center justify-between p-4 bg-[#0f1419] rounded-xl border border-[#2a3a4d] hover:border-[#3a4a5d] transition-all cursor-pointer group">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-[#8b5cf6]/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-all">
-                    <Target className="w-6 h-6 text-[#8b5cf6]" />
+                  <div className="w-11 h-11 bg-[#8b5cf6]/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-all">
+                    <Target className="w-5 h-5 text-[#8b5cf6]" />
                   </div>
                   <div>
                     <h4 className="font-semibold text-white flex items-center gap-2">
-                      {dashboardStats.activeMilestones} Active Milestones
+                      {stats?.activeMilestones || 0} Active Milestones
                       <span className="px-1.5 py-0.5 text-[8px] bg-[#ef4444] text-white rounded font-bold">NEW</span>
                     </h4>
                     <p className="text-[#6b7280] text-sm">Premium users in progress</p>
@@ -228,95 +238,68 @@ export default function AdminDashboard() {
                 </span>
               </div>
             </Link>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
         {/* Recent Users */}
-        <div className="bg-[#1a2332] rounded-xl border border-[#2a3a4d] overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#2a3a4d] flex items-center justify-between bg-gradient-to-r from-[#3b82f6]/20 to-transparent">
-            <h3 className="font-semibold text-white flex items-center gap-2">
-              <Zap className="w-5 h-5 text-[#3b82f6]" /> Recent Users
-            </h3>
-            <Link href="/admin/users" className="text-[#10b981] text-sm font-medium hover:underline">
-              View all
-            </Link>
-          </div>
-          <div className="p-4">
-            {recentUsers.length === 0 ? (
-              <p className="text-center text-[#6b7280] py-8">No recent users</p>
-            ) : (
-              recentUsers.slice(0, 5).map((user, i) => (
-                <div key={user._id} className={`flex items-center justify-between py-4 ${i !== Math.min(recentUsers.length - 1, 4) ? 'border-b border-[#2a3a4d]' : ''}`}>
-                  <div className="flex items-center gap-3">
-                    <div className={`w-11 h-11 rounded-full bg-gradient-to-br ${getAvatarColor(i)} flex items-center justify-center text-white font-bold shadow-lg`}>
-                      {user.username.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-white">{user.username}</h4>
-                      <p className="text-[#6b7280] text-sm">@{user.username}</p>
-                    </div>
+        <Card className="bg-[#1a2332] border-[#2a3a4d]">
+          <CardHeader className="border-b border-[#2a3a4d] bg-gradient-to-r from-[#3b82f6]/20 to-transparent">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-white flex items-center gap-2 text-base">
+                <Zap className="w-5 h-5 text-[#3b82f6]" /> Recent Users
+              </CardTitle>
+              <Link href="/admin/users">
+                <span className="text-[#10b981] text-sm cursor-pointer hover:underline">View all</span>
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4">
+            {recentUsers?.map((user, i) => (
+              <div 
+                key={user.id} 
+                className={`flex items-center justify-between py-4 ${i !== (recentUsers.length - 1) ? 'border-b border-[#2a3a4d]' : ''}`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-11 h-11 rounded-full bg-gradient-to-br ${avatarColors[i % avatarColors.length]} flex items-center justify-center text-white font-bold shadow-lg`}>
+                    {user.username.charAt(0).toUpperCase()}
                   </div>
-                  <div className="text-right">
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
-                      user.status === 'active' ? 'bg-[#10b981]/20 text-[#10b981]' : 'bg-[#f59e0b]/20 text-[#f59e0b]'
-                    }`}>
-                      {user.status}
-                    </span>
-                    <p className="text-[#9ca3af] text-sm mt-1">₹{(user.balance || 0).toLocaleString()}</p>
+                  <div>
+                    <h4 className="font-semibold text-white">{user.username}</h4>
+                    <p className="text-[#6b7280] text-sm">@{user.username}</p>
                   </div>
                 </div>
-              ))
-            )}
-          </div>
-        </div>
+                <div className="text-right">
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                    user.status === 'active' ? 'bg-[#10b981]/20 text-[#10b981]' : 'bg-[#f59e0b]/20 text-[#f59e0b]'
+                  }`}>
+                    {user.status}
+                  </span>
+                  <p className="text-[#9ca3af] text-sm mt-1">₹{user.balance}</p>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Quick Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-[#1a2332] rounded-xl border border-[#2a3a4d] p-4 hover:border-[#10b981]/50 transition-all cursor-pointer">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-[#10b981] to-[#059669] rounded-xl flex items-center justify-center shadow-lg">
-              <Target className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <p className="text-[#6b7280] text-xs">Active Milestones</p>
-              <p className="text-white text-xl font-bold">{dashboardStats.activeMilestones}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-[#1a2332] rounded-xl border border-[#2a3a4d] p-4 hover:border-[#8b5cf6]/50 transition-all cursor-pointer">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-[#8b5cf6] to-[#7c3aed] rounded-xl flex items-center justify-center shadow-lg">
-              <Crown className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <p className="text-[#6b7280] text-xs">Premium Users</p>
-              <p className="text-white text-xl font-bold">{dashboardStats.premiumUsers}</p>
+        {quickStats.map((stat, i) => (
+          <div 
+            key={i} 
+            className="bg-[#1a2332] border border-[#2a3a4d] rounded-xl p-4 hover:border-[#3a4a5d] transition-all cursor-pointer"
+          >
+            <div className="flex items-center gap-3">
+              <div className={`w-12 h-12 bg-gradient-to-br ${stat.gradient} rounded-xl flex items-center justify-center shadow-lg`}>
+                <stat.icon className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <p className="text-[#6b7280] text-xs">{stat.label}</p>
+                <p className="text-white text-xl font-bold">{stat.value}</p>
+              </div>
             </div>
           </div>
-        </div>
-        <div className="bg-[#1a2332] rounded-xl border border-[#2a3a4d] p-4 hover:border-[#f59e0b]/50 transition-all cursor-pointer">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-[#f59e0b] to-[#d97706] rounded-xl flex items-center justify-center shadow-lg">
-              <Clock className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <p className="text-[#6b7280] text-xs">Pending Withdrawals</p>
-              <p className="text-white text-xl font-bold">{dashboardStats.pendingWithdrawals}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-[#1a2332] rounded-xl border border-[#2a3a4d] p-4 hover:border-[#ef4444]/50 transition-all cursor-pointer">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-[#ef4444] to-[#dc2626] rounded-xl flex items-center justify-center shadow-lg">
-              <AlertCircle className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <p className="text-[#6b7280] text-xs">Pending Approvals</p>
-              <p className="text-white text-xl font-bold">{dashboardStats.pendingUsers}</p>
-            </div>
-          </div>
-        </div>
+        ))}
       </div>
     </div>
   );
