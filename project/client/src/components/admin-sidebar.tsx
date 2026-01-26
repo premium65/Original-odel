@@ -10,7 +10,7 @@ import {
   CreditCard, DollarSign, UserCog, Target, UserCheck, ChevronDown, ChevronRight,
   Globe, Phone, Mail, MessageCircle, Info, FileText, Shield,
   Home, ShoppingBag, Image, Type, Palette, Settings, Megaphone, Receipt,
-  Gem, Building, Wallet, Percent, UserShield, Clock
+  Gem, Building, Wallet, Percent, Clock, UserCog as AdminIcon
 } from "lucide-react";
 
 interface MenuItem {
@@ -50,7 +50,7 @@ const menuGroups: MenuGroup[] = [
     items: [
       { title: "All Users", url: "/admin/users", icon: Users },
       { title: "Pending Users", url: "/admin/pending", icon: Clock },
-      { title: "Admins", url: "/admin/admins", icon: UserShield },
+      { title: "Admins", url: "/admin/admins", icon: AdminIcon },
     ]
   },
   { 
