@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, serial, numeric, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, serial, numeric } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -21,17 +21,17 @@ export const users = pgTable("users", {
   accountHolderName: varchar("account_holder_name", { length: 100 }),
   branchName: varchar("branch_name", { length: 100 }),
   // Financial tracking
-  destinationAmount: numeric("destination_amount", { precision: 10, scale: 2 }).notNull().default("25000.00"),
-  milestoneAmount: numeric("milestone_amount", { precision: 10, scale: 2 }).notNull().default("0.00"),
-  milestoneReward: numeric("milestone_reward", { precision: 10, scale: 2 }).notNull().default("0.00"),
-  totalAdsCompleted: integer("total_ads_completed").notNull().default(0),
+  destinationAmount: numeric("destination_amount", { precision: 10, scale: 2 }).notNull().default("25000.00"), // Registration bonus (becomes 0 after first ad)
+  milestoneAmount: numeric("milestone_amount", { precision: 10, scale: 2 }).notNull().default("0.00"), // Current withdrawable balance
+  milestoneReward: numeric("milestone_reward", { precision: 10, scale: 2 }).notNull().default("0.00"), // Total ad earnings
+  totalAdsCompleted: integer("total_ads_completed").notNull().default(0), // Total number of ads completed
   // Restriction fields
-  restrictionAdsLimit: integer("restriction_ads_limit"),
-  restrictionDeposit: numeric("restriction_deposit", { precision: 10, scale: 2 }),
-  restrictionCommission: numeric("restriction_commission", { precision: 10, scale: 2 }),
-  ongoingMilestone: numeric("ongoing_milestone", { precision: 10, scale: 2 }).notNull().default("0.00"),
-  restrictedAdsCompleted: integer("restricted_ads_completed").notNull().default(0),
-  points: integer("points").notNull().default(100),
+  restrictionAdsLimit: integer("restriction_ads_limit"), // Max ads allowed (e.g., 12)
+  restrictionDeposit: numeric("restriction_deposit", { precision: 10, scale: 2 }), // Deposit amount (e.g., 5000)
+  restrictionCommission: numeric("restriction_commission", { precision: 10, scale: 2 }), // Commission during restriction
+  ongoingMilestone: numeric("ongoing_milestone", { precision: 10, scale: 2 }).notNull().default("0.00"), // Pending amount during restriction
+  restrictedAdsCompleted: integer("restricted_ads_completed").notNull().default(0), // Count of ads completed under current restriction
+  points: integer("points").notNull().default(100), // User points (modifiable by admin)
 });
 
 // Ratings table
@@ -39,7 +39,7 @@ export const ratings = pgTable("ratings", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id),
   targetUsername: varchar("target_username", { length: 50 }).notNull(),
-  rating: integer("rating").notNull(),
+  rating: integer("rating").notNull(), // 1-5 stars
   comment: text("comment"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -47,11 +47,11 @@ export const ratings = pgTable("ratings", {
 // Ads table
 export const ads = pgTable("ads", {
   id: serial("id").primaryKey(),
-  adCode: varchar("ad_code", { length: 20 }).notNull().unique(),
-  duration: integer("duration").notNull().default(10),
-  price: numeric("price", { precision: 10, scale: 2 }).notNull().default("101.75"),
+  adCode: varchar("ad_code", { length: 20 }).notNull().unique(), // AD-0001, AD-0002, etc
+  duration: integer("duration").notNull().default(10), // seconds
+  price: numeric("price", { precision: 10, scale: 2 }).notNull().default("101.75"), // reward per click in LKR
   link: text("link").notNull(),
-  imageUrl: text("image_url"),
+  imageUrl: text("image_url"), // path to product image
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -68,51 +68,44 @@ export const withdrawals = pgTable("withdrawals", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id),
   amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
-  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  status: varchar("status", { length: 20 }).notNull().default("pending"), // pending, approved, rejected
   requestedAt: timestamp("requested_at").notNull().defaultNow(),
   processedAt: timestamp("processed_at"),
-  processedBy: integer("processed_by").references(() => users.id),
-  notes: text("notes"),
+  processedBy: integer("processed_by").references(() => users.id), // admin who processed
+  notes: text("notes"), // admin notes
+  // Bank details for withdrawal
   bankFullName: varchar("bank_full_name", { length: 100 }),
   bankAccountNumber: varchar("bank_account_number", { length: 50 }),
   bankName: varchar("bank_name", { length: 100 }),
   bankBranch: varchar("bank_branch", { length: 100 }),
 });
 
-// ============================================
-// SLIDESHOW & SITE SETTINGS TABLES
-// ============================================
+// =============================================
+// CMS TABLES - Site Settings & Slideshow
+// =============================================
 
-// Slideshow Items Table
-export const slideshowItems = pgTable("slideshow_items", {
-  id: serial("id").primaryKey(),
-  title: text("title").notNull(),
-  description: text("description"),
-  imageUrl: text("image_url").notNull(),
-  linkUrl: text("link_url"),
-  buttonText: text("button_text"),
-  order: integer("order").default(0),
-  isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-// Site Settings Table (for colors, theme, etc.)
+// Site Settings Table
 export const siteSettings = pgTable("site_settings", {
   id: serial("id").primaryKey(),
-  settingKey: text("setting_key").notNull().unique(),
-  settingValue: text("setting_value").notNull(),
-  settingType: text("setting_type").default("string"),
-  category: text("category").default("general"),
-  label: text("label"),
-  description: text("description"),
+  category: varchar("category", { length: 50 }).notNull(),
+  settingKey: varchar("setting_key", { length: 100 }).notNull(),
+  settingValue: text("setting_value"),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// ============================================
-// RELATIONS
-// ============================================
+// Slideshow Images Table
+export const slideshowImages = pgTable("slideshow_images", {
+  id: serial("id").primaryKey(),
+  title: varchar("title", { length: 200 }),
+  imageUrl: text("image_url").notNull(),
+  linkUrl: text("link_url"),
+  displayOrder: integer("display_order").default(0),
+  isActive: integer("is_active").default(1),
+  page: varchar("page", { length: 50 }).default("home"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
 
+// Relations
 export const usersRelations = relations(users, ({ many }) => ({
   ratings: many(ratings),
   adClicks: many(adClicks),
@@ -148,10 +141,7 @@ export const withdrawalsRelations = relations(withdrawals, ({ one }) => ({
   }),
 }));
 
-// ============================================
-// INSERT SCHEMAS
-// ============================================
-
+// Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   registeredAt: true,
@@ -185,21 +175,7 @@ export const insertWithdrawalSchema = createInsertSchema(withdrawals).omit({
   userId: true,
 });
 
-export const insertSlideshowItemSchema = createInsertSchema(slideshowItems).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertSiteSettingSchema = createInsertSchema(siteSettings).omit({
-  id: true,
-  updatedAt: true,
-});
-
-// ============================================
-// TYPES
-// ============================================
-
+// Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type InsertRating = z.infer<typeof insertRatingSchema>;
@@ -210,25 +186,5 @@ export type InsertAd = z.infer<typeof insertAdSchema>;
 export type InsertAdClick = z.infer<typeof insertAdClickSchema>;
 export type Withdrawal = typeof withdrawals.$inferSelect;
 export type InsertWithdrawal = z.infer<typeof insertWithdrawalSchema>;
-export type SlideshowItem = typeof slideshowItems.$inferSelect;
-export type InsertSlideshowItem = z.infer<typeof insertSlideshowItemSchema>;
 export type SiteSetting = typeof siteSettings.$inferSelect;
-export type InsertSiteSetting = z.infer<typeof insertSiteSettingSchema>;
-
-// ============================================
-// DEFAULT COLOR SETTINGS
-// ============================================
-
-export const defaultColorSettings = [
-  { settingKey: "primary_color", settingValue: "#f59e0b", settingType: "color", category: "colors", label: "Primary Color", description: "Main accent color" },
-  { settingKey: "secondary_color", settingValue: "#1a1a2e", settingType: "color", category: "colors", label: "Secondary Color", description: "Background color" },
-  { settingKey: "accent_color", settingValue: "#16213e", settingType: "color", category: "colors", label: "Accent Color", description: "Accent highlights" },
-  { settingKey: "text_color", settingValue: "#ffffff", settingType: "color", category: "colors", label: "Text Color", description: "Main text color" },
-  { settingKey: "nav_bg_color", settingValue: "#000000", settingType: "color", category: "colors", label: "Navigation Background", description: "Top nav bar" },
-  { settingKey: "footer_bg_color", settingValue: "#111827", settingType: "color", category: "colors", label: "Footer Background", description: "Footer section" },
-  { settingKey: "card_bg_color", settingValue: "#1f2937", settingType: "color", category: "colors", label: "Card Background", description: "Cards and panels" },
-  { settingKey: "button_color", settingValue: "#f59e0b", settingType: "color", category: "colors", label: "Button Color", description: "Primary buttons" },
-  { settingKey: "button_hover_color", settingValue: "#d97706", settingType: "color", category: "colors", label: "Button Hover", description: "Button hover state" },
-  { settingKey: "marquee_bg_color", settingValue: "#f59e0b", settingType: "color", category: "colors", label: "Marquee Background", description: "Scrolling banner" },
-  { settingKey: "marquee_text_color", settingValue: "#000000", settingType: "color", category: "colors", label: "Marquee Text", description: "Banner text" },
-];
+export type SlideshowImage = typeof slideshowImages.$inferSelect;
