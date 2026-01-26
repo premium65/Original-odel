@@ -1,577 +1,944 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { 
+  Search, 
+  Star, 
+  RotateCcw, 
+  Award, 
+  Gem, 
+  Wallet, 
+  UserCog,
+  User,
+  Phone,
+  Mail,
+  CreditCard,
+  Building,
+  Hash,
+  AlertCircle,
+  CheckCircle,
+  Loader2,
+  X,
+  Plus,
+  Minus
+} from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogFooter, 
+  DialogHeader, 
+  DialogTitle 
+} from "@/components/ui/dialog";
 import {
-  Crown, Target, Check, DollarSign, Search, RotateCcw, Zap, Gift, 
-  PiggyBank, Edit, Save, X, AlertCircle, Clock, Eye, XCircle
-} from "lucide-react";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
 
-interface PremiumUser {
+interface User {
   id: number;
   username: string;
   email: string;
-  phone: string;
-  plan: string;
+  fullName: string;
+  mobileNumber: string | null;
+  status: string;
+  registeredAt: string;
+  isAdmin: number;
+  bankName: string | null;
+  accountNumber: string | null;
+  accountHolderName: string | null;
+  branchName: string | null;
+  destinationAmount: string;
+  milestoneAmount: string;
+  milestoneReward: string;
+  totalAdsCompleted: number;
+  restrictionAdsLimit: number | null;
+  restrictionDeposit: string | null;
+  restrictionCommission: string | null;
+  ongoingMilestone: string;
+  restrictedAdsCompleted: number;
   points: number;
-  treasureType: string;
-  bookingValue: number;
-  milestone: {
-    adsCountLimit: number;
-    adsClickedCount: number;
-    depositAmount: number;
-    depositPaid: boolean;
-    withdrawMilestone: number;
-    commissionReward: number;
-    milestoneStatus: string;
-  };
-  bankDetails: {
-    bankName: string;
-    accountNo: string;
-    branch: string;
-  };
 }
 
-export default function PremiumManage() {
+export default function AdminPremiumManage() {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [activeModal, setActiveModal] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedUser, setSelectedUser] = useState<PremiumUser | null>(null);
-  
-  // Modal states
-  const [showCreateMilestone, setShowCreateMilestone] = useState(false);
-  const [showResetConfirm, setShowResetConfirm] = useState(false);
-  const [showSetPoints, setShowSetPoints] = useState(false);
-  const [showAddTreasure, setShowAddTreasure] = useState(false);
-  const [showAddBooking, setShowAddBooking] = useState(false);
-  const [showEditUser, setShowEditUser] = useState(false);
 
-  // Form states
-  const [milestoneForm, setMilestoneForm] = useState({
-    adsCountLimit: "",
-    depositAmount: "",
-    withdrawMilestone: "",
-    commissionReward: ""
+  // Form states for each modal
+  const [promotionForm, setPromotionForm] = useState({
+    adsLimit: "",
+    deposit: "",
+    pendingAmount: "",
+    commission: ""
   });
   const [pointsValue, setPointsValue] = useState("");
-  const [treasureType, setTreasureType] = useState("premium");
+  const [treasureForm, setTreasureForm] = useState({
+    type: "premium" as "premium" | "normal",
+    amount: ""
+  });
   const [bookingValue, setBookingValue] = useState("");
-
-  // Fetch premium users
-  const { data: premiumUsers, isLoading } = useQuery<PremiumUser[]>({
-    queryKey: ["/api/admin/premium-users"],
-    queryFn: async () => {
-      const res = await fetch("/api/admin/premium-users", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch premium users");
-      return res.json();
-    },
+  const [userDetailsForm, setUserDetailsForm] = useState({
+    username: "",
+    mobileNumber: "",
+    password: ""
+  });
+  const [bankDetailsForm, setBankDetailsForm] = useState({
+    bankName: "",
+    accountNumber: "",
+    accountHolderName: "",
+    branchName: ""
   });
 
-  // Mutations
-  const createMilestone = useMutation({
-    mutationFn: async (data: { userId: number; milestone: typeof milestoneForm }) => {
-      const res = await fetch(`/api/admin/users/${data.userId}/milestone`, {
+  // Fetch all users
+  const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
+    queryKey: ["/api/admin/users"],
+  });
+
+  // Filter users based on search
+  const filteredUsers = users.filter(user => 
+    user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Update form values when user is selected
+  useEffect(() => {
+    if (selectedUser) {
+      setUserDetailsForm({
+        username: selectedUser.username,
+        mobileNumber: selectedUser.mobileNumber || "",
+        password: ""
+      });
+      setBankDetailsForm({
+        bankName: selectedUser.bankName || "",
+        accountNumber: selectedUser.accountNumber || "",
+        accountHolderName: selectedUser.accountHolderName || "",
+        branchName: selectedUser.branchName || ""
+      });
+      // If user has existing restriction, populate the form
+      if (selectedUser.restrictionAdsLimit) {
+        setPromotionForm({
+          adsLimit: selectedUser.restrictionAdsLimit?.toString() || "",
+          deposit: selectedUser.restrictionDeposit || "",
+          pendingAmount: selectedUser.ongoingMilestone || "",
+          commission: selectedUser.restrictionCommission || ""
+        });
+      } else {
+        setPromotionForm({
+          adsLimit: "",
+          deposit: "",
+          pendingAmount: "",
+          commission: ""
+        });
+      }
+    }
+  }, [selectedUser]);
+
+  // Mutation for creating/editing promotion (restriction)
+  const createPromotionMutation = useMutation({
+    mutationFn: async (data: { adsLimit: number; deposit: string; commission: string; pendingAmount: string }) => {
+      const res = await fetch(`/api/admin/users/${selectedUser?.id}/restrict`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(data.milestone),
+        body: JSON.stringify(data)
       });
-      if (!res.ok) throw new Error("Failed to create milestone");
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to create promotion");
+      }
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/premium-users"] });
-      toast({ title: "Milestone created successfully!" });
-      setShowCreateMilestone(false);
-      setSelectedUser(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "Success", description: "Promotion created successfully!" });
+      setActiveModal(null);
+      refreshSelectedUser();
     },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
   });
 
-  const resetMilestone = useMutation({
-    mutationFn: async (userId: number) => {
-      const res = await fetch(`/api/admin/users/${userId}/milestone/reset`, {
+  // Mutation for resetting milestone
+  const resetMilestoneMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/admin/users/${selectedUser?.id}/unrestrict`, {
         method: "POST",
-        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include"
       });
       if (!res.ok) throw new Error("Failed to reset milestone");
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/premium-users"] });
-      toast({ title: "Milestone reset successfully!" });
-      setShowResetConfirm(false);
-      setSelectedUser(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "Success", description: "Milestone reset successfully!" });
+      setActiveModal(null);
+      refreshSelectedUser();
     },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
   });
 
-  const updatePoints = useMutation({
-    mutationFn: async (data: { userId: number; points: number }) => {
-      const res = await fetch(`/api/admin/users/${data.userId}/points`, {
-        method: "PUT",
+  // Mutation for setting points
+  const setPointsMutation = useMutation({
+    mutationFn: async (amount: string) => {
+      const res = await fetch(`/api/admin/users/${selectedUser?.id}/add-value`, {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ points: data.points }),
+        body: JSON.stringify({ field: "points", amount })
       });
-      if (!res.ok) throw new Error("Failed to update points");
+      if (!res.ok) throw new Error("Failed to set points");
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/premium-users"] });
-      toast({ title: "Points updated successfully!" });
-      setShowSetPoints(false);
-      setSelectedUser(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "Success", description: "Points updated successfully!" });
+      setActiveModal(null);
+      setPointsValue("");
+      refreshSelectedUser();
     },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
   });
 
-  const filteredUsers = premiumUsers?.filter(user => 
-    user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Mutation for adding treasure
+  const addTreasureMutation = useMutation({
+    mutationFn: async (data: { type: string; amount: string }) => {
+      const field = data.type === "premium" ? "premiumTreasure" : "normalTreasure";
+      const res = await fetch(`/api/admin/users/${selectedUser?.id}/add-value`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ field, amount: data.amount })
+      });
+      if (!res.ok) throw new Error("Failed to add treasure");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "Success", description: "Treasure added successfully!" });
+      setActiveModal(null);
+      setTreasureForm({ type: "premium", amount: "" });
+      refreshSelectedUser();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  });
 
-  const stats = {
-    premiumUsers: premiumUsers?.length || 0,
-    activeMilestones: premiumUsers?.filter(u => u.milestone?.milestoneStatus === 'in_progress').length || 0,
-    completed: premiumUsers?.filter(u => u.milestone?.milestoneStatus === 'completed').length || 0,
-    totalDeposits: premiumUsers?.reduce((sum, u) => sum + (u.milestone?.depositPaid ? u.milestone.depositAmount : 0), 0) || 0,
+  // Mutation for adding booking value
+  const addBookingValueMutation = useMutation({
+    mutationFn: async (amount: string) => {
+      const res = await fetch(`/api/admin/users/${selectedUser?.id}/add-value`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ field: "bookingValue", amount })
+      });
+      if (!res.ok) throw new Error("Failed to add booking value");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "Success", description: "Booking value added successfully!" });
+      setActiveModal(null);
+      setBookingValue("");
+      refreshSelectedUser();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  });
+
+  // Mutation for updating user details
+  const updateUserDetailsMutation = useMutation({
+    mutationFn: async (data: { username?: string; mobileNumber?: string; password?: string }) => {
+      const res = await fetch(`/api/admin/users/${selectedUser?.id}/details`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error("Failed to update user details");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "Success", description: "User details updated successfully!" });
+      refreshSelectedUser();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  });
+
+  // Mutation for updating bank details
+  const updateBankDetailsMutation = useMutation({
+    mutationFn: async (data: { bankName?: string; accountNumber?: string; accountHolderName?: string; branchName?: string }) => {
+      const res = await fetch(`/api/admin/users/${selectedUser?.id}/bank`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error("Failed to update bank details");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "Success", description: "Bank details updated successfully!" });
+      refreshSelectedUser();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  });
+
+  // Refresh selected user data
+  const refreshSelectedUser = () => {
+    if (selectedUser) {
+      const updatedUser = users.find(u => u.id === selectedUser.id);
+      if (updatedUser) {
+        setSelectedUser(updatedUser);
+      }
+    }
   };
 
-  const planColors: Record<string, string> = {
-    "Gold Plan": "bg-[#f59e0b]/20 text-[#f59e0b]",
-    "Silver Plan": "bg-[#9ca3af]/20 text-[#9ca3af]",
-    "Platinum Plan": "bg-[#8b5cf6]/20 text-[#8b5cf6]",
-    "Starter Plan": "bg-[#10b981]/20 text-[#10b981]",
+  // Action cards configuration
+  const actionCards = [
+    {
+      id: "create-promotion",
+      title: "Create Promotion",
+      description: "Set milestone restrictions for user",
+      icon: Star,
+      gradient: "from-amber-500 to-orange-600",
+      badge: "⭐",
+      disabled: !selectedUser
+    },
+    {
+      id: "reset-milestone",
+      title: "RESET Milestone",
+      description: "Clear all milestone progress",
+      icon: RotateCcw,
+      gradient: "from-red-500 to-rose-600",
+      badge: null,
+      disabled: !selectedUser || !selectedUser.restrictionAdsLimit
+    },
+    {
+      id: "set-points",
+      title: "SET Points",
+      description: "Manually set user's point balance",
+      icon: Award,
+      gradient: "from-purple-500 to-violet-600",
+      badge: null,
+      disabled: !selectedUser
+    },
+    {
+      id: "add-treasure",
+      title: "ADD Treasure",
+      description: "Add premium or normal treasure",
+      icon: Gem,
+      gradient: "from-emerald-500 to-teal-600",
+      badge: null,
+      disabled: !selectedUser
+    },
+    {
+      id: "add-booking",
+      title: "ADD Booking Value",
+      description: "Add to user's milestone amount",
+      icon: Wallet,
+      gradient: "from-blue-500 to-indigo-600",
+      badge: null,
+      disabled: !selectedUser
+    },
+    {
+      id: "edit-user",
+      title: "EDIT User/Bank",
+      description: "Edit user details and bank info",
+      icon: UserCog,
+      gradient: "from-slate-500 to-gray-600",
+      badge: null,
+      disabled: !selectedUser
+    }
+  ];
+
+  // Format currency
+  const formatCurrency = (value: string | number) => {
+    const num = typeof value === 'string' ? parseFloat(value) : value;
+    return new Intl.NumberFormat('en-LK', {
+      style: 'currency',
+      currency: 'LKR',
+      minimumFractionDigits: 2
+    }).format(num);
   };
-
-  const avatarColors = [
-    "from-[#f59e0b] to-[#d97706]",
-    "from-[#9ca3af] to-[#6b7280]",
-    "from-[#8b5cf6] to-[#7c3aed]",
-    "from-[#10b981] to-[#059669]",
-    "from-[#ec4899] to-[#db2777]",
-  ];
-
-  const adminActions = [
-    { icon: Target, color: "#8b5cf6", label: "Promotions", desc: "Create Milestone" },
-    { icon: RotateCcw, color: "#ef4444", label: "RESET", desc: "Restart milestone" },
-    { icon: Zap, color: "#10b981", label: "SET Points", desc: "Set user points" },
-    { icon: Gift, color: "#f59e0b", label: "ADD Treasure", desc: "Premium/Normal" },
-    { icon: PiggyBank, color: "#ec4899", label: "ADD Booking", desc: "Booking value" },
-    { icon: Edit, color: "#3b82f6", label: "EDIT", desc: "User/Bank details" },
-  ];
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600">
+          <Star className="h-6 w-6 text-white" />
+        </div>
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-            <Crown className="w-7 h-7 text-[#f59e0b]" />
-            Premium Manage
-            <span className="px-2 py-1 text-xs bg-[#ef4444] text-white rounded-full animate-pulse">NEW</span>
-          </h1>
-          <p className="text-[#6b7280] mt-1">Manage premium users & milestone promotions (System review - No admin needed)</p>
-        </div>
-        <Button 
-          onClick={() => setShowCreateMilestone(true)}
-          className="bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] hover:opacity-90"
-        >
-          <Target className="w-5 h-5 mr-2" /> Create Promotion
-        </Button>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          { title: "Premium Users", value: stats.premiumUsers, icon: Crown, gradient: "from-[#10b981] to-[#059669]" },
-          { title: "Active Milestones", value: stats.activeMilestones, icon: Target, gradient: "from-[#3b82f6] to-[#2563eb]" },
-          { title: "Completed", value: stats.completed, icon: Check, gradient: "from-[#8b5cf6] to-[#7c3aed]" },
-          { title: "Total Deposits", value: `₹${stats.totalDeposits.toLocaleString()}`, icon: DollarSign, gradient: "from-[#f59e0b] to-[#d97706]" },
-        ].map((stat, i) => (
-          <div key={i} className={`bg-gradient-to-br ${stat.gradient} rounded-xl p-5 text-white relative overflow-hidden shadow-lg`}>
-            <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-white/10 rounded-full" />
-            <stat.icon className="w-8 h-8 mb-3 opacity-80" />
-            <p className="text-3xl font-bold">{stat.value}</p>
-            <p className="text-sm opacity-80">{stat.title}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Admin Actions Guide */}
-      <div className="bg-[#1a2332] rounded-xl border border-[#2a3a4d] p-5">
-        <h4 className="text-sm font-semibold text-[#10b981] mb-4 flex items-center gap-2">
-          <Zap className="w-4 h-4" /> Admin Actions (Controls Only - No Manual Review)
-        </h4>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          {adminActions.map((item, i) => (
-            <div 
-              key={i} 
-              className="flex items-center gap-3 p-3 rounded-xl bg-[#0f1419] border border-[#2a3a4d] hover:border-[#3a4a5d] transition-all cursor-pointer group"
-            >
-              <div 
-                className="p-2.5 rounded-lg group-hover:scale-110 transition-all" 
-                style={{ backgroundColor: `${item.color}20`, color: item.color }}
-              >
-                <item.icon className="w-5 h-5" />
-              </div>
-              <div>
-                <span className="text-white text-sm font-medium block">{item.label}</span>
-                <span className="text-[#6b7280] text-xs">{item.desc}</span>
-              </div>
-            </div>
-          ))}
+          <h1 className="text-2xl font-bold text-white">Premium Manage</h1>
+          <p className="text-gray-400">Manage user milestones and premium features</p>
         </div>
       </div>
 
-      {/* Premium Users Table */}
-      <Card className="bg-[#1a2332] border-[#2a3a4d]">
-        <CardHeader className="border-b border-[#2a3a4d] bg-gradient-to-r from-[#f59e0b]/20 to-transparent">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-[#f59e0b] flex items-center gap-2">
-              <Crown className="w-5 h-5" /> Premium Users & Milestones
-            </CardTitle>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6b7280]" />
-              <Input 
-                placeholder="Search user..." 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 w-48 bg-[#0f1419] border-[#2a3a4d] text-white"
-              />
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-[#0f1419]">
-                <tr>
-                  {["User", "Plan", "Progress", "Deposit", "Withdraw", "Reward", "Status", "Actions"].map(h => (
-                    <th key={h} className="text-left px-5 py-4 text-xs font-semibold text-[#10b981] uppercase tracking-wider">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#2a3a4d]">
-                {isLoading ? (
-                  <tr><td colSpan={8} className="text-center py-8 text-[#6b7280]">Loading...</td></tr>
-                ) : filteredUsers?.length === 0 ? (
-                  <tr><td colSpan={8} className="text-center py-8 text-[#6b7280]">No premium users found</td></tr>
-                ) : (
-                  filteredUsers?.map((user, i) => (
-                    <tr key={user.id} className="hover:bg-[#0f1419]/50 transition-colors">
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-11 h-11 rounded-full bg-gradient-to-br ${avatarColors[i % avatarColors.length]} flex items-center justify-center text-white font-bold text-lg shadow-lg`}>
-                            {user.username.charAt(0).toUpperCase()}
-                          </div>
-                          <div>
-                            <p className="font-semibold text-white">{user.username}</p>
-                            <p className="text-xs text-[#6b7280]">{user.email}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-5 py-4">
-                        <span className={`px-3 py-1.5 text-xs font-semibold rounded-full ${planColors[user.plan] || planColors["Starter Plan"]}`}>
-                          {user.plan || "Starter Plan"}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4">
-                        {user.milestone ? (
-                          <div className="w-28">
-                            <div className="flex justify-between text-xs mb-1.5">
-                              <span className="text-[#10b981] font-semibold">
-                                {user.milestone.adsClickedCount}/{user.milestone.adsCountLimit}
-                              </span>
-                              <span className="text-[#6b7280]">
-                                {Math.round((user.milestone.adsClickedCount / user.milestone.adsCountLimit) * 100)}%
-                              </span>
-                            </div>
-                            <div className="w-full h-2.5 bg-[#2a3a4d] rounded-full overflow-hidden">
-                              <div 
-                                className={`h-full rounded-full bg-gradient-to-r ${
-                                  user.milestone.milestoneStatus === 'completed' ? 'from-[#10b981] to-[#059669]' :
-                                  user.milestone.milestoneStatus === 'in_progress' ? 'from-[#3b82f6] to-[#2563eb]' : 
-                                  'from-[#f59e0b] to-[#d97706]'
-                                }`} 
-                                style={{ width: `${(user.milestone.adsClickedCount / user.milestone.adsCountLimit) * 100}%` }} 
-                              />
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-[#6b7280] text-xs">No milestone</span>
-                        )}
-                      </td>
-                      <td className="px-5 py-4">
-                        {user.milestone ? (
-                          user.milestone.depositPaid ? (
-                            <span className="flex items-center gap-1.5 text-[#10b981] font-semibold">
-                              <Check className="w-4 h-4" /> ₹{user.milestone.depositAmount.toLocaleString()}
-                            </span>
-                          ) : (
-                            <span className="flex items-center gap-1.5 text-[#ef4444] font-semibold">
-                              <XCircle className="w-4 h-4" /> ₹{user.milestone.depositAmount.toLocaleString()}
-                            </span>
-                          )
-                        ) : "-"}
-                      </td>
-                      <td className="px-5 py-4">
-                        <span className="text-[#f59e0b] font-semibold">
-                          {user.milestone ? `₹${user.milestone.withdrawMilestone.toLocaleString()}` : "-"}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4">
-                        <span className="text-[#10b981] font-semibold">
-                          {user.milestone ? `₹${user.milestone.commissionReward.toLocaleString()}` : "-"}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4">
-                        {user.milestone ? (
-                          <span className={`px-3 py-1.5 text-xs font-semibold rounded-full ${
-                            user.milestone.milestoneStatus === 'completed' ? 'bg-[#10b981]/20 text-[#10b981]' :
-                            user.milestone.milestoneStatus === 'in_progress' ? 'bg-[#3b82f6]/20 text-[#3b82f6]' :
-                            user.milestone.milestoneStatus === 'pending' ? 'bg-[#f59e0b]/20 text-[#f59e0b]' : 
-                            'bg-[#ef4444]/20 text-[#ef4444]'
-                          }`}>
-                            {user.milestone.milestoneStatus.replace('_', ' ')}
-                          </span>
-                        ) : (
-                          <span className="text-[#6b7280] text-xs">-</span>
-                        )}
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-1">
-                          {[
-                            { icon: Target, color: "#8b5cf6", action: () => { setSelectedUser(user); setShowCreateMilestone(true); } },
-                            { icon: RotateCcw, color: "#ef4444", action: () => { setSelectedUser(user); setShowResetConfirm(true); } },
-                            { icon: Zap, color: "#10b981", action: () => { setSelectedUser(user); setPointsValue(String(user.points)); setShowSetPoints(true); } },
-                            { icon: Gift, color: "#f59e0b", action: () => { setSelectedUser(user); setTreasureType(user.treasureType); setShowAddTreasure(true); } },
-                            { icon: PiggyBank, color: "#ec4899", action: () => { setSelectedUser(user); setBookingValue(String(user.bookingValue)); setShowAddBooking(true); } },
-                            { icon: Edit, color: "#3b82f6", action: () => { setSelectedUser(user); setShowEditUser(true); } },
-                          ].map((btn, j) => (
-                            <button 
-                              key={j} 
-                              onClick={btn.action}
-                              className="p-2 rounded-lg hover:scale-110 transition-all" 
-                              style={{ backgroundColor: `${btn.color}20`, color: btn.color }}
-                            >
-                              <btn.icon className="w-4 h-4" />
-                            </button>
-                          ))}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Customer Popup Preview */}
-      <Card className="bg-[#1a2332] border-[#2a3a4d]">
+      {/* User Search & Selection */}
+      <Card className="bg-[#1a1a2e] border-gray-700">
         <CardHeader>
-          <CardTitle className="text-[#10b981] flex items-center gap-2">
-            <Eye className="w-5 h-5" /> Customer "Confirm Earn" Popup (After Ad Submission)
+          <CardTitle className="text-white flex items-center gap-2">
+            <Search className="h-5 w-5 text-amber-500" />
+            Select User
           </CardTitle>
+          <CardDescription className="text-gray-400">
+            Search and select a user to manage their premium settings
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="bg-[#0f1419] rounded-xl p-6 max-w-md mx-auto border border-[#2a3a4d] shadow-2xl">
-            <div className="text-center mb-5">
-              <div className="w-20 h-20 bg-gradient-to-br from-[#10b981] to-[#059669] rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
-                <Check className="w-10 h-10 text-white" />
-              </div>
-              <p className="text-[#10b981] font-bold text-lg">✅ Your ad is submitted successfully</p>
-              <p className="text-[#f59e0b] text-sm mt-2 flex items-center justify-center gap-1">
-                <Clock className="w-4 h-4" /> Your ad is under system review
-              </p>
-            </div>
-            <div className="space-y-3 border-t border-[#2a3a4d] pt-5">
-              <div className="flex justify-between items-center p-3 bg-[#1a2332] rounded-lg">
-                <span className="text-[#9ca3af]">Milestone Amount:</span>
-                <span className="text-[#ef4444] font-bold text-lg">-5,000 LKR</span>
-              </div>
-              <div className="flex justify-between items-center p-3 bg-[#1a2332] rounded-lg">
-                <span className="text-[#9ca3af]">Withdraw Milestone (Pending):</span>
-                <span className="text-[#f59e0b] font-bold text-lg">2,000 LKR</span>
-              </div>
-            </div>
-            <div className="mt-5 pt-4 border-t border-[#2a3a4d] text-center">
-              <p className="text-[#6b7280] text-sm">Progress: <span className="text-white font-semibold">7/12</span> → <span className="text-[#10b981] font-semibold">8/12</span></p>
-            </div>
-            <div className="mt-4 p-3 bg-[#ef4444]/10 border border-[#ef4444]/30 rounded-lg">
-              <p className="text-xs text-[#ef4444] text-center">❌ NO "Admin will review" | ❌ NO "Bonus +101.75"</p>
-            </div>
+        <CardContent className="space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search by username, name, or email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 bg-[#16213e] border-gray-600 text-white placeholder:text-gray-500"
+            />
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Create Milestone Modal */}
-      {showCreateMilestone && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#1a2332] rounded-xl border border-[#2a3a4d] w-full max-w-lg shadow-2xl">
-            <div className="px-6 py-4 border-b border-[#2a3a4d] flex items-center justify-between bg-gradient-to-r from-[#8b5cf6]/20 to-transparent">
-              <h3 className="text-lg font-semibold text-[#8b5cf6] flex items-center gap-2">
-                <Target className="w-5 h-5" /> Create Promotion (Milestone)
-              </h3>
-              <button onClick={() => { setShowCreateMilestone(false); setSelectedUser(null); }} className="text-[#6b7280] hover:text-white p-1">
-                <X className="w-5 h-5" />
-              </button>
+          {searchTerm && filteredUsers.length > 0 && !selectedUser && (
+            <div className="max-h-60 overflow-y-auto rounded-lg border border-gray-700 bg-[#16213e]">
+              {filteredUsers.slice(0, 10).map(user => (
+                <div
+                  key={user.id}
+                  onClick={() => {
+                    setSelectedUser(user);
+                    setSearchTerm("");
+                  }}
+                  className="p-3 hover:bg-[#1f2937] cursor-pointer border-b border-gray-700 last:border-b-0 transition-colors"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-white font-medium">{user.username}</p>
+                      <p className="text-gray-400 text-sm">{user.fullName} • {user.email}</p>
+                    </div>
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                      user.status === 'active' ? 'bg-green-500/20 text-green-400' :
+                      user.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
+                      'bg-red-500/20 text-red-400'
+                    }`}>
+                      {user.status}
+                    </span>
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="p-6 space-y-5">
-              {selectedUser && (
-                <div className="flex items-center gap-3 p-3 bg-[#0f1419] rounded-lg border border-[#2a3a4d]">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#f59e0b] to-[#d97706] flex items-center justify-center text-white font-bold">
-                    {selectedUser.username.charAt(0).toUpperCase()}
+          )}
+
+          {/* Selected User Display */}
+          {selectedUser && (
+            <div className="p-4 rounded-lg bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                    <User className="h-6 w-6 text-white" />
                   </div>
                   <div>
-                    <p className="font-semibold text-white">{selectedUser.username}</p>
-                    <p className="text-xs text-[#6b7280]">{selectedUser.email}</p>
+                    <p className="text-white font-bold text-lg">{selectedUser.username}</p>
+                    <p className="text-gray-400 text-sm">{selectedUser.fullName}</p>
+                    <p className="text-gray-500 text-xs">{selectedUser.email}</p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedUser(null)}
+                  className="text-gray-400 hover:text-white"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {/* User Stats Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+                <div className="p-3 rounded-lg bg-[#16213e] border border-gray-700">
+                  <p className="text-gray-400 text-xs">Points</p>
+                  <p className="text-white font-bold">{selectedUser.points}/100</p>
+                </div>
+                <div className="p-3 rounded-lg bg-[#16213e] border border-gray-700">
+                  <p className="text-gray-400 text-xs">Milestone Amount</p>
+                  <p className={`font-bold ${parseFloat(selectedUser.milestoneAmount) < 0 ? 'text-red-400' : 'text-green-400'}`}>
+                    {formatCurrency(selectedUser.milestoneAmount)}
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg bg-[#16213e] border border-gray-700">
+                  <p className="text-gray-400 text-xs">Milestone Reward</p>
+                  <p className="text-emerald-400 font-bold">{formatCurrency(selectedUser.milestoneReward)}</p>
+                </div>
+                <div className="p-3 rounded-lg bg-[#16213e] border border-gray-700">
+                  <p className="text-gray-400 text-xs">Destination</p>
+                  <p className="text-blue-400 font-bold">{formatCurrency(selectedUser.destinationAmount)}</p>
+                </div>
+              </div>
+
+              {/* Restriction Status */}
+              {selectedUser.restrictionAdsLimit && (
+                <div className="mt-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertCircle className="h-4 w-4 text-amber-400" />
+                    <span className="text-amber-400 font-medium text-sm">Active Promotion</span>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                    <div>
+                      <p className="text-gray-500 text-xs">Ads Progress</p>
+                      <p className="text-white">{selectedUser.restrictedAdsCompleted}/{selectedUser.restrictionAdsLimit}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500 text-xs">Deposit</p>
+                      <p className="text-red-400">{formatCurrency(selectedUser.restrictionDeposit || "0")}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500 text-xs">Pending</p>
+                      <p className="text-orange-400">{formatCurrency(selectedUser.ongoingMilestone)}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500 text-xs">Commission/Ad</p>
+                      <p className="text-green-400">{formatCurrency(selectedUser.restrictionCommission || "0")}</p>
+                    </div>
                   </div>
                 </div>
               )}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-[#9ca3af]">Ads Count Limit</Label>
-                  <Input 
-                    type="number" 
-                    placeholder="e.g. 12" 
-                    value={milestoneForm.adsCountLimit}
-                    onChange={(e) => setMilestoneForm({...milestoneForm, adsCountLimit: e.target.value})}
-                    className="mt-2 bg-[#0f1419] border-[#2a3a4d] text-white"
-                  />
-                </div>
-                <div>
-                  <Label className="text-[#9ca3af]">Deposit Amount (₹)</Label>
-                  <Input 
-                    type="number" 
-                    placeholder="e.g. 5000" 
-                    value={milestoneForm.depositAmount}
-                    onChange={(e) => setMilestoneForm({...milestoneForm, depositAmount: e.target.value})}
-                    className="mt-2 bg-[#0f1419] border-[#2a3a4d] text-white"
-                  />
-                  <p className="text-xs text-[#6b7280] mt-1">Shows as NEGATIVE</p>
-                </div>
-                <div>
-                  <Label className="text-[#9ca3af]">Withdraw Milestone (₹)</Label>
-                  <Input 
-                    type="number" 
-                    placeholder="e.g. 2000" 
-                    value={milestoneForm.withdrawMilestone}
-                    onChange={(e) => setMilestoneForm({...milestoneForm, withdrawMilestone: e.target.value})}
-                    className="mt-2 bg-[#0f1419] border-[#2a3a4d] text-white"
-                  />
-                </div>
-                <div>
-                  <Label className="text-[#9ca3af]">Commission Reward (₹)</Label>
-                  <Input 
-                    type="number" 
-                    placeholder="e.g. 500" 
-                    value={milestoneForm.commissionReward}
-                    onChange={(e) => setMilestoneForm({...milestoneForm, commissionReward: e.target.value})}
-                    className="mt-2 bg-[#0f1419] border-[#2a3a4d] text-white"
-                  />
-                </div>
-              </div>
-              <div className="flex gap-3 pt-2">
-                <Button variant="outline" onClick={() => { setShowCreateMilestone(false); setSelectedUser(null); }} className="flex-1 bg-[#2a3a4d] border-0 text-[#9ca3af]">
-                  Cancel
-                </Button>
-                <Button 
-                  onClick={() => selectedUser && createMilestone.mutate({ userId: selectedUser.id, milestone: milestoneForm })}
-                  className="flex-1 bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed]"
-                  disabled={createMilestone.isPending}
-                >
-                  <Save className="w-4 h-4 mr-2" /> Save Milestone
-                </Button>
-              </div>
             </div>
-          </div>
-        </div>
-      )}
+          )}
+        </CardContent>
+      </Card>
 
-      {/* Reset Confirm Modal */}
-      {showResetConfirm && selectedUser && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#1a2332] rounded-xl border border-[#2a3a4d] w-full max-w-md shadow-2xl">
-            <div className="px-6 py-4 border-b border-[#2a3a4d] bg-gradient-to-r from-[#ef4444]/20 to-transparent">
-              <h3 className="text-lg font-semibold text-[#ef4444] flex items-center gap-2">
-                <AlertCircle className="w-5 h-5" /> Confirm RESET
-              </h3>
+      {/* Action Cards Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {actionCards.map(card => (
+          <Card 
+            key={card.id}
+            className={`bg-[#1a1a2e] border-gray-700 overflow-hidden cursor-pointer transition-all duration-200 hover:scale-[1.02] hover:border-gray-500 ${card.disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+            onClick={() => !card.disabled && setActiveModal(card.id)}
+          >
+            <div className={`h-1 bg-gradient-to-r ${card.gradient}`} />
+            <CardContent className="pt-4">
+              <div className="flex items-start justify-between">
+                <div className={`p-3 rounded-lg bg-gradient-to-br ${card.gradient}`}>
+                  <card.icon className="h-6 w-6 text-white" />
+                </div>
+                {card.badge && (
+                  <span className="text-2xl">{card.badge}</span>
+                )}
+              </div>
+              <h3 className="text-white font-bold mt-3">{card.title}</h3>
+              <p className="text-gray-400 text-sm mt-1">{card.description}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Create Promotion Modal */}
+      <Dialog open={activeModal === "create-promotion"} onOpenChange={() => setActiveModal(null)}>
+        <DialogContent className="bg-[#1a1a2e] border-gray-700 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Star className="h-5 w-5 text-amber-500" />
+              {selectedUser?.restrictionAdsLimit ? "Edit Promotion" : "Create Promotion"}
+            </DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Set milestone restrictions for {selectedUser?.username}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="text-gray-300">Ads Count Limit (Booking Count)</Label>
+              <Input
+                type="number"
+                placeholder="e.g., 12"
+                value={promotionForm.adsLimit}
+                onChange={(e) => setPromotionForm({...promotionForm, adsLimit: e.target.value})}
+                className="bg-[#16213e] border-gray-600 text-white"
+              />
             </div>
-            <div className="p-6 space-y-4">
-              <p className="text-[#9ca3af]">Reset milestone for <span className="text-white font-semibold">{selectedUser.username}</span>?</p>
-              <div className="bg-[#ef4444]/10 border border-[#ef4444]/30 rounded-lg p-4">
-                <p className="text-[#ef4444] text-sm font-semibold mb-2">This will:</p>
-                <ul className="text-sm text-[#9ca3af] space-y-1.5">
-                  <li>• adsClickedCount = 0</li>
-                  <li>• milestoneStatus = reset</li>
-                  <li>• depositPaid = false</li>
-                  <li>• Old milestone closed</li>
-                </ul>
-              </div>
-              <div className="flex gap-3">
-                <Button variant="outline" onClick={() => { setShowResetConfirm(false); setSelectedUser(null); }} className="flex-1 bg-[#2a3a4d] border-0 text-[#9ca3af]">
-                  Cancel
-                </Button>
-                <Button 
-                  onClick={() => resetMilestone.mutate(selectedUser.id)}
-                  className="flex-1 bg-gradient-to-r from-[#ef4444] to-[#dc2626]"
-                  disabled={resetMilestone.isPending}
-                >
-                  <RotateCcw className="w-4 h-4 mr-2" /> RESET
-                </Button>
-              </div>
+            <div className="space-y-2">
+              <Label className="text-gray-300">Deposit Amount (LKR)</Label>
+              <Input
+                type="number"
+                placeholder="e.g., 5000"
+                value={promotionForm.deposit}
+                onChange={(e) => setPromotionForm({...promotionForm, deposit: e.target.value})}
+                className="bg-[#16213e] border-gray-600 text-white"
+              />
+              <p className="text-xs text-gray-500">Will show as negative to user</p>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-gray-300">Withdraw Milestone / Pending Amount (LKR)</Label>
+              <Input
+                type="number"
+                placeholder="e.g., 2000"
+                value={promotionForm.pendingAmount}
+                onChange={(e) => setPromotionForm({...promotionForm, pendingAmount: e.target.value})}
+                className="bg-[#16213e] border-gray-600 text-white"
+              />
+              <p className="text-xs text-gray-500">Locked/pending amount shown to user</p>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-gray-300">Commission Reward per Ad (LKR)</Label>
+              <Input
+                type="number"
+                placeholder="e.g., 500"
+                value={promotionForm.commission}
+                onChange={(e) => setPromotionForm({...promotionForm, commission: e.target.value})}
+                className="bg-[#16213e] border-gray-600 text-white"
+              />
             </div>
           </div>
-        </div>
-      )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setActiveModal(null)} className="border-gray-600 text-gray-300">
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => createPromotionMutation.mutate({
+                adsLimit: parseInt(promotionForm.adsLimit),
+                deposit: promotionForm.deposit,
+                commission: promotionForm.commission,
+                pendingAmount: promotionForm.pendingAmount || promotionForm.deposit
+              })}
+              disabled={createPromotionMutation.isPending || !promotionForm.adsLimit || !promotionForm.deposit || !promotionForm.commission}
+              className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700"
+            >
+              {createPromotionMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {selectedUser?.restrictionAdsLimit ? "Update" : "Create"} Promotion
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset Milestone Modal */}
+      <Dialog open={activeModal === "reset-milestone"} onOpenChange={() => setActiveModal(null)}>
+        <DialogContent className="bg-[#1a1a2e] border-gray-700 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-400">
+              <RotateCcw className="h-5 w-5" />
+              Reset Milestone
+            </DialogTitle>
+            <DialogDescription className="text-gray-400">
+              This will clear all milestone progress for {selectedUser?.username}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/30">
+              <p className="text-red-400 text-sm">
+                <strong>Warning:</strong> This action will:
+              </p>
+              <ul className="mt-2 text-sm text-gray-400 space-y-1">
+                <li>• Reset ads clicked count to 0</li>
+                <li>• Remove all restriction settings</li>
+                <li>• Clear pending milestone amount</li>
+                <li>• Delete all ad click history</li>
+              </ul>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setActiveModal(null)} className="border-gray-600 text-gray-300">
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => resetMilestoneMutation.mutate()}
+              disabled={resetMilestoneMutation.isPending}
+              className="bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700"
+            >
+              {resetMilestoneMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Reset Milestone
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Set Points Modal */}
-      {showSetPoints && selectedUser && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#1a2332] rounded-xl border border-[#2a3a4d] w-full max-w-md shadow-2xl">
-            <div className="px-6 py-4 border-b border-[#2a3a4d] bg-gradient-to-r from-[#10b981]/20 to-transparent flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-[#10b981] flex items-center gap-2">
-                <Zap className="w-5 h-5" /> SET Points
-              </h3>
-              <button onClick={() => { setShowSetPoints(false); setSelectedUser(null); }} className="text-[#6b7280] hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
+      <Dialog open={activeModal === "set-points"} onOpenChange={() => setActiveModal(null)}>
+        <DialogContent className="bg-[#1a1a2e] border-gray-700 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Award className="h-5 w-5 text-purple-500" />
+              Set Points
+            </DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Set point balance for {selectedUser?.username} (max 100)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="p-3 rounded-lg bg-[#16213e] border border-gray-700">
+              <p className="text-gray-400 text-xs">Current Points</p>
+              <p className="text-white text-2xl font-bold">{selectedUser?.points}/100</p>
             </div>
-            <div className="p-6 space-y-4">
-              <div className="p-3 bg-[#0f1419] rounded-lg border border-[#2a3a4d]">
-                <p className="text-[#6b7280] text-xs">Current Points for {selectedUser.username}</p>
-                <p className="text-[#8b5cf6] font-bold text-2xl">{selectedUser.points.toLocaleString()}</p>
-              </div>
-              <div>
-                <Label className="text-[#9ca3af]">New Points Value</Label>
-                <Input 
-                  type="number" 
-                  placeholder="e.g. 1500" 
-                  value={pointsValue}
-                  onChange={(e) => setPointsValue(e.target.value)}
-                  className="mt-2 bg-[#0f1419] border-[#2a3a4d] text-white"
-                />
-              </div>
-              <div className="flex gap-3">
-                <Button variant="outline" onClick={() => { setShowSetPoints(false); setSelectedUser(null); }} className="flex-1 bg-[#2a3a4d] border-0 text-[#9ca3af]">
-                  Cancel
-                </Button>
-                <Button 
-                  onClick={() => updatePoints.mutate({ userId: selectedUser.id, points: Number(pointsValue) })}
-                  className="flex-1 bg-gradient-to-r from-[#10b981] to-[#059669]"
-                  disabled={updatePoints.isPending}
-                >
-                  <Save className="w-4 h-4 mr-2" /> Save
-                </Button>
-              </div>
+            <div className="space-y-2">
+              <Label className="text-gray-300">New Points Value</Label>
+              <Input
+                type="number"
+                placeholder="Enter value (0-100)"
+                min="0"
+                max="100"
+                value={pointsValue}
+                onChange={(e) => setPointsValue(e.target.value)}
+                className="bg-[#16213e] border-gray-600 text-white"
+              />
             </div>
           </div>
-        </div>
-      )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setActiveModal(null)} className="border-gray-600 text-gray-300">
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => setPointsMutation.mutate(pointsValue)}
+              disabled={setPointsMutation.isPending || !pointsValue || parseInt(pointsValue) > 100}
+              className="bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700"
+            >
+              {setPointsMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Set Points
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Treasure Modal */}
+      <Dialog open={activeModal === "add-treasure"} onOpenChange={() => setActiveModal(null)}>
+        <DialogContent className="bg-[#1a1a2e] border-gray-700 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Gem className="h-5 w-5 text-emerald-500" />
+              Add Treasure
+            </DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Add treasure balance for {selectedUser?.username}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 rounded-lg bg-[#16213e] border border-gray-700">
+                <p className="text-gray-400 text-xs">Premium Treasure</p>
+                <p className="text-emerald-400 font-bold">{formatCurrency(selectedUser?.milestoneReward || "0")}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-[#16213e] border border-gray-700">
+                <p className="text-gray-400 text-xs">Normal Treasure</p>
+                <p className="text-blue-400 font-bold">{formatCurrency(selectedUser?.destinationAmount || "0")}</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-gray-300">Treasure Type</Label>
+              <Select 
+                value={treasureForm.type} 
+                onValueChange={(value: "premium" | "normal") => setTreasureForm({...treasureForm, type: value})}
+              >
+                <SelectTrigger className="bg-[#16213e] border-gray-600 text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-[#1a1a2e] border-gray-700">
+                  <SelectItem value="premium" className="text-white">Premium Treasure (Milestone Reward)</SelectItem>
+                  <SelectItem value="normal" className="text-white">Normal Treasure (Destination Amount)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-gray-300">Amount to Add (LKR)</Label>
+              <Input
+                type="number"
+                placeholder="Enter amount"
+                value={treasureForm.amount}
+                onChange={(e) => setTreasureForm({...treasureForm, amount: e.target.value})}
+                className="bg-[#16213e] border-gray-600 text-white"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setActiveModal(null)} className="border-gray-600 text-gray-300">
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => addTreasureMutation.mutate(treasureForm)}
+              disabled={addTreasureMutation.isPending || !treasureForm.amount}
+              className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700"
+            >
+              {addTreasureMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Add Treasure
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Booking Value Modal */}
+      <Dialog open={activeModal === "add-booking"} onOpenChange={() => setActiveModal(null)}>
+        <DialogContent className="bg-[#1a1a2e] border-gray-700 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wallet className="h-5 w-5 text-blue-500" />
+              Add Booking Value
+            </DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Add to milestone amount for {selectedUser?.username}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="p-3 rounded-lg bg-[#16213e] border border-gray-700">
+              <p className="text-gray-400 text-xs">Current Milestone Amount</p>
+              <p className={`text-2xl font-bold ${parseFloat(selectedUser?.milestoneAmount || "0") < 0 ? 'text-red-400' : 'text-green-400'}`}>
+                {formatCurrency(selectedUser?.milestoneAmount || "0")}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-gray-300">Amount to Add (LKR)</Label>
+              <Input
+                type="number"
+                placeholder="Enter amount"
+                value={bookingValue}
+                onChange={(e) => setBookingValue(e.target.value)}
+                className="bg-[#16213e] border-gray-600 text-white"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setActiveModal(null)} className="border-gray-600 text-gray-300">
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => addBookingValueMutation.mutate(bookingValue)}
+              disabled={addBookingValueMutation.isPending || !bookingValue}
+              className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
+            >
+              {addBookingValueMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Add Booking Value
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit User/Bank Modal */}
+      <Dialog open={activeModal === "edit-user"} onOpenChange={() => setActiveModal(null)}>
+        <DialogContent className="bg-[#1a1a2e] border-gray-700 text-white max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserCog className="h-5 w-5 text-gray-400" />
+              Edit User & Bank Details
+            </DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Update details for {selectedUser?.username}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+            {/* User Details Section */}
+            <div className="space-y-4">
+              <h4 className="text-white font-medium flex items-center gap-2">
+                <User className="h-4 w-4" />
+                User Details
+              </h4>
+              <div className="space-y-2">
+                <Label className="text-gray-300">Username</Label>
+                <Input
+                  value={userDetailsForm.username}
+                  onChange={(e) => setUserDetailsForm({...userDetailsForm, username: e.target.value})}
+                  className="bg-[#16213e] border-gray-600 text-white"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-gray-300">Mobile Number</Label>
+                <Input
+                  value={userDetailsForm.mobileNumber}
+                  onChange={(e) => setUserDetailsForm({...userDetailsForm, mobileNumber: e.target.value})}
+                  className="bg-[#16213e] border-gray-600 text-white"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-gray-300">New Password (optional)</Label>
+                <Input
+                  type="password"
+                  placeholder="Leave blank to keep current"
+                  value={userDetailsForm.password}
+                  onChange={(e) => setUserDetailsForm({...userDetailsForm, password: e.target.value})}
+                  className="bg-[#16213e] border-gray-600 text-white"
+                />
+              </div>
+              <Button 
+                onClick={() => updateUserDetailsMutation.mutate(userDetailsForm)}
+                disabled={updateUserDetailsMutation.isPending}
+                className="w-full bg-gradient-to-r from-slate-500 to-gray-600"
+              >
+                {updateUserDetailsMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Update User Details
+              </Button>
+            </div>
+
+            {/* Bank Details Section */}
+            <div className="space-y-4">
+              <h4 className="text-white font-medium flex items-center gap-2">
+                <Building className="h-4 w-4" />
+                Bank Details
+              </h4>
+              <div className="space-y-2">
+                <Label className="text-gray-300">Bank Name</Label>
+                <Input
+                  value={bankDetailsForm.bankName}
+                  onChange={(e) => setBankDetailsForm({...bankDetailsForm, bankName: e.target.value})}
+                  className="bg-[#16213e] border-gray-600 text-white"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-gray-300">Account Number</Label>
+                <Input
+                  value={bankDetailsForm.accountNumber}
+                  onChange={(e) => setBankDetailsForm({...bankDetailsForm, accountNumber: e.target.value})}
+                  className="bg-[#16213e] border-gray-600 text-white"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-gray-300">Account Holder Name</Label>
+                <Input
+                  value={bankDetailsForm.accountHolderName}
+                  onChange={(e) => setBankDetailsForm({...bankDetailsForm, accountHolderName: e.target.value})}
+                  className="bg-[#16213e] border-gray-600 text-white"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-gray-300">Branch Name</Label>
+                <Input
+                  value={bankDetailsForm.branchName}
+                  onChange={(e) => setBankDetailsForm({...bankDetailsForm, branchName: e.target.value})}
+                  className="bg-[#16213e] border-gray-600 text-white"
+                />
+              </div>
+              <Button 
+                onClick={() => updateBankDetailsMutation.mutate(bankDetailsForm)}
+                disabled={updateBankDetailsMutation.isPending}
+                className="w-full bg-gradient-to-r from-slate-500 to-gray-600"
+              >
+                {updateBankDetailsMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Update Bank Details
+              </Button>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setActiveModal(null)} className="border-gray-600 text-gray-300">
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
