@@ -22,11 +22,11 @@ interface DashboardStats {
 }
 
 interface RecentUser {
-  id: number;
+  _id: string;
   username: string;
   email: string;
   status: string;
-  balance: string;
+  balance: number;
   createdAt: string;
 }
 
@@ -40,21 +40,21 @@ export default function AdminDashboard() {
     }));
   }, []);
 
-  // Fetch dashboard stats
+  // Fetch dashboard stats - FIXED API PATH
   const { data: stats } = useQuery<DashboardStats>({
-    queryKey: ["/api/admin/dashboard-stats"],
+    queryKey: ["/api/admin/dashboard/stats"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/dashboard-stats", { credentials: "include" });
+      const res = await fetch("/api/admin/dashboard/stats", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch stats");
       return res.json();
     },
   });
 
-  // Fetch recent users
+  // Fetch recent users - FIXED API PATH
   const { data: recentUsers } = useQuery<RecentUser[]>({
-    queryKey: ["/api/admin/recent-users"],
+    queryKey: ["/api/admin/users/recent"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/recent-users?limit=3", { credentials: "include" });
+      const res = await fetch("/api/admin/users/recent", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch users");
       return res.json();
     },
@@ -102,7 +102,7 @@ export default function AdminDashboard() {
     { 
       title: "Active Users", 
       value: stats?.activeUsers || 0, 
-      subtitle: `${stats?.totalUsers ? Math.round((stats.activeUsers / stats.totalUsers) * 100) : 0}% of total`,
+      subtitle: `${stats?.totalUsers ? Math.round(((stats?.activeUsers || 0) / stats.totalUsers) * 100) : 0}% of total`,
       icon: UserCheck, 
       gradient: "from-[#06b6d4] to-[#0891b2]" 
     },
@@ -254,30 +254,34 @@ export default function AdminDashboard() {
             </div>
           </CardHeader>
           <CardContent className="p-4">
-            {recentUsers?.map((user, i) => (
-              <div 
-                key={user.id} 
-                className={`flex items-center justify-between py-4 ${i !== (recentUsers.length - 1) ? 'border-b border-[#2a3a4d]' : ''}`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-11 h-11 rounded-full bg-gradient-to-br ${avatarColors[i % avatarColors.length]} flex items-center justify-center text-white font-bold shadow-lg`}>
-                    {user.username.charAt(0).toUpperCase()}
+            {recentUsers && recentUsers.length > 0 ? (
+              recentUsers.map((user, i) => (
+                <div 
+                  key={user._id} 
+                  className={`flex items-center justify-between py-4 ${i !== (recentUsers.length - 1) ? 'border-b border-[#2a3a4d]' : ''}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-11 h-11 rounded-full bg-gradient-to-br ${avatarColors[i % avatarColors.length]} flex items-center justify-center text-white font-bold shadow-lg`}>
+                      {user.username.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-white">{user.username}</h4>
+                      <p className="text-[#6b7280] text-sm">@{user.username}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="font-semibold text-white">{user.username}</h4>
-                    <p className="text-[#6b7280] text-sm">@{user.username}</p>
+                  <div className="text-right">
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                      user.status === 'active' ? 'bg-[#10b981]/20 text-[#10b981]' : 'bg-[#f59e0b]/20 text-[#f59e0b]'
+                    }`}>
+                      {user.status}
+                    </span>
+                    <p className="text-[#9ca3af] text-sm mt-1">₹{user.balance?.toLocaleString() || '0'}</p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
-                    user.status === 'active' ? 'bg-[#10b981]/20 text-[#10b981]' : 'bg-[#f59e0b]/20 text-[#f59e0b]'
-                  }`}>
-                    {user.status}
-                  </span>
-                  <p className="text-[#9ca3af] text-sm mt-1">₹{user.balance}</p>
-                </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-[#6b7280] text-center py-4">No recent users</p>
+            )}
           </CardContent>
         </Card>
       </div>
