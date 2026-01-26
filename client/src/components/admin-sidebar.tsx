@@ -1,27 +1,11 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
-} from "@/components/ui/sidebar";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import {
+import { 
   LayoutDashboard,
   Users,
   UserCheck,
   ShieldCheck,
-  UserCog,
-  Star,
+  CreditCard,
   Crown,
   FileText,
   Wallet,
@@ -44,6 +28,8 @@ import {
   Palette,
   ImageIcon,
   ChevronDown,
+  ChevronRight,
+  LogOut
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -52,249 +38,241 @@ interface MenuItem {
   icon: React.ComponentType<{ className?: string }>;
   path?: string;
   badge?: string;
+  badgeType?: "star" | "new";
   children?: MenuItem[];
 }
 
-interface MenuSection {
+interface MenuGroup {
   title: string;
   icon: React.ComponentType<{ className?: string }>;
+  color: string;
   badge?: string;
   items: MenuItem[];
 }
 
-const menuSections: MenuSection[] = [
+const menuStructure: MenuGroup[] = [
   {
     title: "USER MANAGEMENT",
     icon: Users,
+    color: "text-[#06b6d4]", // Cyan
     items: [
       { label: "All Users", icon: Users, path: "/admin/users" },
       { label: "Pending Users", icon: UserCheck, path: "/admin/pending" },
       { label: "Admins", icon: ShieldCheck, path: "/admin/admins" },
-    ],
+    ]
   },
   {
     title: "TRANSACTION",
-    icon: Wallet,
+    icon: CreditCard,
+    color: "text-[#10b981]", // Green
     items: [
-      { label: "Users", icon: UserCog, path: "/admin/transaction-users" },
-      { label: "Premium Manage", icon: Star, path: "/admin/premium-manage", badge: "⭐" },
-      { label: "Premium", icon: Crown, path: "/admin/premium", badge: "⭐" },
+      { label: "Users", icon: Users, path: "/admin/transaction-users" },
+      { label: "Premium Manage", icon: Crown, path: "/admin/premium-manage", badge: "⭐", badgeType: "star" },
+      { label: "Premium", icon: Crown, path: "/admin/premium", badge: "NEW", badgeType: "new" },
       { label: "Transaction Details", icon: FileText, path: "/admin/transactions" },
       { label: "Withdraw List", icon: Wallet, path: "/admin/withdrawals" },
       { label: "Deposit Details", icon: PiggyBank, path: "/admin/deposits" },
       { label: "Commission", icon: Percent, path: "/admin/commission" },
-    ],
+    ]
   },
   {
     title: "ADS MANAGEMENT",
     icon: Megaphone,
+    color: "text-[#f59e0b]", // Orange
     items: [
       { label: "Manage Ads", icon: Megaphone, path: "/admin/ads" },
-    ],
+    ]
   },
   {
     title: "SOCIAL MEDIA",
     icon: Globe,
+    color: "text-[#10b981]", // Green
     badge: "NEW",
     items: [
-      {
-        label: "Contact Us",
+      { 
+        label: "Contact Us", 
         icon: Phone,
         children: [
           { label: "Phone", icon: Phone, path: "/admin/contact/phone" },
           { label: "Email", icon: Mail, path: "/admin/contact/email" },
           { label: "WhatsApp", icon: MessageCircle, path: "/admin/contact/whatsapp" },
           { label: "Telegram", icon: Send, path: "/admin/contact/telegram" },
-        ],
+        ]
       },
-      {
-        label: "Info",
+      { 
+        label: "Info", 
         icon: Info,
         children: [
           { label: "About Us", icon: Info, path: "/admin/info/about" },
           { label: "Terms & Conditions", icon: FileQuestion, path: "/admin/info/terms" },
           { label: "Privacy Policy", icon: Shield, path: "/admin/info/privacy" },
-        ],
+        ]
       },
-    ],
+    ]
   },
   {
     title: "SITE CONTENT",
     icon: Layout,
+    color: "text-[#8b5cf6]", // Purple
     badge: "NEW",
     items: [
       { label: "Home Page", icon: Home, path: "/admin/content/home" },
       { label: "Dashboard Page", icon: SlidersHorizontal, path: "/admin/content/dashboard" },
       { label: "Slideshow Images", icon: Image, path: "/admin/slideshow" },
       { label: "Text & Labels", icon: Type, path: "/admin/content/text" },
-    ],
+    ]
   },
   {
     title: "APPEARANCE",
     icon: Palette,
+    color: "text-[#ec4899]", // Pink
     badge: "NEW",
     items: [
       { label: "Theme Colors", icon: Palette, path: "/admin/theme-settings" },
       { label: "Logo & Branding", icon: ImageIcon, path: "/admin/branding" },
-    ],
+    ]
   },
 ];
 
-export function AdminSidebar() {
+export default function AdminSidebar() {
   const [location] = useLocation();
-  const [openSections, setOpenSections] = useState<string[]>(["USER MANAGEMENT", "TRANSACTION"]);
-  const [openSubmenus, setOpenSubmenus] = useState<string[]>([]);
+  const [expandedGroups, setExpandedGroups] = useState<string[]>(["USER MANAGEMENT", "TRANSACTION", "ADS MANAGEMENT", "SOCIAL MEDIA"]);
+  const [expandedSubmenus, setExpandedSubmenus] = useState<string[]>([]);
 
-  const toggleSection = (title: string) => {
-    setOpenSections((prev) =>
-      prev.includes(title) ? prev.filter((t) => t !== title) : [...prev, title]
+  const toggleGroup = (title: string) => {
+    setExpandedGroups(prev => 
+      prev.includes(title) ? prev.filter(g => g !== title) : [...prev, title]
     );
   };
 
   const toggleSubmenu = (label: string) => {
-    setOpenSubmenus((prev) =>
-      prev.includes(label) ? prev.filter((l) => l !== label) : [...prev, label]
+    setExpandedSubmenus(prev => 
+      prev.includes(label) ? prev.filter(s => s !== label) : [...prev, label]
     );
   };
 
   const isActive = (path?: string) => path && location === path;
 
+  const renderMenuItem = (item: MenuItem, depth: number = 0) => {
+    const hasChildren = item.children && item.children.length > 0;
+    const isExpanded = expandedSubmenus.includes(item.label);
+    const active = isActive(item.path);
+
+    if (hasChildren) {
+      return (
+        <div key={item.label}>
+          <button
+            onClick={() => toggleSubmenu(item.label)}
+            className="w-full flex items-center justify-between px-4 py-2 text-sm text-[#9ca3af] hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <item.icon className="h-4 w-4" />
+              <span>{item.label}</span>
+            </div>
+            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          </button>
+          {isExpanded && (
+            <div className="ml-6 mt-1 space-y-1">
+              {item.children!.map(child => renderMenuItem(child, depth + 1))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <Link key={item.path} href={item.path || "#"}>
+        <div
+          className={cn(
+            "flex items-center justify-between px-4 py-2 text-sm rounded-lg cursor-pointer transition-colors",
+            active 
+              ? "bg-[#10b981]/20 text-[#10b981]" 
+              : "text-[#9ca3af] hover:text-white hover:bg-white/5"
+          )}
+        >
+          <div className="flex items-center gap-3">
+            <item.icon className="h-4 w-4" />
+            <span>{item.label}</span>
+          </div>
+          {item.badge && item.badgeType === "star" && (
+            <span className="text-[#f59e0b] text-lg">⭐</span>
+          )}
+          {item.badge && item.badgeType === "new" && (
+            <span className="px-1.5 py-0.5 text-[10px] font-bold bg-[#ef4444] text-white rounded">NEW</span>
+          )}
+        </div>
+      </Link>
+    );
+  };
+
   return (
-    <Sidebar className="border-r border-[#2a3a4d] bg-[#1a2332]">
-      <SidebarHeader className="p-4 border-b border-[#2a3a4d]">
+    <div className="w-64 bg-[#1a2332] border-r border-[#2a3a4d] min-h-screen flex flex-col">
+      {/* Logo */}
+      <div className="p-4 border-b border-[#2a3a4d]">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#f59e0b] to-[#ea580c] flex items-center justify-center shadow-lg">
+          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#10b981] to-[#06b6d4] flex items-center justify-center">
             <span className="text-white font-bold text-lg">O</span>
           </div>
           <div>
-            <h1 className="text-white font-bold text-lg">OdelADS</h1>
+            <h1 className="text-white font-bold">OdelADS</h1>
             <p className="text-[#6b7280] text-xs">Admin Panel</p>
           </div>
         </div>
-      </SidebarHeader>
+      </div>
 
-      <SidebarContent className="px-2 py-4">
+      {/* Navigation */}
+      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
         {/* Dashboard */}
-        <SidebarGroup>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                asChild
-                isActive={location === "/admin"}
-                className={cn(
-                  "w-full",
-                  location === "/admin" && "bg-gradient-to-r from-[#f59e0b]/20 to-[#ea580c]/20 text-[#f59e0b] border-l-2 border-[#f59e0b]"
-                )}
-              >
-                <Link href="/admin">
-                  <LayoutDashboard className="h-5 w-5" />
-                  <span className="font-semibold">Dashboard</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarGroup>
+        <Link href="/admin">
+          <div
+            className={cn(
+              "flex items-center gap-3 px-4 py-2.5 rounded-lg cursor-pointer transition-colors",
+              location === "/admin"
+                ? "bg-[#10b981]/20 text-[#10b981] border border-[#10b981]/30"
+                : "text-[#9ca3af] hover:text-white hover:bg-white/5"
+            )}
+          >
+            <LayoutDashboard className="h-5 w-5" />
+            <span className="font-medium">Dashboard</span>
+          </div>
+        </Link>
 
-        {/* Menu Sections */}
-        {menuSections.map((section) => (
-          <SidebarGroup key={section.title}>
-            <Collapsible
-              open={openSections.includes(section.title)}
-              onOpenChange={() => toggleSection(section.title)}
+        {/* Menu Groups */}
+        {menuStructure.map(group => (
+          <div key={group.title} className="pt-3">
+            <button
+              onClick={() => toggleGroup(group.title)}
+              className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold transition-colors"
             >
-              <CollapsibleTrigger asChild>
-                <SidebarGroupLabel className="flex items-center justify-between cursor-pointer hover:text-white px-2 py-2 text-[#6b7280]">
-                  <div className="flex items-center gap-2">
-                    <section.icon className="h-4 w-4" />
-                    <span className="text-xs font-semibold">{section.title}</span>
-                    {section.badge && (
-                      <span className="px-1.5 py-0.5 text-[10px] font-bold bg-[#10b981]/20 text-[#10b981] rounded">
-                        {section.badge}
-                      </span>
-                    )}
-                  </div>
-                  <ChevronDown
-                    className={cn(
-                      "h-4 w-4 transition-transform",
-                      openSections.includes(section.title) && "rotate-180"
-                    )}
-                  />
-                </SidebarGroupLabel>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <SidebarGroupContent>
-                  <SidebarMenu>
-                    {section.items.map((item) =>
-                      item.children ? (
-                        <Collapsible
-                          key={item.label}
-                          open={openSubmenus.includes(item.label)}
-                          onOpenChange={() => toggleSubmenu(item.label)}
-                        >
-                          <SidebarMenuItem>
-                            <CollapsibleTrigger asChild>
-                              <SidebarMenuButton className="w-full justify-between">
-                                <div className="flex items-center gap-2">
-                                  <item.icon className="h-4 w-4" />
-                                  <span>{item.label}</span>
-                                </div>
-                                <ChevronDown
-                                  className={cn(
-                                    "h-4 w-4 transition-transform",
-                                    openSubmenus.includes(item.label) && "rotate-180"
-                                  )}
-                                />
-                              </SidebarMenuButton>
-                            </CollapsibleTrigger>
-                            <CollapsibleContent>
-                              <SidebarMenuSub>
-                                {item.children.map((child) => (
-                                  <SidebarMenuSubItem key={child.path}>
-                                    <SidebarMenuSubButton
-                                      asChild
-                                      isActive={isActive(child.path)}
-                                      className={cn(
-                                        isActive(child.path) && "bg-[#f59e0b]/20 text-[#f59e0b]"
-                                      )}
-                                    >
-                                      <Link href={child.path || "#"}>
-                                        <child.icon className="h-4 w-4" />
-                                        <span>{child.label}</span>
-                                      </Link>
-                                    </SidebarMenuSubButton>
-                                  </SidebarMenuSubItem>
-                                ))}
-                              </SidebarMenuSub>
-                            </CollapsibleContent>
-                          </SidebarMenuItem>
-                        </Collapsible>
-                      ) : (
-                        <SidebarMenuItem key={item.path}>
-                          <SidebarMenuButton
-                            asChild
-                            isActive={isActive(item.path)}
-                            className={cn(
-                              isActive(item.path) && "bg-[#f59e0b]/20 text-[#f59e0b]"
-                            )}
-                          >
-                            <Link href={item.path || "#"}>
-                              <item.icon className="h-4 w-4" />
-                              <span>{item.label}</span>
-                              {item.badge && (
-                                <span className="ml-auto text-lg">{item.badge}</span>
-                              )}
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                      )
-                    )}
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </CollapsibleContent>
-            </Collapsible>
-          </SidebarGroup>
+              <div className="flex items-center gap-2">
+                <group.icon className={cn("h-4 w-4", group.color)} />
+                <span className={group.color}>{group.title}</span>
+                {group.badge && (
+                  <span className="px-1.5 py-0.5 text-[10px] font-bold bg-[#f59e0b] text-white rounded">{group.badge}</span>
+                )}
+              </div>
+              {expandedGroups.includes(group.title) ? (
+                <ChevronDown className={cn("h-4 w-4", group.color)} />
+              ) : (
+                <ChevronRight className={cn("h-4 w-4", group.color)} />
+              )}
+            </button>
+            {expandedGroups.includes(group.title) && (
+              <div className="mt-1 space-y-1 ml-2">
+                {group.items.map(item => renderMenuItem(item))}
+              </div>
+            )}
+          </div>
         ))}
-      </SidebarContent>
-    </Sidebar>
+      </nav>
+
+      {/* Logout */}
+      <div className="p-3 border-t border-[#2a3a4d]">
+        <button className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-[#ef4444] hover:bg-[#ef4444]/10 transition-colors">
+          <LogOut className="h-5 w-5" />
+          <span>Logout</span>
+        </button>
+      </div>
+    </div>
   );
 }
