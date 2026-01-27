@@ -1,6 +1,7 @@
-import { getUsersCollection, getDb } from "./mongoConnection";
+import { users, ratings, ads, type User, type InsertUser, type Rating, type InsertRating, type Ad, type InsertAd } from "@shared/schema";
+import { db } from "./db";
+import { eq, desc, sql } from "drizzle-orm";
 import bcrypt from "bcrypt";
-import { ObjectId } from "mongodb";
 
 const SALT_ROUNDS = 10;
 
@@ -8,451 +9,351 @@ async function hashPassword(password: string): Promise<string> {
   return await bcrypt.hash(password, SALT_ROUNDS);
 }
 
-export interface User {
-  _id?: ObjectId;
-  username: string;
-  email: string;
-  password: string;
-  fullName: string;
-  mobileNumber: string;
-  status: string;
-  isAdmin: number;
-  destinationAmount: string;
-  milestoneAmount: string;
-  milestoneReward: string;
-  ongoingMilestone: string;
-  totalAdsCompleted: number;
-  points: number;
-  restrictionAdsLimit: number | null;
-  restrictionDeposit: string | null;
-  restrictionCommission: string | null;
-  restrictedAdsCompleted: number;
-  bankName: string | null;
-  accountNumber: string | null;
-  accountHolderName: string | null;
-  branchName: string | null;
-  createdAt: Date;
+export interface IStorage {
+  // User methods
+  getUser(id: number): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+  getAllUsers(): Promise<User[]>;
+  updateUser(id: number, data: Partial<User>): Promise<User | undefined>;
+  updateUserStatus(id: number, status: string): Promise<User | undefined>;
+  deleteUser(id: number): Promise<void>;
+  
+  // Financial methods
+  addMilestoneAmount(userId: number, amount: string): Promise<User | undefined>;
+  addMilestoneReward(userId: number, amount: number): Promise<User | undefined>;
+  resetAllMilestoneRewards(): Promise<void>;
+  
+  // Ad click tracking
+  getUserAdClickCount(userId: number): Promise<number>;
+  incrementAdsCompleted(userId: number): Promise<User | undefined>;
+  
+  // Premium manage methods
+  resetUserField(userId: number, field: string): Promise<User | undefined>;
+  addUserFieldValue(userId: number, field: string, amount: string): Promise<User | undefined>;
+  updateUserDetails(userId: number, data: { username?: string; mobileNumber?: string; password?: string }): Promise<User | undefined>;
+  updateUserBankDetails(userId: number, data: { bankName?: string; accountNumber?: string; accountHolderName?: string; branchName?: string }): Promise<User | undefined>;
+  setUserRestriction(userId: number, adsLimit: number, deposit: string, commission: string, pendingAmount?: string): Promise<User | undefined>;
+  removeUserRestriction(userId: number): Promise<User | undefined>;
+  incrementRestrictedAds(userId: number): Promise<User | undefined>;
+  
+  // Rating methods
+  createRating(rating: InsertRating): Promise<Rating>;
+  getUserRatings(userId: number): Promise<Rating[]>;
+  getAllRatings(): Promise<Rating[]>;
+  deleteRating(id: number): Promise<void>;
+  
+  // Ad methods
+  createAd(ad: InsertAd): Promise<Ad>;
+  getAd(id: number): Promise<Ad | undefined>;
+  getAllAds(): Promise<Ad[]>;
+  updateAd(id: number, data: Partial<Ad>): Promise<Ad | undefined>;
+  deleteAd(id: number): Promise<void>;
 }
 
-// Get settings collection
-function getSettingsCollection() {
-  const db = getDb();
-  return db.collection("settings");
-}
-
-export class MongoStorage {
-  // ============ USER QUERIES ============
-  async getUserByUsername(username: string): Promise<User | null> {
-    const collection = getUsersCollection();
-    return (await collection.findOne({ username })) as User | null;
+export class DatabaseStorage implements IStorage {
+  // ========================================
+  // USER METHODS
+  // ========================================
+  
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
   }
 
-  async getUserByEmail(email: string): Promise<User | null> {
-    const collection = getUsersCollection();
-    return (await collection.findOne({ email })) as User | null;
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
   }
 
-  async getUser(userId: string): Promise<User | null> {
-    const collection = getUsersCollection();
-    try {
-      return (await collection.findOne({ _id: new ObjectId(userId) })) as User | null;
-    } catch (e) {
-      return (await collection.findOne({ id: parseInt(userId) })) as User | null;
-    }
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user;
   }
 
-  async createUser(userData: Omit<User, "_id">): Promise<User> {
-    const collection = getUsersCollection();
-    const result = await collection.insertOne({
-      ...userData,
-      destinationAmount: userData.destinationAmount || "0",
-      milestoneAmount: userData.milestoneAmount || "0",
-      milestoneReward: userData.milestoneReward || "0",
-      ongoingMilestone: userData.ongoingMilestone || "0",
-      totalAdsCompleted: userData.totalAdsCompleted || 0,
-      points: userData.points || 0,
-      restrictionAdsLimit: null,
-      restrictionDeposit: null,
-      restrictionCommission: null,
-      restrictedAdsCompleted: 0,
-      createdAt: new Date(),
-    });
-    return { ...userData, _id: result.insertedId, createdAt: new Date() } as User;
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await db.insert(users).values(insertUser).returning();
+    return user;
   }
 
   async getAllUsers(): Promise<User[]> {
-    const collection = getUsersCollection();
-    return (await collection.find({}).sort({ createdAt: -1 }).toArray()) as User[];
+    return await db.select().from(users).orderBy(desc(users.id));
   }
 
-  // ============ USER STATUS ============
-  async updateUserStatus(userId: string, status: string): Promise<User | null> {
-    const collection = getUsersCollection();
-    const result = await collection.findOneAndUpdate(
-      { _id: new ObjectId(userId) },
-      { $set: { status } },
-      { returnDocument: "after" }
-    );
-    return result as User | null;
+  async updateUser(id: number, data: Partial<User>): Promise<User | undefined> {
+    const [user] = await db.update(users).set(data).where(eq(users.id, id)).returning();
+    return user;
   }
 
-  // ============ GENERAL UPDATE ============
-  async updateUser(userId: string, updates: Partial<User>): Promise<User | null> {
-    const collection = getUsersCollection();
-    const result = await collection.findOneAndUpdate(
-      { _id: new ObjectId(userId) },
-      { $set: updates },
-      { returnDocument: "after" }
-    );
-    return result as User | null;
+  async updateUserStatus(id: number, status: string): Promise<User | undefined> {
+    const [user] = await db.update(users).set({ status }).where(eq(users.id, id)).returning();
+    return user;
   }
 
-  // ============ PASSWORD ============
-  async updateUserPassword(userId: string, newPassword: string): Promise<User | null> {
-    const collection = getUsersCollection();
-    const hashedPassword = await hashPassword(newPassword);
-    const result = await collection.findOneAndUpdate(
-      { _id: new ObjectId(userId) },
-      { $set: { password: hashedPassword } },
-      { returnDocument: "after" }
-    );
-    return result as User | null;
+  async deleteUser(id: number): Promise<void> {
+    await db.delete(users).where(eq(users.id, id));
   }
 
-  // ============ MILESTONE AMOUNTS ============
-  async addMilestoneAmount(userId: string, amount: string): Promise<User | null> {
-    const collection = getUsersCollection();
+  // ========================================
+  // FINANCIAL METHODS
+  // ========================================
+  
+  async addMilestoneAmount(userId: number, amount: string): Promise<User | undefined> {
     const user = await this.getUser(userId);
-    if (!user) return null;
+    if (!user) return undefined;
     
     const currentAmount = parseFloat(user.milestoneAmount || "0");
     const newAmount = currentAmount + parseFloat(amount);
     
-    const result = await collection.findOneAndUpdate(
-      { _id: new ObjectId(userId) },
-      { $set: { milestoneAmount: newAmount.toFixed(2) } },
-      { returnDocument: "after" }
-    );
-    return result as User | null;
+    const [updated] = await db
+      .update(users)
+      .set({ milestoneAmount: newAmount.toFixed(2) })
+      .where(eq(users.id, userId))
+      .returning();
+    return updated;
   }
 
-  async addMilestoneReward(userId: string, amount: string): Promise<User | null> {
-    const collection = getUsersCollection();
+  async addMilestoneReward(userId: number, amount: number): Promise<User | undefined> {
     const user = await this.getUser(userId);
-    if (!user) return null;
+    if (!user) return undefined;
     
-    const currentAmount = parseFloat(user.milestoneReward || "0");
-    const newAmount = currentAmount + parseFloat(amount);
+    const currentReward = parseFloat(user.milestoneReward || "0");
+    const newReward = currentReward + amount;
     
-    const result = await collection.findOneAndUpdate(
-      { _id: new ObjectId(userId) },
-      { $set: { milestoneReward: newAmount.toFixed(2) } },
-      { returnDocument: "after" }
-    );
-    return result as User | null;
+    const [updated] = await db
+      .update(users)
+      .set({ milestoneReward: newReward.toFixed(2) })
+      .where(eq(users.id, userId))
+      .returning();
+    return updated;
   }
 
-  async addDestinationAmount(userId: string, amount: string): Promise<User | null> {
-    const collection = getUsersCollection();
-    const user = await this.getUser(userId);
-    if (!user) return null;
-    
-    const currentAmount = parseFloat(user.destinationAmount || "0");
-    const newAmount = currentAmount + parseFloat(amount);
-    
-    const result = await collection.findOneAndUpdate(
-      { _id: new ObjectId(userId) },
-      { $set: { destinationAmount: newAmount.toFixed(2) } },
-      { returnDocument: "after" }
-    );
-    return result as User | null;
+  async resetAllMilestoneRewards(): Promise<void> {
+    await db.update(users).set({ milestoneReward: "0" });
   }
 
-  // ============ RESET FIELDS ============
-  async resetDestinationAmount(userId: string): Promise<User | null> {
-    const collection = getUsersCollection();
-    const result = await collection.findOneAndUpdate(
-      { _id: new ObjectId(userId) },
-      { $set: { destinationAmount: "0" } },
-      { returnDocument: "after" }
-    );
-    return result as User | null;
-  }
-
-  async resetUserField(userId: string, field: string): Promise<User | null> {
-    const collection = getUsersCollection();
-    const result = await collection.findOneAndUpdate(
-      { _id: new ObjectId(userId) },
-      { $set: { [field]: field === "points" || field === "totalAdsCompleted" ? 0 : "0" } },
-      { returnDocument: "after" }
-    );
-    return result as User | null;
-  }
-
-  // ============ ADD FIELD VALUE (Premium Manage) ============
-  async addUserFieldValue(userId: string, field: string, amount: string): Promise<User | null> {
-    const collection = getUsersCollection();
-    const user = await this.getUser(userId);
-    if (!user) return null;
-
-    let newValue: any;
-    const numAmount = parseFloat(amount);
-
-    switch (field) {
-      case "points":
-        newValue = Math.min(100, (user.points || 0) + numAmount);
-        break;
-      case "milestoneAmount":
-      case "bookingValue":
-        newValue = (parseFloat(user.milestoneAmount || "0") + numAmount).toFixed(2);
-        field = "milestoneAmount";
-        break;
-      case "milestoneReward":
-      case "premiumTreasure":
-        newValue = (parseFloat(user.milestoneReward || "0") + numAmount).toFixed(2);
-        field = "milestoneReward";
-        break;
-      case "destinationAmount":
-      case "normalTreasure":
-        newValue = (parseFloat(user.destinationAmount || "0") + numAmount).toFixed(2);
-        field = "destinationAmount";
-        break;
-      case "ongoingMilestone":
-        newValue = (parseFloat(user.ongoingMilestone || "0") + numAmount).toFixed(2);
-        break;
-      default:
-        newValue = numAmount;
-    }
-
-    const result = await collection.findOneAndUpdate(
-      { _id: new ObjectId(userId) },
-      { $set: { [field]: newValue } },
-      { returnDocument: "after" }
-    );
-    return result as User | null;
-  }
-
-  // ============ RESTRICTION / PROMOTION ============
-  async setUserRestriction(userId: string, adsLimit: number, deposit: string, commission: string, pendingAmount?: string): Promise<User | null> {
-    const collection = getUsersCollection();
-    const user = await this.getUser(userId);
-    if (!user) return null;
-
-    const currentMilestone = parseFloat(user.milestoneAmount || "0");
-    const depositAmount = parseFloat(deposit);
-    const newMilestoneAmount = (currentMilestone - depositAmount).toFixed(2);
-
-    const result = await collection.findOneAndUpdate(
-      { _id: new ObjectId(userId) },
-      {
-        $set: {
-          restrictionAdsLimit: adsLimit,
-          restrictionDeposit: deposit,
-          restrictionCommission: commission,
-          restrictedAdsCompleted: 0,
-          ongoingMilestone: pendingAmount || deposit,
-          milestoneAmount: newMilestoneAmount,
-        },
-      },
-      { returnDocument: "after" }
-    );
-    return result as User | null;
-  }
-
-  async removeUserRestriction(userId: string): Promise<User | null> {
-    const collection = getUsersCollection();
-    const result = await collection.findOneAndUpdate(
-      { _id: new ObjectId(userId) },
-      {
-        $set: {
-          restrictionAdsLimit: null,
-          restrictionDeposit: null,
-          restrictionCommission: null,
-          restrictedAdsCompleted: 0,
-          ongoingMilestone: "0",
-        },
-      },
-      { returnDocument: "after" }
-    );
-    return result as User | null;
-  }
-
-  async incrementRestrictedAds(userId: string): Promise<User | null> {
-    const collection = getUsersCollection();
-    const result = await collection.findOneAndUpdate(
-      { _id: new ObjectId(userId) },
-      { $inc: { restrictedAdsCompleted: 1 } },
-      { returnDocument: "after" }
-    );
-    return result as User | null;
-  }
-
-  // ============ ADS ============
-  async incrementAdsCompleted(userId: string): Promise<User | null> {
-    const collection = getUsersCollection();
-    const result = await collection.findOneAndUpdate(
-      { _id: new ObjectId(userId) },
-      { $inc: { totalAdsCompleted: 1 } },
-      { returnDocument: "after" }
-    );
-    return result as User | null;
-  }
-
-  async getUserAdClickCount(userId: string): Promise<number> {
+  // ========================================
+  // AD CLICK TRACKING
+  // ========================================
+  
+  async getUserAdClickCount(userId: number): Promise<number> {
     const user = await this.getUser(userId);
     return user?.totalAdsCompleted || 0;
   }
 
-  // ============ USER DETAILS ============
-  async updateUserDetails(userId: string, details: { username?: string; mobileNumber?: string; password?: string }): Promise<User | null> {
-    const collection = getUsersCollection();
-    const updates: any = {};
-
-    if (details.username) updates.username = details.username;
-    if (details.mobileNumber) updates.mobileNumber = details.mobileNumber;
-    if (details.password) updates.password = await hashPassword(details.password);
-
-    if (Object.keys(updates).length === 0) return this.getUser(userId);
-
-    const result = await collection.findOneAndUpdate(
-      { _id: new ObjectId(userId) },
-      { $set: updates },
-      { returnDocument: "after" }
-    );
-    return result as User | null;
+  async incrementAdsCompleted(userId: number): Promise<User | undefined> {
+    const user = await this.getUser(userId);
+    if (!user) return undefined;
+    
+    const [updated] = await db
+      .update(users)
+      .set({ totalAdsCompleted: (user.totalAdsCompleted || 0) + 1 })
+      .where(eq(users.id, userId))
+      .returning();
+    return updated;
   }
 
-  // ============ BANK DETAILS ============
-  async updateUserBankDetails(userId: string, bankDetails: { bankName?: string; accountNumber?: string; accountHolderName?: string; branchName?: string }): Promise<User | null> {
-    const collection = getUsersCollection();
-    const updates: any = {};
-
-    if (bankDetails.bankName !== undefined) updates.bankName = bankDetails.bankName;
-    if (bankDetails.accountNumber !== undefined) updates.accountNumber = bankDetails.accountNumber;
-    if (bankDetails.accountHolderName !== undefined) updates.accountHolderName = bankDetails.accountHolderName;
-    if (bankDetails.branchName !== undefined) updates.branchName = bankDetails.branchName;
-
-    if (Object.keys(updates).length === 0) return this.getUser(userId);
-
-    const result = await collection.findOneAndUpdate(
-      { _id: new ObjectId(userId) },
-      { $set: updates },
-      { returnDocument: "after" }
-    );
-    return result as User | null;
-  }
-
-  // ============ ADMIN TOGGLE ============
-  async toggleAdmin(userId: string, isAdmin: number): Promise<User | null> {
-    const collection = getUsersCollection();
-    const result = await collection.findOneAndUpdate(
-      { _id: new ObjectId(userId) },
-      { $set: { isAdmin } },
-      { returnDocument: "after" }
-    );
-    return result as User | null;
-  }
-
-  // ============================================================
-  // SETTINGS STORAGE (MongoDB - PERSISTENT!)
-  // ============================================================
+  // ========================================
+  // PREMIUM MANAGE METHODS
+  // ========================================
   
-  async getSettings(category: string): Promise<any[]> {
-    try {
-      const collection = getSettingsCollection();
-      const settings = await collection.find({ category }).toArray();
-      return settings;
-    } catch (error) {
-      console.error(`Error getting ${category} settings:`, error);
-      return [];
+  async resetUserField(userId: number, field: string): Promise<User | undefined> {
+    const user = await this.getUser(userId);
+    if (!user) return undefined;
+    
+    const updateData: any = {};
+    
+    switch (field) {
+      case 'milestoneAmount':
+        updateData.milestoneAmount = "0";
+        break;
+      case 'milestoneReward':
+        updateData.milestoneReward = "0";
+        break;
+      case 'destinationAmount':
+        updateData.destinationAmount = "0";
+        break;
+      case 'ongoingMilestone':
+        updateData.ongoingMilestone = "0";
+        break;
+      case 'totalAdsCompleted':
+        updateData.totalAdsCompleted = 0;
+        break;
+      case 'points':
+        updateData.points = 0;
+        break;
+      case 'restrictedAdsCompleted':
+        updateData.restrictedAdsCompleted = 0;
+        break;
+      default:
+        return user;
     }
+    
+    const [updated] = await db.update(users).set(updateData).where(eq(users.id, userId)).returning();
+    return updated;
   }
 
-  async saveSettings(category: string, type: string, data: any): Promise<boolean> {
-    try {
-      const collection = getSettingsCollection();
-      await collection.updateOne(
-        { category, type },
-        { 
-          $set: { 
-            category,
-            type,
-            data,
-            updatedAt: new Date()
-          }
-        },
-        { upsert: true }
-      );
-      return true;
-    } catch (error) {
-      console.error(`Error saving ${category} settings:`, error);
-      return false;
+  async addUserFieldValue(userId: number, field: string, amount: string): Promise<User | undefined> {
+    const user = await this.getUser(userId);
+    if (!user) return undefined;
+    
+    const updateData: any = {};
+    const amountNum = parseFloat(amount);
+    
+    switch (field) {
+      case 'milestoneAmount':
+        updateData.milestoneAmount = (parseFloat(user.milestoneAmount || "0") + amountNum).toFixed(2);
+        break;
+      case 'milestoneReward':
+        updateData.milestoneReward = (parseFloat(user.milestoneReward || "0") + amountNum).toFixed(2);
+        break;
+      case 'destinationAmount':
+        updateData.destinationAmount = (parseFloat(user.destinationAmount || "0") + amountNum).toFixed(2);
+        break;
+      case 'ongoingMilestone':
+        updateData.ongoingMilestone = (parseFloat(user.ongoingMilestone || "0") + amountNum).toFixed(2);
+        break;
+      case 'totalAdsCompleted':
+        updateData.totalAdsCompleted = (user.totalAdsCompleted || 0) + Math.floor(amountNum);
+        break;
+      case 'points':
+        updateData.points = (user.points || 0) + Math.floor(amountNum);
+        break;
+      default:
+        return user;
     }
+    
+    const [updated] = await db.update(users).set(updateData).where(eq(users.id, userId)).returning();
+    return updated;
   }
 
-  async deleteSettings(category: string, type: string): Promise<boolean> {
-    try {
-      const collection = getSettingsCollection();
-      await collection.deleteOne({ category, type });
-      return true;
-    } catch (error) {
-      console.error(`Error deleting ${category} settings:`, error);
-      return false;
-    }
+  async updateUserDetails(userId: number, data: { username?: string; mobileNumber?: string; password?: string }): Promise<User | undefined> {
+    const user = await this.getUser(userId);
+    if (!user) return undefined;
+    
+    const updateData: any = {};
+    if (data.username) updateData.username = data.username;
+    if (data.mobileNumber) updateData.mobileNumber = data.mobileNumber;
+    if (data.password) updateData.password = await hashPassword(data.password);
+    
+    if (Object.keys(updateData).length === 0) return user;
+    
+    const [updated] = await db.update(users).set(updateData).where(eq(users.id, userId)).returning();
+    return updated;
   }
 
-  // Slideshow specific
-  async getSlideshow(): Promise<any[]> {
-    try {
-      const collection = getSettingsCollection();
-      const slides = await collection.find({ category: "slideshow" }).sort({ createdAt: -1 }).toArray();
-      return slides.map(s => ({ ...s.data, id: s._id.toString() }));
-    } catch (error) {
-      console.error("Error getting slideshow:", error);
-      return [];
-    }
+  async updateUserBankDetails(userId: number, data: { bankName?: string; accountNumber?: string; accountHolderName?: string; branchName?: string }): Promise<User | undefined> {
+    const user = await this.getUser(userId);
+    if (!user) return undefined;
+    
+    const updateData: any = {};
+    if (data.bankName !== undefined) updateData.bankName = data.bankName;
+    if (data.accountNumber !== undefined) updateData.accountNumber = data.accountNumber;
+    if (data.accountHolderName !== undefined) updateData.accountHolderName = data.accountHolderName;
+    if (data.branchName !== undefined) updateData.branchName = data.branchName;
+    
+    if (Object.keys(updateData).length === 0) return user;
+    
+    const [updated] = await db.update(users).set(updateData).where(eq(users.id, userId)).returning();
+    return updated;
   }
 
-  async addSlide(slideData: any): Promise<any> {
-    try {
-      const collection = getSettingsCollection();
-      const result = await collection.insertOne({
-        category: "slideshow",
-        type: "slide",
-        data: slideData,
-        createdAt: new Date()
-      });
-      return { ...slideData, id: result.insertedId.toString() };
-    } catch (error) {
-      console.error("Error adding slide:", error);
-      return null;
+  async setUserRestriction(userId: number, adsLimit: number, deposit: string, commission: string, pendingAmount?: string): Promise<User | undefined> {
+    const user = await this.getUser(userId);
+    if (!user) return undefined;
+    
+    const updateData: any = {
+      restrictionAdsLimit: adsLimit,
+      restrictionDeposit: deposit,
+      restrictionCommission: commission,
+      restrictedAdsCompleted: 0,
+    };
+    
+    if (pendingAmount) {
+      updateData.pendingAmount = pendingAmount;
     }
+    
+    const [updated] = await db.update(users).set(updateData).where(eq(users.id, userId)).returning();
+    return updated;
   }
 
-  async updateSlide(slideId: string, slideData: any): Promise<any> {
-    try {
-      const collection = getSettingsCollection();
-      await collection.updateOne(
-        { _id: new ObjectId(slideId) },
-        { $set: { data: slideData, updatedAt: new Date() } }
-      );
-      return { ...slideData, id: slideId };
-    } catch (error) {
-      console.error("Error updating slide:", error);
-      return null;
-    }
+  async removeUserRestriction(userId: number): Promise<User | undefined> {
+    const user = await this.getUser(userId);
+    if (!user) return undefined;
+    
+    const [updated] = await db
+      .update(users)
+      .set({
+        restrictionAdsLimit: null,
+        restrictionDeposit: null,
+        restrictionCommission: null,
+        restrictedAdsCompleted: 0,
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return updated;
   }
 
-  async deleteSlide(slideId: string): Promise<boolean> {
-    try {
-      const collection = getSettingsCollection();
-      await collection.deleteOne({ _id: new ObjectId(slideId) });
-      return true;
-    } catch (error) {
-      console.error("Error deleting slide:", error);
-      return false;
-    }
+  async incrementRestrictedAds(userId: number): Promise<User | undefined> {
+    const user = await this.getUser(userId);
+    if (!user) return undefined;
+    
+    const [updated] = await db
+      .update(users)
+      .set({ restrictedAdsCompleted: (user.restrictedAdsCompleted || 0) + 1 })
+      .where(eq(users.id, userId))
+      .returning();
+    return updated;
+  }
+
+  // ========================================
+  // RATING METHODS
+  // ========================================
+  
+  async createRating(insertRating: InsertRating): Promise<Rating> {
+    const [rating] = await db.insert(ratings).values(insertRating).returning();
+    return rating;
+  }
+
+  async getUserRatings(userId: number): Promise<Rating[]> {
+    return await db.select().from(ratings).where(eq(ratings.oderId, userId)).orderBy(desc(ratings.id));
+  }
+
+  async getAllRatings(): Promise<Rating[]> {
+    return await db.select().from(ratings).orderBy(desc(ratings.id));
+  }
+
+  async deleteRating(id: number): Promise<void> {
+    await db.delete(ratings).where(eq(ratings.id, id));
+  }
+
+  // ========================================
+  // AD METHODS
+  // ========================================
+  
+  async createAd(insertAd: InsertAd): Promise<Ad> {
+    const [ad] = await db.insert(ads).values(insertAd).returning();
+    return ad;
+  }
+
+  async getAd(id: number): Promise<Ad | undefined> {
+    const [ad] = await db.select().from(ads).where(eq(ads.id, id));
+    return ad;
+  }
+
+  async getAllAds(): Promise<Ad[]> {
+    return await db.select().from(ads).orderBy(desc(ads.id));
+  }
+
+  async updateAd(id: number, data: Partial<Ad>): Promise<Ad | undefined> {
+    const [ad] = await db.update(ads).set(data).where(eq(ads.id, id)).returning();
+    return ad;
+  }
+
+  async deleteAd(id: number): Promise<void> {
+    await db.delete(ads).where(eq(ads.id, id));
   }
 }
 
-export const mongoStorage = new MongoStorage();
+export const storage = new DatabaseStorage();
