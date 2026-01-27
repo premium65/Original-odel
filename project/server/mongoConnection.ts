@@ -11,15 +11,25 @@ export async function connectMongo(): Promise<void> {
       return;
     }
 
-    mongoClient = new MongoClient("mongodb://127.0.0.1:27017");
+    // Use MONGO_URI from environment variable (for Render/production)
+    // Falls back to localhost for local development
+    const mongoUri = process.env.MONGO_URI || process.env.MONGODB_URI || "mongodb://127.0.0.1:27017";
+    
+    console.log("Connecting to MongoDB...");
+    console.log("MongoDB URI exists:", !!process.env.MONGO_URI || !!process.env.MONGODB_URI);
+    
+    mongoClient = new MongoClient(mongoUri);
     await mongoClient.connect();
     db = mongoClient.db("odeladspro");
     usersCollection = db.collection("users");
-    console.log("Connected to MongoDB successfully");
+    console.log("✅ Connected to MongoDB successfully!");
   } catch (error) {
-    console.error("MongoDB connection error:", error);
+    console.error("❌ MongoDB connection error:", error);
     console.log("MongoDB is not available. Using PostgreSQL instead.");
-    throw error;
+    // Reset to null so isMongoConnected returns false
+    mongoClient = null;
+    db = null;
+    usersCollection = null;
   }
 }
 
