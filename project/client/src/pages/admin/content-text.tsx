@@ -7,7 +7,6 @@ export default function AdminContentText() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [content, setContent] = useState({
-    // Navbar Labels
     navHome: "Home",
     navFeatures: "Features",
     navAds: "Ads",
@@ -16,20 +15,17 @@ export default function AdminContentText() {
     navLogin: "Login",
     navRegister: "Register",
     navLogout: "Logout",
-    // Page Titles
     pageFeaturesTitle: "Features",
     pageAdsTitle: "Watch Ads",
     pageWalletTitle: "Your Wallet",
     pageWithdrawTitle: "Withdraw Funds",
     pageLoginTitle: "Login to Your Account",
     pageRegisterTitle: "Create Account",
-    // Button Labels
     btnWatchAd: "Watch Ad",
     btnClaim: "Claim Reward",
     btnWithdraw: "Request Withdrawal",
     btnSubmit: "Submit",
     btnCancel: "Cancel",
-    // Footer Text
     footerCopyright: "© 2024 OdelAdsPro. All rights reserved.",
     footerTagline: "Where Luxury and Rewards Meet"
   });
@@ -50,6 +46,7 @@ export default function AdminContentText() {
       const res = await fetch("/api/admin/settings/content", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ type: "labels", data }),
       });
       if (!res.ok) throw new Error("Failed to save");
@@ -70,7 +67,6 @@ export default function AdminContentText() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-white">Text & Labels</h1>
@@ -79,24 +75,22 @@ export default function AdminContentText() {
         <button
           onClick={handleSave}
           disabled={saveMutation.isPending}
-          className="flex items-center gap-2 px-5 py-2.5 bg-[#10b981] text-white rounded-xl hover:bg-[#059669] transition-colors"
+          className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-500 text-white rounded-xl font-semibold hover:from-emerald-600 hover:to-green-600 transition-all disabled:opacity-50"
         >
-          <Save className="w-5 h-5" />
-          <span className="font-medium">{saveMutation.isPending ? "Saving..." : "Save Changes"}</span>
+          <Save className="h-5 w-5" />
+          {saveMutation.isPending ? "Saving..." : "Save Changes"}
         </button>
       </div>
 
-      {/* Navbar Labels */}
-      <div className="bg-[#1a2332] rounded-xl border border-[#2a3a4d] overflow-hidden">
-        <div className="p-5 border-b border-[#2a3a4d]">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#8b5cf6]/20 flex items-center justify-center">
-              <Type className="w-5 h-5 text-[#8b5cf6]" />
-            </div>
-            <h2 className="text-lg font-semibold text-white">Navigation Labels</h2>
+      {/* Navigation Labels */}
+      <div className="bg-[#1a2332] rounded-xl border border-[#2a3a4d] p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2 rounded-lg bg-purple-500/20">
+            <Type className="h-5 w-5 text-purple-400" />
           </div>
+          <h2 className="text-xl font-semibold text-white">Navigation Labels</h2>
         </div>
-        <div className="p-5 grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {[
             { key: "navHome", label: "Home" },
             { key: "navFeatures", label: "Features" },
@@ -106,14 +100,14 @@ export default function AdminContentText() {
             { key: "navLogin", label: "Login" },
             { key: "navRegister", label: "Register" },
             { key: "navLogout", label: "Logout" },
-          ].map(item => (
-            <div key={item.key}>
-              <label className="block text-xs text-[#6b7280] mb-1">{item.label}</label>
+          ].map(({ key, label }) => (
+            <div key={key}>
+              <label className="block text-sm text-gray-400 mb-2">{label}</label>
               <input
                 type="text"
-                value={(content as any)[item.key]}
-                onChange={(e) => setContent({ ...content, [item.key]: e.target.value })}
-                className="w-full px-3 py-2 bg-[#0f1419] border border-[#2a3a4d] rounded-lg text-white text-sm focus:border-[#10b981] focus:outline-none"
+                value={(content as any)[key]}
+                onChange={(e) => setContent({ ...content, [key]: e.target.value })}
+                className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-lg text-white focus:border-purple-500 focus:outline-none"
               />
             </div>
           ))}
@@ -121,11 +115,9 @@ export default function AdminContentText() {
       </div>
 
       {/* Page Titles */}
-      <div className="bg-[#1a2332] rounded-xl border border-[#2a3a4d] overflow-hidden">
-        <div className="p-5 border-b border-[#2a3a4d]">
-          <h2 className="text-lg font-semibold text-white">Page Titles</h2>
-        </div>
-        <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="bg-[#1a2332] rounded-xl border border-[#2a3a4d] p-6">
+        <h2 className="text-xl font-semibold text-white mb-6">Page Titles</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {[
             { key: "pageFeaturesTitle", label: "Features Page" },
             { key: "pageAdsTitle", label: "Ads Page" },
@@ -133,14 +125,14 @@ export default function AdminContentText() {
             { key: "pageWithdrawTitle", label: "Withdraw Page" },
             { key: "pageLoginTitle", label: "Login Page" },
             { key: "pageRegisterTitle", label: "Register Page" },
-          ].map(item => (
-            <div key={item.key}>
-              <label className="block text-xs text-[#6b7280] mb-1">{item.label}</label>
+          ].map(({ key, label }) => (
+            <div key={key}>
+              <label className="block text-sm text-gray-400 mb-2">{label}</label>
               <input
                 type="text"
-                value={(content as any)[item.key]}
-                onChange={(e) => setContent({ ...content, [item.key]: e.target.value })}
-                className="w-full px-3 py-2 bg-[#0f1419] border border-[#2a3a4d] rounded-lg text-white text-sm focus:border-[#10b981] focus:outline-none"
+                value={(content as any)[key]}
+                onChange={(e) => setContent({ ...content, [key]: e.target.value })}
+                className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-lg text-white focus:border-purple-500 focus:outline-none"
               />
             </div>
           ))}
@@ -148,25 +140,23 @@ export default function AdminContentText() {
       </div>
 
       {/* Button Labels */}
-      <div className="bg-[#1a2332] rounded-xl border border-[#2a3a4d] overflow-hidden">
-        <div className="p-5 border-b border-[#2a3a4d]">
-          <h2 className="text-lg font-semibold text-white">Button Labels</h2>
-        </div>
-        <div className="p-5 grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="bg-[#1a2332] rounded-xl border border-[#2a3a4d] p-6">
+        <h2 className="text-xl font-semibold text-white mb-6">Button Labels</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[
-            { key: "btnWatchAd", label: "Watch Ad" },
-            { key: "btnClaim", label: "Claim" },
-            { key: "btnWithdraw", label: "Withdraw" },
-            { key: "btnSubmit", label: "Submit" },
-            { key: "btnCancel", label: "Cancel" },
-          ].map(item => (
-            <div key={item.key}>
-              <label className="block text-xs text-[#6b7280] mb-1">{item.label}</label>
+            { key: "btnWatchAd", label: "Watch Ad Button" },
+            { key: "btnClaim", label: "Claim Button" },
+            { key: "btnWithdraw", label: "Withdraw Button" },
+            { key: "btnSubmit", label: "Submit Button" },
+            { key: "btnCancel", label: "Cancel Button" },
+          ].map(({ key, label }) => (
+            <div key={key}>
+              <label className="block text-sm text-gray-400 mb-2">{label}</label>
               <input
                 type="text"
-                value={(content as any)[item.key]}
-                onChange={(e) => setContent({ ...content, [item.key]: e.target.value })}
-                className="w-full px-3 py-2 bg-[#0f1419] border border-[#2a3a4d] rounded-lg text-white text-sm focus:border-[#10b981] focus:outline-none"
+                value={(content as any)[key]}
+                onChange={(e) => setContent({ ...content, [key]: e.target.value })}
+                className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-lg text-white focus:border-purple-500 focus:outline-none"
               />
             </div>
           ))}
@@ -174,27 +164,25 @@ export default function AdminContentText() {
       </div>
 
       {/* Footer */}
-      <div className="bg-[#1a2332] rounded-xl border border-[#2a3a4d] overflow-hidden">
-        <div className="p-5 border-b border-[#2a3a4d]">
-          <h2 className="text-lg font-semibold text-white">Footer Text</h2>
-        </div>
-        <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="bg-[#1a2332] rounded-xl border border-[#2a3a4d] p-6">
+        <h2 className="text-xl font-semibold text-white mb-6">Footer Text</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs text-[#6b7280] mb-1">Copyright Text</label>
+            <label className="block text-sm text-gray-400 mb-2">Copyright Text</label>
             <input
               type="text"
               value={content.footerCopyright}
               onChange={(e) => setContent({ ...content, footerCopyright: e.target.value })}
-              className="w-full px-3 py-2 bg-[#0f1419] border border-[#2a3a4d] rounded-lg text-white text-sm focus:border-[#10b981] focus:outline-none"
+              className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-lg text-white focus:border-purple-500 focus:outline-none"
             />
           </div>
           <div>
-            <label className="block text-xs text-[#6b7280] mb-1">Tagline</label>
+            <label className="block text-sm text-gray-400 mb-2">Tagline</label>
             <input
               type="text"
               value={content.footerTagline}
               onChange={(e) => setContent({ ...content, footerTagline: e.target.value })}
-              className="w-full px-3 py-2 bg-[#0f1419] border border-[#2a3a4d] rounded-lg text-white text-sm focus:border-[#10b981] focus:outline-none"
+              className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-lg text-white focus:border-purple-500 focus:outline-none"
             />
           </div>
         </div>
