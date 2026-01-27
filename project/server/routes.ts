@@ -430,7 +430,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const userId = parseInt(req.params.userId);
-      const user = await storage.getUser(userId);
+      // Use MongoDB if connected, otherwise PostgreSQL
+      let user: any = null;
+      if (isMongoConnected()) {
+        user = await mongoStorage.getUser(String(userId));
+      } else {
+        user = await storage.getUser(userId);
+      }
       if (!user) {
         return res.status(404).send("User not found");
       }
@@ -1088,13 +1094,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).send("Invalid user or amount");
       }
 
-      const user = await storage.getUser(userId);
+      // Use MongoDB if connected, otherwise PostgreSQL
+      let user: any = null;
+      if (isMongoConnected()) {
+        user = await mongoStorage.getUser(String(userId));
+      } else {
+        user = await storage.getUser(userId);
+      }
       if (!user) {
         return res.status(404).send("User not found");
       }
 
       const newBalance = (user.balance || 0) + amount;
-      const updatedUser = await storage.updateUser(userId, { balance: newBalance });
+      // Add to milestoneAmount (the withdrawable balance)
+      if (isMongoConnected()) {
+        await mongoStorage.addMilestoneAmount(String(userId), String(amount));
+      } else {
+        await storage.addMilestoneAmount(userId, String(amount));
+      }
 
       res.json({ 
         success: true, 
