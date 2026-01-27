@@ -1,511 +1,322 @@
 import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { ArrowLeft, Palette, Save, RotateCcw, Eye, Check } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Palette, Save, RotateCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Link } from "wouter";
 
-interface SiteSetting {
-  id: number;
-  settingKey: string;
-  settingValue: string;
-  settingType: string;
-  category: string;
-  label: string | null;
-  description: string | null;
-}
-
-interface ColorPreset {
-  name: string;
-  colors: Record<string, string>;
-}
-
-const colorPresets: ColorPreset[] = [
-  {
-    name: "Amber Gold (Default)",
-    colors: {
-      primary_color: "#f59e0b",
-      secondary_color: "#1a1a2e",
-      accent_color: "#16213e",
-      text_color: "#ffffff",
-      nav_bg_color: "#000000",
-      footer_bg_color: "#111827",
-      card_bg_color: "#1f2937",
-      button_color: "#f59e0b",
-      button_hover_color: "#d97706",
-      marquee_bg_color: "#f59e0b",
-      marquee_text_color: "#000000",
-    },
-  },
-  {
-    name: "Royal Purple",
-    colors: {
-      primary_color: "#8b5cf6",
-      secondary_color: "#1e1b4b",
-      accent_color: "#312e81",
-      text_color: "#ffffff",
-      nav_bg_color: "#0f0a1e",
-      footer_bg_color: "#1e1b4b",
-      card_bg_color: "#312e81",
-      button_color: "#8b5cf6",
-      button_hover_color: "#7c3aed",
-      marquee_bg_color: "#8b5cf6",
-      marquee_text_color: "#ffffff",
-    },
-  },
-  {
-    name: "Ocean Blue",
-    colors: {
-      primary_color: "#0ea5e9",
-      secondary_color: "#0c1929",
-      accent_color: "#164e63",
-      text_color: "#ffffff",
-      nav_bg_color: "#0a1929",
-      footer_bg_color: "#0c1929",
-      card_bg_color: "#164e63",
-      button_color: "#0ea5e9",
-      button_hover_color: "#0284c7",
-      marquee_bg_color: "#0ea5e9",
-      marquee_text_color: "#ffffff",
-    },
-  },
-  {
-    name: "Emerald Green",
-    colors: {
-      primary_color: "#10b981",
-      secondary_color: "#0a1f1a",
-      accent_color: "#065f46",
-      text_color: "#ffffff",
-      nav_bg_color: "#0a1612",
-      footer_bg_color: "#0a1f1a",
-      card_bg_color: "#065f46",
-      button_color: "#10b981",
-      button_hover_color: "#059669",
-      marquee_bg_color: "#10b981",
-      marquee_text_color: "#ffffff",
-    },
-  },
-  {
-    name: "Rose Pink",
-    colors: {
-      primary_color: "#f43f5e",
-      secondary_color: "#1f1015",
-      accent_color: "#4c1d24",
-      text_color: "#ffffff",
-      nav_bg_color: "#1a0a0f",
-      footer_bg_color: "#1f1015",
-      card_bg_color: "#4c1d24",
-      button_color: "#f43f5e",
-      button_hover_color: "#e11d48",
-      marquee_bg_color: "#f43f5e",
-      marquee_text_color: "#ffffff",
-    },
-  },
-  {
-    name: "Sunset Orange",
-    colors: {
-      primary_color: "#f97316",
-      secondary_color: "#1c1008",
-      accent_color: "#7c2d12",
-      text_color: "#ffffff",
-      nav_bg_color: "#1a0f08",
-      footer_bg_color: "#1c1008",
-      card_bg_color: "#7c2d12",
-      button_color: "#f97316",
-      button_hover_color: "#ea580c",
-      marquee_bg_color: "#f97316",
-      marquee_text_color: "#ffffff",
-    },
-  },
-];
+const defaultTheme = {
+  // Background colors
+  bgPrimary: "#0f1419",
+  bgSecondary: "#1a2332",
+  bgCard: "#1a2332",
+  bgHover: "#2a3a4d",
+  // Text colors
+  textPrimary: "#ffffff",
+  textSecondary: "#9ca3af",
+  textMuted: "#6b7280",
+  // Brand colors
+  primary: "#10b981",
+  primaryHover: "#059669",
+  accent: "#8b5cf6",
+  accentHover: "#7c3aed",
+  // Status colors
+  success: "#10b981",
+  warning: "#f59e0b",
+  error: "#ef4444",
+  info: "#0ea5e9",
+  // Border colors
+  borderPrimary: "#2a3a4d",
+  borderSecondary: "#334155",
+  // Gradient colors
+  gradientStart: "#8b5cf6",
+  gradientEnd: "#6366f1"
+};
 
 export default function AdminThemeSettings() {
   const { toast } = useToast();
-  const [localColors, setLocalColors] = useState<Record<string, string>>({});
-  const [hasChanges, setHasChanges] = useState(false);
+  const queryClient = useQueryClient();
+  const [theme, setTheme] = useState(defaultTheme);
 
-  // Fetch current settings
-  const { data: settings, isLoading } = useQuery<SiteSetting[]>({
-    queryKey: ["/api/admin/settings"],
+  const { data: settings = [] } = useQuery<any[]>({
+    queryKey: ["/api/admin/settings/theme"],
   });
 
-  // Initialize settings mutation
-  const initMutation = useMutation({
-    mutationFn: async () => {
-      return apiRequest("POST", "/api/admin/settings/init");
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
-      toast({ title: "Success", description: "Default settings initialized" });
-    },
-  });
+  useEffect(() => {
+    const themeSetting = settings.find(s => s.type === "theme");
+    if (themeSetting?.data) {
+      setTheme({ ...defaultTheme, ...themeSetting.data });
+    }
+  }, [settings]);
 
-  // Save settings mutation
   const saveMutation = useMutation({
-    mutationFn: async (colors: Record<string, string>) => {
-      const settingsArray = Object.entries(colors).map(([key, value]) => ({
-        key,
-        value,
-      }));
-      return apiRequest("PUT", "/api/admin/settings", { settings: settingsArray });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
-      toast({ title: "Success", description: "Theme colors saved successfully" });
-      setHasChanges(false);
-    },
-    onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    },
-  });
-
-  // Reset settings mutation
-  const resetMutation = useMutation({
-    mutationFn: async () => {
-      return apiRequest("POST", "/api/admin/settings/reset");
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
-      toast({ title: "Success", description: "Settings reset to default" });
-      setHasChanges(false);
-    },
-  });
-
-  // Initialize local colors from settings
-  useEffect(() => {
-    if (settings) {
-      const colorSettings = settings.filter((s) => s.category === "colors");
-      const colors: Record<string, string> = {};
-      colorSettings.forEach((s) => {
-        colors[s.settingKey] = s.settingValue;
+    mutationFn: async (data: typeof theme) => {
+      const res = await fetch("/api/admin/settings/theme", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "theme", data }),
       });
-      setLocalColors(colors);
-    }
-  }, [settings]);
-
-  // Initialize default settings if none exist
-  useEffect(() => {
-    if (settings && settings.length === 0) {
-      initMutation.mutate();
-    }
-  }, [settings]);
-
-  const handleColorChange = (key: string, value: string) => {
-    setLocalColors((prev) => ({ ...prev, [key]: value }));
-    setHasChanges(true);
-  };
+      if (!res.ok) throw new Error("Failed to save");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/theme"] });
+      toast({ title: "Success", description: "Theme colors saved successfully" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to save theme colors", variant: "destructive" });
+    },
+  });
 
   const handleSave = () => {
-    saveMutation.mutate(localColors);
+    saveMutation.mutate(theme);
   };
 
-  const applyPreset = (preset: ColorPreset) => {
-    setLocalColors(preset.colors);
-    setHasChanges(true);
-    toast({ title: "Preset Applied", description: `${preset.name} theme applied. Click Save to confirm.` });
+  const handleReset = () => {
+    setTheme(defaultTheme);
+    toast({ title: "Reset", description: "Theme reset to defaults" });
   };
 
-  const colorFields = [
-    { key: "primary_color", label: "Primary Color", description: "Main accent color" },
-    { key: "secondary_color", label: "Secondary Color", description: "Background color" },
-    { key: "accent_color", label: "Accent Color", description: "Accent highlights" },
-    { key: "text_color", label: "Text Color", description: "Main text color" },
-    { key: "nav_bg_color", label: "Navigation Background", description: "Top nav bar" },
-    { key: "footer_bg_color", label: "Footer Background", description: "Footer section" },
-    { key: "card_bg_color", label: "Card Background", description: "Cards and panels" },
-    { key: "button_color", label: "Button Color", description: "Primary buttons" },
-    { key: "button_hover_color", label: "Button Hover", description: "Button hover state" },
-    { key: "marquee_bg_color", label: "Marquee Background", description: "Scrolling banner" },
-    { key: "marquee_text_color", label: "Marquee Text", description: "Banner text" },
-  ];
+  const ColorInput = ({ label, value, onChange, description }: { 
+    label: string; 
+    value: string; 
+    onChange: (value: string) => void;
+    description?: string;
+  }) => (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <label className="text-sm font-medium text-[#9ca3af]">{label}</label>
+        <div className="flex items-center gap-2">
+          <input
+            type="color"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-8 h-8 rounded cursor-pointer border-0"
+          />
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-24 px-2 py-1 bg-[#0f1419] border border-[#2a3a4d] rounded text-white text-sm font-mono focus:border-[#10b981] focus:outline-none"
+          />
+        </div>
+      </div>
+      {description && <p className="text-xs text-[#6b7280]">{description}</p>}
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <Link href="/admin">
-              <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white">
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-            </Link>
-            <div>
-              <h1 className="text-3xl font-bold flex items-center gap-2">
-                <Palette className="h-8 w-8 text-amber-500" />
-                Theme Settings
-              </h1>
-              <p className="text-gray-400">Customize your site colors and appearance</p>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-white">Theme Colors</h1>
+          <p className="text-[#9ca3af] mt-1">Customize the color scheme of your site</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleReset}
+            className="flex items-center gap-2 px-4 py-2.5 bg-[#2a3a4d] text-white rounded-xl hover:bg-[#3a4a5d] transition-colors"
+          >
+            <RotateCcw className="w-5 h-5" />
+            <span className="font-medium">Reset</span>
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saveMutation.isPending}
+            className="flex items-center gap-2 px-5 py-2.5 bg-[#10b981] text-white rounded-xl hover:bg-[#059669] transition-colors"
+          >
+            <Save className="w-5 h-5" />
+            <span className="font-medium">{saveMutation.isPending ? "Saving..." : "Save Changes"}</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Background Colors */}
+        <div className="bg-[#1a2332] rounded-xl border border-[#2a3a4d] overflow-hidden">
+          <div className="p-5 border-b border-[#2a3a4d]">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[#8b5cf6]/20 flex items-center justify-center">
+                <Palette className="w-5 h-5 text-[#8b5cf6]" />
+              </div>
+              <h2 className="text-lg font-semibold text-white">Background Colors</h2>
             </div>
           </div>
-          <div className="flex gap-2">
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="outline" className="border-gray-600 hover:bg-gray-700">
-                  <RotateCcw className="h-4 w-4 mr-2" />
-                  Reset to Default
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent className="bg-gray-800 border-gray-700">
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Reset Theme Settings?</AlertDialogTitle>
-                  <AlertDialogDescription className="text-gray-400">
-                    This will reset all colors to the default Amber Gold theme.
-                    This action cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel className="bg-gray-700 hover:bg-gray-600">Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => resetMutation.mutate()}
-                    className="bg-red-500 hover:bg-red-600"
-                  >
-                    Reset
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-            <Button
-              onClick={handleSave}
-              disabled={!hasChanges || saveMutation.isPending}
-              className="bg-amber-500 hover:bg-amber-600"
-            >
-              <Save className="h-4 w-4 mr-2" />
-              Save Changes
-            </Button>
+          <div className="p-5 space-y-4">
+            <ColorInput 
+              label="Primary Background" 
+              value={theme.bgPrimary} 
+              onChange={(v) => setTheme({ ...theme, bgPrimary: v })}
+              description="Main page background"
+            />
+            <ColorInput 
+              label="Secondary Background" 
+              value={theme.bgSecondary} 
+              onChange={(v) => setTheme({ ...theme, bgSecondary: v })}
+              description="Sidebar, header background"
+            />
+            <ColorInput 
+              label="Card Background" 
+              value={theme.bgCard} 
+              onChange={(v) => setTheme({ ...theme, bgCard: v })}
+              description="Card and panel background"
+            />
+            <ColorInput 
+              label="Hover Background" 
+              value={theme.bgHover} 
+              onChange={(v) => setTheme({ ...theme, bgHover: v })}
+              description="Hover state background"
+            />
           </div>
         </div>
 
-        <Tabs defaultValue="colors" className="space-y-6">
-          <TabsList className="bg-gray-800">
-            <TabsTrigger value="colors">Color Settings</TabsTrigger>
-            <TabsTrigger value="presets">Theme Presets</TabsTrigger>
-            <TabsTrigger value="preview">Live Preview</TabsTrigger>
-          </TabsList>
+        {/* Text Colors */}
+        <div className="bg-[#1a2332] rounded-xl border border-[#2a3a4d] overflow-hidden">
+          <div className="p-5 border-b border-[#2a3a4d]">
+            <h2 className="text-lg font-semibold text-white">Text Colors</h2>
+          </div>
+          <div className="p-5 space-y-4">
+            <ColorInput 
+              label="Primary Text" 
+              value={theme.textPrimary} 
+              onChange={(v) => setTheme({ ...theme, textPrimary: v })}
+              description="Headings and main text"
+            />
+            <ColorInput 
+              label="Secondary Text" 
+              value={theme.textSecondary} 
+              onChange={(v) => setTheme({ ...theme, textSecondary: v })}
+              description="Body text and labels"
+            />
+            <ColorInput 
+              label="Muted Text" 
+              value={theme.textMuted} 
+              onChange={(v) => setTheme({ ...theme, textMuted: v })}
+              description="Helper text and placeholders"
+            />
+          </div>
+        </div>
 
-          {/* Color Settings Tab */}
-          <TabsContent value="colors">
-            {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-amber-500"></div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {colorFields.map((field) => (
-                  <Card key={field.key} className="bg-gray-800 border-gray-700">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">{field.label}</CardTitle>
-                      <CardDescription className="text-xs">{field.description}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="w-12 h-12 rounded-lg border-2 border-gray-600 cursor-pointer relative overflow-hidden"
-                          style={{ backgroundColor: localColors[field.key] || "#000000" }}
-                        >
-                          <input
-                            type="color"
-                            value={localColors[field.key] || "#000000"}
-                            onChange={(e) => handleColorChange(field.key, e.target.value)}
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                          />
-                        </div>
-                        <Input
-                          value={localColors[field.key] || ""}
-                          onChange={(e) => handleColorChange(field.key, e.target.value)}
-                          placeholder="#000000"
-                          className="bg-gray-700 border-gray-600 font-mono text-sm"
-                        />
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </TabsContent>
+        {/* Brand Colors */}
+        <div className="bg-[#1a2332] rounded-xl border border-[#2a3a4d] overflow-hidden">
+          <div className="p-5 border-b border-[#2a3a4d]">
+            <h2 className="text-lg font-semibold text-white">Brand Colors</h2>
+          </div>
+          <div className="p-5 space-y-4">
+            <ColorInput 
+              label="Primary Color" 
+              value={theme.primary} 
+              onChange={(v) => setTheme({ ...theme, primary: v })}
+              description="Main brand color (buttons, links)"
+            />
+            <ColorInput 
+              label="Primary Hover" 
+              value={theme.primaryHover} 
+              onChange={(v) => setTheme({ ...theme, primaryHover: v })}
+              description="Primary color hover state"
+            />
+            <ColorInput 
+              label="Accent Color" 
+              value={theme.accent} 
+              onChange={(v) => setTheme({ ...theme, accent: v })}
+              description="Secondary brand color"
+            />
+            <ColorInput 
+              label="Accent Hover" 
+              value={theme.accentHover} 
+              onChange={(v) => setTheme({ ...theme, accentHover: v })}
+              description="Accent color hover state"
+            />
+          </div>
+        </div>
 
-          {/* Theme Presets Tab */}
-          <TabsContent value="presets">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {colorPresets.map((preset) => (
-                <Card
-                  key={preset.name}
-                  className="bg-gray-800 border-gray-700 cursor-pointer hover:border-amber-500/50 transition-all duration-300"
-                  onClick={() => applyPreset(preset)}
-                >
-                  <CardHeader>
-                    <CardTitle className="text-lg">{preset.name}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {/* Color Preview */}
-                    <div className="space-y-2">
-                      <div
-                        className="h-20 rounded-lg flex items-end p-3"
-                        style={{
-                          background: `linear-gradient(135deg, ${preset.colors.secondary_color} 0%, ${preset.colors.accent_color} 100%)`,
-                        }}
-                      >
-                        <div
-                          className="px-3 py-1 rounded text-sm font-bold"
-                          style={{
-                            backgroundColor: preset.colors.button_color,
-                            color: preset.colors.marquee_text_color,
-                          }}
-                        >
-                          Button
-                        </div>
-                      </div>
-                      <div className="flex gap-1">
-                        {Object.entries(preset.colors)
-                          .slice(0, 6)
-                          .map(([key, color]) => (
-                            <div
-                              key={key}
-                              className="flex-1 h-6 rounded"
-                              style={{ backgroundColor: color }}
-                              title={key}
-                            />
-                          ))}
-                      </div>
-                    </div>
-                    <Button className="w-full mt-4 bg-gray-700 hover:bg-gray-600">
-                      <Check className="h-4 w-4 mr-2" />
-                      Apply Preset
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
+        {/* Status Colors */}
+        <div className="bg-[#1a2332] rounded-xl border border-[#2a3a4d] overflow-hidden">
+          <div className="p-5 border-b border-[#2a3a4d]">
+            <h2 className="text-lg font-semibold text-white">Status Colors</h2>
+          </div>
+          <div className="p-5 space-y-4">
+            <ColorInput 
+              label="Success" 
+              value={theme.success} 
+              onChange={(v) => setTheme({ ...theme, success: v })}
+              description="Success messages and indicators"
+            />
+            <ColorInput 
+              label="Warning" 
+              value={theme.warning} 
+              onChange={(v) => setTheme({ ...theme, warning: v })}
+              description="Warning messages"
+            />
+            <ColorInput 
+              label="Error" 
+              value={theme.error} 
+              onChange={(v) => setTheme({ ...theme, error: v })}
+              description="Error messages"
+            />
+            <ColorInput 
+              label="Info" 
+              value={theme.info} 
+              onChange={(v) => setTheme({ ...theme, info: v })}
+              description="Info messages"
+            />
+          </div>
+        </div>
+
+        {/* Border & Gradient Colors */}
+        <div className="bg-[#1a2332] rounded-xl border border-[#2a3a4d] overflow-hidden lg:col-span-2">
+          <div className="p-5 border-b border-[#2a3a4d]">
+            <h2 className="text-lg font-semibold text-white">Border & Gradient Colors</h2>
+          </div>
+          <div className="p-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <ColorInput 
+              label="Primary Border" 
+              value={theme.borderPrimary} 
+              onChange={(v) => setTheme({ ...theme, borderPrimary: v })}
+            />
+            <ColorInput 
+              label="Secondary Border" 
+              value={theme.borderSecondary} 
+              onChange={(v) => setTheme({ ...theme, borderSecondary: v })}
+            />
+            <ColorInput 
+              label="Gradient Start" 
+              value={theme.gradientStart} 
+              onChange={(v) => setTheme({ ...theme, gradientStart: v })}
+            />
+            <ColorInput 
+              label="Gradient End" 
+              value={theme.gradientEnd} 
+              onChange={(v) => setTheme({ ...theme, gradientEnd: v })}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Preview */}
+      <div className="bg-[#1a2332] rounded-xl border border-[#2a3a4d] overflow-hidden">
+        <div className="p-5 border-b border-[#2a3a4d]">
+          <h2 className="text-lg font-semibold text-white">Preview</h2>
+        </div>
+        <div className="p-5" style={{ backgroundColor: theme.bgPrimary }}>
+          <div className="p-6 rounded-xl" style={{ backgroundColor: theme.bgCard, borderColor: theme.borderPrimary, borderWidth: 1 }}>
+            <h3 className="text-xl font-bold mb-2" style={{ color: theme.textPrimary }}>Sample Card</h3>
+            <p className="mb-4" style={{ color: theme.textSecondary }}>This is how your content will look with the selected colors.</p>
+            <div className="flex gap-3">
+              <button className="px-4 py-2 rounded-lg font-medium" style={{ backgroundColor: theme.primary, color: '#fff' }}>
+                Primary Button
+              </button>
+              <button className="px-4 py-2 rounded-lg font-medium" style={{ backgroundColor: theme.accent, color: '#fff' }}>
+                Accent Button
+              </button>
             </div>
-          </TabsContent>
-
-          {/* Live Preview Tab */}
-          <TabsContent value="preview">
-            <Card className="bg-gray-800 border-gray-700">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Eye className="h-5 w-5" />
-                  Live Preview
-                </CardTitle>
-                <CardDescription>See how your theme will look</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div
-                  className="rounded-lg overflow-hidden"
-                  style={{
-                    background: `linear-gradient(135deg, ${localColors.secondary_color || "#1a1a2e"} 0%, ${localColors.accent_color || "#16213e"} 100%)`,
-                  }}
-                >
-                  {/* Fake Navbar */}
-                  <div
-                    className="p-4 flex justify-between items-center"
-                    style={{ backgroundColor: localColors.nav_bg_color || "#000000" }}
-                  >
-                    <span
-                      className="font-bold text-lg"
-                      style={{ color: localColors.primary_color || "#f59e0b" }}
-                    >
-                      ⭐ Rating - Ads
-                    </span>
-                    <div className="flex gap-4">
-                      {["HOME", "FEATURES", "ADS", "CONTACT"].map((item) => (
-                        <span
-                          key={item}
-                          className="text-sm font-bold"
-                          style={{ color: localColors.primary_color || "#f59e0b" }}
-                        >
-                          {item}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Fake Marquee */}
-                  <div
-                    className="py-2 text-center font-bold text-sm"
-                    style={{
-                      backgroundColor: localColors.marquee_bg_color || "#f59e0b",
-                      color: localColors.marquee_text_color || "#000000",
-                    }}
-                  >
-                    🔥 EARN MORE TODAY &gt;&gt;&gt; CLICK ADS & WIN &gt;&gt;&gt;
-                  </div>
-
-                  {/* Content */}
-                  <div className="p-6 space-y-4">
-                    <div
-                      className="p-4 rounded-lg"
-                      style={{ backgroundColor: localColors.card_bg_color || "#1f2937" }}
-                    >
-                      <h3
-                        className="font-bold text-lg mb-2"
-                        style={{ color: localColors.text_color || "#ffffff" }}
-                      >
-                        Welcome, User
-                      </h3>
-                      <p
-                        className="text-sm opacity-80"
-                        style={{ color: localColors.text_color || "#ffffff" }}
-                      >
-                        @username
-                      </p>
-                    </div>
-
-                    <div className="flex gap-4">
-                      <button
-                        className="px-6 py-2 rounded font-bold transition-all"
-                        style={{
-                          backgroundColor: localColors.button_color || "#f59e0b",
-                          color: localColors.marquee_text_color || "#000000",
-                        }}
-                      >
-                        Primary Button
-                      </button>
-                      <button
-                        className="px-6 py-2 rounded font-bold border-2"
-                        style={{
-                          borderColor: localColors.primary_color || "#f59e0b",
-                          color: localColors.primary_color || "#f59e0b",
-                          backgroundColor: "transparent",
-                        }}
-                      >
-                        Secondary Button
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Fake Footer */}
-                  <div
-                    className="p-4 text-center text-sm"
-                    style={{
-                      backgroundColor: localColors.footer_bg_color || "#111827",
-                      color: localColors.text_color || "#ffffff",
-                    }}
-                  >
-                    © 2024 Rating-Ads. All rights reserved.
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+            <div className="flex gap-3 mt-4">
+              <span className="px-3 py-1 rounded-full text-sm" style={{ backgroundColor: `${theme.success}33`, color: theme.success }}>Success</span>
+              <span className="px-3 py-1 rounded-full text-sm" style={{ backgroundColor: `${theme.warning}33`, color: theme.warning }}>Warning</span>
+              <span className="px-3 py-1 rounded-full text-sm" style={{ backgroundColor: `${theme.error}33`, color: theme.error }}>Error</span>
+              <span className="px-3 py-1 rounded-full text-sm" style={{ backgroundColor: `${theme.info}33`, color: theme.info }}>Info</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
