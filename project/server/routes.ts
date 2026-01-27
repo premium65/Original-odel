@@ -9,8 +9,6 @@ import bcrypt from "bcrypt";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { mongoStorage } from "./mongoStorage";
-import { isMongoConnected } from "./mongoConnection";
 import cors from "cors";
 
 const SALT_ROUNDS = 10;
@@ -25,106 +23,115 @@ async function verifyPassword(password: string, hash: string): Promise<boolean> 
 
 declare module "express-session" {
   interface SessionData {
-    userId?: string;
+    userId?: number;
   }
 }
 
-// Helper to get numeric userId for PostgreSQL storage
-function getNumericUserId(sessionUserId: string | undefined): number | undefined {
-  if (!sessionUserId) return undefined;
-  const num = Number(sessionUserId);
-  return isNaN(num) ? undefined : num;
-}
-
-// Helper to get admin user from correct storage
-async function getAdminUser(sessionUserId: string | undefined) {
-  if (!sessionUserId) return null;
-  if (isMongoConnected()) {
-    return await mongoStorage.getUser(sessionUserId);
-  } else {
-    const numId = getNumericUserId(sessionUserId);
-    if (!numId) return null;
-    return await storage.getUser(numId);
-  }
-}
+// In-memory storage for settings (CMS)
+const settingsStore: Record<string, any[]> = {
+  contact: [],
+  pages: [],
+  content: [],
+  theme: [],
+  branding: [],
+  slideshow: [],
+};
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Trust proxy for secure cookies
   app.set('trust proxy', 1);
 
-  app.use(cors({ origin: true, credentials: true }));
+  // CORS
+  app.use(cors({
+    origin: true,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+  }));
 
+  // Session
   app.use(session({
     secret: process.env.SESSION_SECRET || "your-secret-key-change-in-production",
     resave: false,
     saveUninitialized: false,
     proxy: true,
-    cookie: { secure: true, httpOnly: true, sameSite: "lax", maxAge: 1000 * 60 * 60 * 24 * 7 },
+    cookie: {
+      secure: process.env.NODE_ENV === 'production',
+      httpOnly: true,
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: 1000 * 60 * 60 * 24 * 7,
+    },
   }));
 
   // ========================================
-  // AUTH ENDPOINTS
+  // AUTH ROUTES
   // ========================================
+  
   app.post("/api/auth/register", async (req, res) => {
     try {
       const data = insertUserSchema.parse(req.body);
-      let existingUsername, existingEmail;
       
-      if (isMongoConnected()) {
-        existingUsername = await mongoStorage.getUserByUsername(data.username);
-        existingEmail = await mongoStorage.getUserByEmail(data.email);
-      } else {
-        existingUsername = await storage.getUserByUsername(data.username);
-        existingEmail = await storage.getUserByEmail(data.email);
-      }
+      const existingUsername = await storage.getUserByUsername(data.username);
+      const existingEmail = await storage.getUserByEmail(data.email);
 
-      if (existingUsername) return res.status(400).send("Username already exists");
-      if (existingEmail) return res.status(400).send("Email already exists");
+      if (existingUsername) {
+        return res.status(400).json({ error: "Username already exists" });
+      }
+      if (existingEmail) {
+        return res.status(400).json({ error: "Email already exists" });
+      }
 
       const hashedPassword = await hashPassword(data.password);
-      
-      let user;
-      if (isMongoConnected()) {
-        user = await mongoStorage.createUser({ ...data, password: hashedPassword } as any);
-      } else {
-        user = await storage.createUser({ ...data, password: hashedPassword });
-      }
+      const user = await storage.createUser({ ...data, password: hashedPassword });
 
-      res.json({ success: true, userId: (user as any)._id || (user as any).id });
+      res.json({ 
+        success: true, 
+        message: "Registration successful. Please wait for admin approval.",
+        userId: user.id 
+      });
     } catch (error) {
-      if (error instanceof z.ZodError) return res.status(400).send(error.errors[0].message);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
       console.error("Registration error:", error);
-      res.status(500).send("Registration failed");
+      res.status(500).json({ error: "Registration failed" });
     }
   });
 
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { username, password } = req.body;
-      if (!username || !password) return res.status(400).json({ error: "Username and password are required" });
-
-      let user: any = null;
-      if (isMongoConnected()) {
-        user = await mongoStorage.getUserByUsername(username);
-      } else {
-        user = await storage.getUserByUsername(username);
+      
+      if (!username || !password) {
+        return res.status(400).json({ error: "Username and password are required" });
       }
 
-      if (!user) return res.status(401).json({ error: "Invalid username or password" });
+      const user = await storage.getUserByUsername(username);
+      if (!user) {
+        return res.status(401).json({ error: "Invalid username or password" });
+      }
 
       const isPasswordValid = await verifyPassword(password, user.password);
-      if (!isPasswordValid) return res.status(401).json({ error: "Invalid username or password" });
+      if (!isPasswordValid) {
+        return res.status(401).json({ error: "Invalid username or password" });
+      }
 
       if (user.status !== "active") {
-        if (user.status === "pending") return res.status(403).json({ error: "Your account is pending admin approval" });
-        if (user.status === "frozen") return res.status(403).json({ error: "Your account has been suspended" });
+        if (user.status === "pending") {
+          return res.status(403).json({ error: "Your account is pending admin approval" });
+        }
+        if (user.status === "frozen") {
+          return res.status(403).json({ error: "Your account has been suspended" });
+        }
         return res.status(403).json({ error: "Account access denied" });
       }
 
-      const userId = user.id || user._id?.toString();
-      req.session.userId = String(userId);
+      req.session.userId = user.id;
 
       req.session.save((err) => {
-        if (err) return res.status(500).json({ error: "Failed to save session" });
+        if (err) {
+          return res.status(500).json({ error: "Failed to save session" });
+        }
         const { password: _, ...userWithoutPassword } = user;
         res.json(userWithoutPassword);
       });
@@ -139,115 +146,153 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/auth/me", async (req, res) => {
-    if (!req.session.userId) return res.status(401).send("Not authenticated");
-    
-    const user = await getAdminUser(req.session.userId);
-    if (!user) return res.status(404).send("User not found");
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
 
-    const { password: _, ...userWithoutPassword } = user as any;
-    res.json(userWithoutPassword);
+      const user = await storage.getUser(req.session.userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const { password: _, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Get user error:", error);
+      res.status(500).json({ error: "Failed to get user" });
+    }
   });
 
   // ========================================
-  // RATINGS ENDPOINTS
+  // RATINGS ROUTES
   // ========================================
+  
   app.post("/api/ratings", async (req, res) => {
     try {
-      if (!req.session.userId) return res.status(401).send("Not authenticated");
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
 
       const data = insertRatingSchema.parse(req.body);
       const rating = await storage.createRating({
         ...data,
-        oderId: getNumericUserId(req.session.userId)!,
+        oderId: req.session.userId,
       });
 
       res.json(rating);
     } catch (error) {
-      if (error instanceof z.ZodError) return res.status(400).send(error.errors[0].message);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
       console.error("Create rating error:", error);
-      res.status(500).send("Failed to create rating");
+      res.status(500).json({ error: "Failed to create rating" });
     }
   });
 
   app.get("/api/ratings/my", async (req, res) => {
     try {
-      if (!req.session.userId) return res.status(401).send("Not authenticated");
-      const ratings = await storage.getUserRatings(getNumericUserId(req.session.userId)!);
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const ratings = await storage.getUserRatings(req.session.userId);
       res.json(ratings);
     } catch (error) {
       console.error("Fetch ratings error:", error);
-      res.status(500).send("Failed to fetch ratings");
+      res.status(500).json({ error: "Failed to fetch ratings" });
+    }
+  });
+
+  app.get("/api/ratings/:userId", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const ratings = await storage.getUserRatings(userId);
+      res.json(ratings);
+    } catch (error) {
+      console.error("Fetch user ratings error:", error);
+      res.status(500).json({ error: "Failed to fetch user ratings" });
     }
   });
 
   // ========================================
-  // ADS ENDPOINTS
+  // ADS ROUTES
   // ========================================
+  
   app.get("/api/ads", async (req, res) => {
     try {
       const ads = await storage.getAllAds();
       res.json(ads);
     } catch (error) {
       console.error("Fetch ads error:", error);
-      res.status(500).send("Failed to fetch ads");
+      res.status(500).json({ error: "Failed to fetch ads" });
+    }
+  });
+
+  app.get("/api/ads/:id", async (req, res) => {
+    try {
+      const adId = parseInt(req.params.id);
+      const ad = await storage.getAd(adId);
+      if (!ad) {
+        return res.status(404).json({ error: "Ad not found" });
+      }
+      res.json(ad);
+    } catch (error) {
+      console.error("Fetch ad error:", error);
+      res.status(500).json({ error: "Failed to fetch ad" });
     }
   });
 
   app.get("/api/ads/click-count", async (req, res) => {
     try {
-      if (!req.session.userId) return res.status(401).send("Not authenticated");
-      
-      let count;
-      if (isMongoConnected()) {
-        count = await mongoStorage.getUserAdClickCount(req.session.userId);
-      } else {
-        count = await storage.getUserAdClickCount(getNumericUserId(req.session.userId)!);
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
       }
+
+      const count = await storage.getUserAdClickCount(req.session.userId);
       res.json({ count });
     } catch (error) {
       console.error("Get ad click count error:", error);
-      res.status(500).send("Failed to get ad click count");
+      res.status(500).json({ error: "Failed to get ad click count" });
     }
   });
 
   app.post("/api/ads/click", async (req, res) => {
     try {
-      if (!req.session.userId) return res.status(401).send("Not authenticated");
-
-      const { adId } = req.body;
-      if (!adId) return res.status(400).send("Ad ID is required");
-
-      const ad = await storage.getAd(adId);
-      if (!ad) return res.status(404).send("Ad not found");
-
-      let user: any;
-      if (isMongoConnected()) {
-        user = await mongoStorage.getUser(req.session.userId);
-      } else {
-        user = await storage.getUser(getNumericUserId(req.session.userId)!);
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
       }
 
-      if (!user) return res.status(404).send("User not found");
+      const { adId } = req.body;
+      if (!adId) {
+        return res.status(400).json({ error: "Ad ID is required" });
+      }
+
+      const ad = await storage.getAd(adId);
+      if (!ad) {
+        return res.status(404).json({ error: "Ad not found" });
+      }
+
+      const user = await storage.getUser(req.session.userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
 
       // Check restriction
       if (user.restrictionAdsLimit !== null && user.restrictionAdsLimit !== undefined) {
-        if (user.restrictedAdsCompleted >= user.restrictionAdsLimit) {
+        if ((user.restrictedAdsCompleted || 0) >= user.restrictionAdsLimit) {
           return res.status(403).json({
             error: "restriction_limit_reached",
-            message: `You have reached the maximum of ${user.restrictionAdsLimit} ads.`,
+            message: `You have completed all ${user.restrictionAdsLimit} ads.`,
+            restrictedCount: user.restrictedAdsCompleted,
+            restrictionLimit: user.restrictionAdsLimit,
           });
         }
 
         const commission = user.restrictionCommission || ad.price;
-        if (isMongoConnected()) {
-          await mongoStorage.addMilestoneReward(req.session.userId, commission);
-          await mongoStorage.incrementRestrictedAds(req.session.userId);
-          await mongoStorage.incrementAdsCompleted(req.session.userId);
-        } else {
-          await storage.addMilestoneReward(getNumericUserId(req.session.userId)!, commission);
-          await storage.incrementRestrictedAds(getNumericUserId(req.session.userId)!);
-          await storage.incrementAdsCompleted(getNumericUserId(req.session.userId)!);
-        }
+        await storage.addMilestoneReward(req.session.userId, commission);
+        await storage.incrementRestrictedAds(req.session.userId);
+        await storage.incrementAdsCompleted(req.session.userId);
 
         res.json({
           success: true,
@@ -257,46 +302,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
           restrictionLimit: user.restrictionAdsLimit,
         });
       } else {
-        // Normal ad click
-        if (isMongoConnected()) {
-          await mongoStorage.addMilestoneReward(req.session.userId, ad.price);
-          await mongoStorage.addMilestoneAmount(req.session.userId, ad.price);
-          await mongoStorage.incrementAdsCompleted(req.session.userId);
-        } else {
-          await storage.addMilestoneReward(getNumericUserId(req.session.userId)!, ad.price);
-          await storage.addMilestoneAmount(getNumericUserId(req.session.userId)!, ad.price);
-          await storage.incrementAdsCompleted(getNumericUserId(req.session.userId)!);
-        }
+        await storage.addMilestoneReward(req.session.userId, ad.price);
+        await storage.addMilestoneAmount(req.session.userId, String(ad.price));
+        await storage.incrementAdsCompleted(req.session.userId);
 
-        res.json({ success: true, earnings: ad.price, restricted: false });
+        res.json({
+          success: true,
+          earnings: ad.price,
+          restricted: false,
+        });
       }
     } catch (error) {
       console.error("Record ad click error:", error);
-      res.status(500).send("Failed to record ad click");
+      res.status(500).json({ error: "Failed to record ad click" });
     }
   });
 
   // ========================================
-  // ADMIN USER ENDPOINTS - MONGODB FIXED!
+  // ADMIN - USER MANAGEMENT
   // ========================================
+  
   app.get("/api/admin/users", async (req, res) => {
     try {
-      if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
-      
-      const currentUser = await getAdminUser(req.session.userId);
-      if (!currentUser || (currentUser as any).isAdmin !== 1) {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) {
         return res.status(403).json({ error: "Admin access required" });
       }
 
-      let users;
-      if (isMongoConnected()) {
-        users = await mongoStorage.getAllUsers();
-      } else {
-        users = await storage.getAllUsers();
-      }
-
+      const users = await storage.getAllUsers();
       res.set("Cache-Control", "no-store");
-      res.json(users.map(({ password, ...user }: any) => user));
+      res.json(users.map(({ password, ...user }) => user));
     } catch (error) {
       console.error("Fetch users error:", error);
       res.status(500).json({ error: "Failed to fetch users" });
@@ -305,23 +344,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/admin/users/:userId", async (req, res) => {
     try {
-      if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
-      
-      const currentUser = await getAdminUser(req.session.userId);
-      if (!currentUser || (currentUser as any).isAdmin !== 1) {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) {
         return res.status(403).json({ error: "Admin access required" });
       }
 
-      let user;
-      if (isMongoConnected()) {
-        user = await mongoStorage.getUser(req.params.userId);
-      } else {
-        user = await storage.getUser(parseInt(req.params.userId));
+      const user = await storage.getUser(parseInt(req.params.userId));
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
       }
 
-      if (!user) return res.status(404).json({ error: "User not found" });
-
-      const { password: _, ...userWithoutPassword } = user as any;
+      const { password: _, ...userWithoutPassword } = user;
       res.json(userWithoutPassword);
     } catch (error) {
       console.error("Fetch user error:", error);
@@ -331,10 +368,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/admin/users/:userId/status", async (req, res) => {
     try {
-      if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
-      
-      const currentUser = await getAdminUser(req.session.userId);
-      if (!currentUser || (currentUser as any).isAdmin !== 1) {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) {
         return res.status(403).json({ error: "Admin access required" });
       }
 
@@ -343,16 +382,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid status" });
       }
 
-      let updatedUser;
-      if (isMongoConnected()) {
-        updatedUser = await mongoStorage.updateUserStatus(req.params.userId, status);
-      } else {
-        updatedUser = await storage.updateUserStatus(parseInt(req.params.userId), status);
+      const updatedUser = await storage.updateUserStatus(parseInt(req.params.userId), status);
+      if (!updatedUser) {
+        return res.status(404).json({ error: "User not found" });
       }
 
-      if (!updatedUser) return res.status(404).json({ error: "User not found" });
-
-      const { password: _, ...userWithoutPassword } = updatedUser as any;
+      const { password: _, ...userWithoutPassword } = updatedUser;
       res.json(userWithoutPassword);
     } catch (error) {
       console.error("Update status error:", error);
@@ -360,147 +395,185 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/admin/users/:userId", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      await storage.deleteUser(parseInt(req.params.userId));
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Delete user error:", error);
+      res.status(500).json({ error: "Failed to delete user" });
+    }
+  });
+
   // ========================================
-  // ADMIN RATINGS
+  // ADMIN - RATINGS
   // ========================================
+  
   app.get("/api/admin/ratings", async (req, res) => {
     try {
-      if (!req.session.userId) return res.status(401).send("Not authenticated");
-      
-      const currentUser = await getAdminUser(req.session.userId);
-      if (!currentUser || (currentUser as any).isAdmin !== 1) {
-        return res.status(403).send("Admin access required");
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).json({ error: "Admin access required" });
       }
 
       const ratings = await storage.getAllRatings();
       res.json(ratings);
     } catch (error) {
       console.error("Fetch ratings error:", error);
-      res.status(500).send("Failed to fetch ratings");
+      res.status(500).json({ error: "Failed to fetch ratings" });
     }
   });
 
   app.delete("/api/admin/ratings/:ratingId", async (req, res) => {
     try {
-      if (!req.session.userId) return res.status(401).send("Not authenticated");
-      
-      const currentUser = await getAdminUser(req.session.userId);
-      if (!currentUser || (currentUser as any).isAdmin !== 1) {
-        return res.status(403).send("Admin access required");
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
       }
 
-      const ratingId = parseInt(req.params.ratingId);
-      await storage.deleteRating(ratingId);
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      await storage.deleteRating(parseInt(req.params.ratingId));
       res.json({ success: true });
     } catch (error) {
       console.error("Delete rating error:", error);
-      res.status(500).send("Failed to delete rating");
+      res.status(500).json({ error: "Failed to delete rating" });
     }
   });
 
   // ========================================
   // WITHDRAWALS
   // ========================================
+  
   app.post("/api/withdrawals", async (req, res) => {
     try {
-      if (!req.session.userId) return res.status(401).send("Not authenticated");
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
 
       const { amount } = req.body;
       if (!amount || parseFloat(amount) <= 0) {
-        return res.status(400).send("Invalid amount");
+        return res.status(400).json({ error: "Invalid amount" });
       }
 
-      // Implementation here
       res.json({ success: true, message: "Withdrawal request submitted" });
     } catch (error) {
       console.error("Withdrawal error:", error);
-      res.status(500).send("Failed to process withdrawal");
+      res.status(500).json({ error: "Failed to process withdrawal" });
     }
   });
 
   app.get("/api/withdrawals/my", async (req, res) => {
     try {
-      if (!req.session.userId) return res.status(401).send("Not authenticated");
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
       res.json([]);
     } catch (error) {
       console.error("Fetch withdrawals error:", error);
-      res.status(500).send("Failed to fetch withdrawals");
+      res.status(500).json({ error: "Failed to fetch withdrawals" });
     }
   });
 
   app.get("/api/admin/withdrawals", async (req, res) => {
     try {
-      if (!req.session.userId) return res.status(401).send("Not authenticated");
-      
-      const currentUser = await getAdminUser(req.session.userId);
-      if (!currentUser || (currentUser as any).isAdmin !== 1) {
-        return res.status(403).send("Admin access required");
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).json({ error: "Admin access required" });
       }
 
       res.json([]);
     } catch (error) {
       console.error("Fetch withdrawals error:", error);
-      res.status(500).send("Failed to fetch withdrawals");
+      res.status(500).json({ error: "Failed to fetch withdrawals" });
     }
   });
 
   app.get("/api/admin/withdrawals/pending", async (req, res) => {
     try {
-      if (!req.session.userId) return res.status(401).send("Not authenticated");
-      
-      const currentUser = await getAdminUser(req.session.userId);
-      if (!currentUser || (currentUser as any).isAdmin !== 1) {
-        return res.status(403).send("Admin access required");
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).json({ error: "Admin access required" });
       }
 
       res.json([]);
     } catch (error) {
       console.error("Fetch pending withdrawals error:", error);
-      res.status(500).send("Failed to fetch pending withdrawals");
+      res.status(500).json({ error: "Failed to fetch pending withdrawals" });
     }
   });
 
   app.post("/api/admin/withdrawals/:id/approve", async (req, res) => {
     try {
-      if (!req.session.userId) return res.status(401).send("Not authenticated");
-      
-      const currentUser = await getAdminUser(req.session.userId);
-      if (!currentUser || (currentUser as any).isAdmin !== 1) {
-        return res.status(403).send("Admin access required");
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).json({ error: "Admin access required" });
       }
 
       res.json({ success: true });
     } catch (error) {
       console.error("Approve withdrawal error:", error);
-      res.status(500).send("Failed to approve withdrawal");
+      res.status(500).json({ error: "Failed to approve withdrawal" });
     }
   });
 
   app.post("/api/admin/withdrawals/:id/reject", async (req, res) => {
     try {
-      if (!req.session.userId) return res.status(401).send("Not authenticated");
-      
-      const currentUser = await getAdminUser(req.session.userId);
-      if (!currentUser || (currentUser as any).isAdmin !== 1) {
-        return res.status(403).send("Admin access required");
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).json({ error: "Admin access required" });
       }
 
       res.json({ success: true });
     } catch (error) {
       console.error("Reject withdrawal error:", error);
-      res.status(500).send("Failed to reject withdrawal");
+      res.status(500).json({ error: "Failed to reject withdrawal" });
     }
   });
 
   // ========================================
-  // ADMIN DEPOSIT - MONGODB FIXED!
+  // ADMIN - DEPOSITS
   // ========================================
+  
   app.post("/api/admin/users/:userId/deposit", async (req, res) => {
     try {
-      if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
-      
-      const currentUser = await getAdminUser(req.session.userId);
-      if (!currentUser || (currentUser as any).isAdmin !== 1) {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) {
         return res.status(403).json({ error: "Admin access required" });
       }
 
@@ -509,16 +582,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid amount" });
       }
 
-      let updatedUser;
-      if (isMongoConnected()) {
-        updatedUser = await mongoStorage.addMilestoneAmount(req.params.userId, String(amount));
-      } else {
-        updatedUser = await storage.addMilestoneAmount(parseInt(req.params.userId), String(amount));
+      const updatedUser = await storage.addMilestoneAmount(parseInt(req.params.userId), String(amount));
+      if (!updatedUser) {
+        return res.status(404).json({ error: "User not found" });
       }
 
-      if (!updatedUser) return res.status(404).json({ error: "User not found" });
-
-      const { password: _, ...userWithoutPassword } = updatedUser as any;
+      const { password: _, ...userWithoutPassword } = updatedUser;
       res.json(userWithoutPassword);
     } catch (error) {
       console.error("Deposit error:", error);
@@ -526,7 +595,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Configure multer for file uploads
+  app.get("/api/admin/deposits", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      res.json([]);
+    } catch (error) {
+      console.error("Get deposits error:", error);
+      res.status(500).json({ error: "Failed to fetch deposits" });
+    }
+  });
+
+  app.post("/api/admin/deposits", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const { userId, amount } = req.body;
+      if (!userId || !amount || parseFloat(amount) <= 0) {
+        return res.status(400).json({ error: "Invalid user or amount" });
+      }
+
+      const user = await storage.getUser(parseInt(userId));
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      await storage.addMilestoneAmount(parseInt(userId), String(amount));
+      res.json({ success: true, message: `Added ${amount} to ${user.username}'s balance` });
+    } catch (error) {
+      console.error("Create deposit error:", error);
+      res.status(500).json({ error: "Failed to create deposit" });
+    }
+  });
+
+  app.get("/api/admin/commissions", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      res.json([]);
+    } catch (error) {
+      console.error("Get commissions error:", error);
+      res.status(500).json({ error: "Failed to fetch commissions" });
+    }
+  });
+
+  // ========================================
+  // ADMIN - AD MANAGEMENT
+  // ========================================
+  
   const uploadDir = path.join(process.cwd(), "attached_assets", "ad_images");
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
@@ -550,14 +687,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   });
 
-  // Admin ad management
   app.post("/api/admin/ads", upload.single("image"), async (req, res) => {
     try {
-      if (!req.session.userId) return res.status(401).send("Not authenticated");
-      
-      const currentUser = await getAdminUser(req.session.userId);
-      if (!currentUser || (currentUser as any).isAdmin !== 1) {
-        return res.status(403).send("Admin access required");
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).json({ error: "Admin access required" });
       }
 
       const adData = insertAdSchema.parse({
@@ -568,80 +706,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ad = await storage.createAd(adData);
       res.json(ad);
     } catch (error) {
-      if (error instanceof z.ZodError) return res.status(400).send(error.errors[0].message);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
       console.error("Create ad error:", error);
-      res.status(500).send("Failed to create ad");
+      res.status(500).json({ error: "Failed to create ad" });
     }
   });
 
   app.put("/api/admin/ads/:id", upload.single("image"), async (req, res) => {
     try {
-      if (!req.session.userId) return res.status(401).send("Not authenticated");
-      
-      const currentUser = await getAdminUser(req.session.userId);
-      if (!currentUser || (currentUser as any).isAdmin !== 1) {
-        return res.status(403).send("Admin access required");
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).json({ error: "Admin access required" });
       }
 
       const adId = parseInt(req.params.id);
       const updateData: any = { ...req.body };
-      
       if (req.file) {
         updateData.imageUrl = `/attached_assets/ad_images/${req.file.filename}`;
       }
 
       const ad = await storage.updateAd(adId, updateData);
-      if (!ad) return res.status(404).send("Ad not found");
+      if (!ad) return res.status(404).json({ error: "Ad not found" });
 
       res.json(ad);
     } catch (error) {
       console.error("Update ad error:", error);
-      res.status(500).send("Failed to update ad");
+      res.status(500).json({ error: "Failed to update ad" });
     }
   });
 
   app.delete("/api/admin/ads/:id", async (req, res) => {
     try {
-      if (!req.session.userId) return res.status(401).send("Not authenticated");
-      
-      const currentUser = await getAdminUser(req.session.userId);
-      if (!currentUser || (currentUser as any).isAdmin !== 1) {
-        return res.status(403).send("Admin access required");
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
       }
 
-      const adId = parseInt(req.params.id);
-      await storage.deleteAd(adId);
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      await storage.deleteAd(parseInt(req.params.id));
       res.json({ success: true });
     } catch (error) {
       console.error("Delete ad error:", error);
-      res.status(500).send("Failed to delete ad");
+      res.status(500).json({ error: "Failed to delete ad" });
     }
   });
 
   // ========================================
-  // PREMIUM MANAGE ENDPOINTS - MONGODB FIXED!
+  // PREMIUM MANAGE - USER OPERATIONS
   // ========================================
+  
   app.post("/api/admin/users/:userId/reset", async (req, res) => {
     try {
-      if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
-      
-      const currentUser = await getAdminUser(req.session.userId);
-      if (!currentUser || (currentUser as any).isAdmin !== 1) {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) {
         return res.status(403).json({ error: "Admin access required" });
       }
 
       const { field } = req.body;
-
-      let updatedUser;
-      if (isMongoConnected()) {
-        updatedUser = await mongoStorage.resetUserField(req.params.userId, field);
-      } else {
-        updatedUser = await storage.resetUserField(parseInt(req.params.userId), field);
-      }
-
+      const updatedUser = await storage.resetUserField(parseInt(req.params.userId), field);
       if (!updatedUser) return res.status(404).json({ error: "User not found" });
 
-      const { password: _, ...userWithoutPassword } = updatedUser as any;
+      const { password: _, ...userWithoutPassword } = updatedUser;
       res.json(userWithoutPassword);
     } catch (error) {
       console.error("Reset field error:", error);
@@ -651,10 +789,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/admin/users/:userId/add-value", async (req, res) => {
     try {
-      if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
-      
-      const currentUser = await getAdminUser(req.session.userId);
-      if (!currentUser || (currentUser as any).isAdmin !== 1) {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) {
         return res.status(403).json({ error: "Admin access required" });
       }
 
@@ -663,16 +803,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid amount" });
       }
 
-      let updatedUser;
-      if (isMongoConnected()) {
-        updatedUser = await mongoStorage.addUserFieldValue(req.params.userId, field, String(amount));
-      } else {
-        updatedUser = await storage.addUserFieldValue(parseInt(req.params.userId), field, String(amount));
-      }
-
+      const updatedUser = await storage.addUserFieldValue(parseInt(req.params.userId), field, String(amount));
       if (!updatedUser) return res.status(404).json({ error: "User not found" });
 
-      const { password: _, ...userWithoutPassword } = updatedUser as any;
+      const { password: _, ...userWithoutPassword } = updatedUser;
       res.json(userWithoutPassword);
     } catch (error) {
       console.error("Add value error:", error);
@@ -682,25 +816,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/admin/users/:userId/details", async (req, res) => {
     try {
-      if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
-      
-      const currentUser = await getAdminUser(req.session.userId);
-      if (!currentUser || (currentUser as any).isAdmin !== 1) {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) {
         return res.status(403).json({ error: "Admin access required" });
       }
 
       const { username, mobileNumber, password } = req.body;
-
-      let updatedUser;
-      if (isMongoConnected()) {
-        updatedUser = await mongoStorage.updateUserDetails(req.params.userId, { username, mobileNumber, password });
-      } else {
-        updatedUser = await storage.updateUserDetails(parseInt(req.params.userId), { username, mobileNumber, password });
-      }
-
+      const updatedUser = await storage.updateUserDetails(parseInt(req.params.userId), { username, mobileNumber, password });
       if (!updatedUser) return res.status(404).json({ error: "User not found" });
 
-      const { password: _, ...userWithoutPassword } = updatedUser as any;
+      const { password: _, ...userWithoutPassword } = updatedUser;
       res.json(userWithoutPassword);
     } catch (error) {
       console.error("Update user details error:", error);
@@ -710,25 +839,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/admin/users/:userId/bank", async (req, res) => {
     try {
-      if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
-      
-      const currentUser = await getAdminUser(req.session.userId);
-      if (!currentUser || (currentUser as any).isAdmin !== 1) {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) {
         return res.status(403).json({ error: "Admin access required" });
       }
 
       const { bankName, accountNumber, accountHolderName, branchName } = req.body;
-
-      let updatedUser;
-      if (isMongoConnected()) {
-        updatedUser = await mongoStorage.updateUserBankDetails(req.params.userId, { bankName, accountNumber, accountHolderName, branchName });
-      } else {
-        updatedUser = await storage.updateUserBankDetails(parseInt(req.params.userId), { bankName, accountNumber, accountHolderName, branchName });
-      }
-
+      const updatedUser = await storage.updateUserBankDetails(parseInt(req.params.userId), { bankName, accountNumber, accountHolderName, branchName });
       if (!updatedUser) return res.status(404).json({ error: "User not found" });
 
-      const { password: _, ...userWithoutPassword } = updatedUser as any;
+      const { password: _, ...userWithoutPassword } = updatedUser;
       res.json(userWithoutPassword);
     } catch (error) {
       console.error("Update bank details error:", error);
@@ -738,29 +862,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/admin/users/:userId/restrict", async (req, res) => {
     try {
-      if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
-      
-      const currentUser = await getAdminUser(req.session.userId);
-      if (!currentUser || (currentUser as any).isAdmin !== 1) {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) {
         return res.status(403).json({ error: "Admin access required" });
       }
 
       const { adsLimit, deposit, commission, pendingAmount } = req.body;
 
       if (!adsLimit || adsLimit <= 0) return res.status(400).json({ error: "Invalid ads limit" });
-      if (!deposit || parseFloat(deposit) <= 0) return res.status(400).json({ error: "Invalid deposit amount" });
-      if (!commission || parseFloat(commission) <= 0) return res.status(400).json({ error: "Invalid commission amount" });
+      if (!deposit || parseFloat(deposit) <= 0) return res.status(400).json({ error: "Invalid deposit" });
+      if (!commission || parseFloat(commission) <= 0) return res.status(400).json({ error: "Invalid commission" });
 
-      let updatedUser;
-      if (isMongoConnected()) {
-        updatedUser = await mongoStorage.setUserRestriction(req.params.userId, adsLimit, deposit, commission, pendingAmount);
-      } else {
-        updatedUser = await storage.setUserRestriction(parseInt(req.params.userId), adsLimit, deposit, commission, pendingAmount);
-      }
-
+      const updatedUser = await storage.setUserRestriction(parseInt(req.params.userId), adsLimit, deposit, commission, pendingAmount);
       if (!updatedUser) return res.status(404).json({ error: "User not found" });
 
-      const { password: _, ...userWithoutPassword } = updatedUser as any;
+      const { password: _, ...userWithoutPassword } = updatedUser;
       res.json(userWithoutPassword);
     } catch (error) {
       console.error("Set restriction error:", error);
@@ -770,23 +890,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/admin/users/:userId/unrestrict", async (req, res) => {
     try {
-      if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
-      
-      const currentUser = await getAdminUser(req.session.userId);
-      if (!currentUser || (currentUser as any).isAdmin !== 1) {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) {
         return res.status(403).json({ error: "Admin access required" });
       }
 
-      let updatedUser;
-      if (isMongoConnected()) {
-        updatedUser = await mongoStorage.removeUserRestriction(req.params.userId);
-      } else {
-        updatedUser = await storage.removeUserRestriction(parseInt(req.params.userId));
-      }
-
+      const updatedUser = await storage.removeUserRestriction(parseInt(req.params.userId));
       if (!updatedUser) return res.status(404).json({ error: "User not found" });
 
-      const { password: _, ...userWithoutPassword } = updatedUser as any;
+      const { password: _, ...userWithoutPassword } = updatedUser;
       res.json(userWithoutPassword);
     } catch (error) {
       console.error("Remove restriction error:", error);
@@ -796,25 +912,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/admin/users/:userId/toggle-admin", async (req, res) => {
     try {
-      if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
-      
-      const currentUser = await getAdminUser(req.session.userId);
-      if (!currentUser || (currentUser as any).isAdmin !== 1) {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) {
         return res.status(403).json({ error: "Admin access required" });
       }
 
       const { isAdmin } = req.body;
-
-      let updatedUser;
-      if (isMongoConnected()) {
-        updatedUser = await mongoStorage.toggleAdmin(req.params.userId, isAdmin ? 1 : 0);
-      } else {
-        updatedUser = await storage.updateUser(parseInt(req.params.userId), { isAdmin: isAdmin ? 1 : 0 });
-      }
-
+      const updatedUser = await storage.updateUser(parseInt(req.params.userId), { isAdmin: isAdmin ? 1 : 0 });
       if (!updatedUser) return res.status(404).json({ error: "User not found" });
 
-      const { password: _, ...userWithoutPassword } = updatedUser as any;
+      const { password: _, ...userWithoutPassword } = updatedUser;
       res.json(userWithoutPassword);
     } catch (error) {
       console.error("Toggle admin error:", error);
@@ -823,86 +934,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========================================
-  // DEPOSITS MANAGEMENT
-  // ========================================
-  app.get("/api/admin/deposits", async (req, res) => {
-    try {
-      if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
-      
-      const currentUser = await getAdminUser(req.session.userId);
-      if (!currentUser || (currentUser as any).isAdmin !== 1) {
-        return res.status(403).json({ error: "Admin access required" });
-      }
-
-      res.json([]);
-    } catch (error) {
-      console.error("Get deposits error:", error);
-      res.status(500).json({ error: "Failed to fetch deposits" });
-    }
-  });
-
-  app.post("/api/admin/deposits", async (req, res) => {
-    try {
-      if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
-      
-      const currentUser = await getAdminUser(req.session.userId);
-      if (!currentUser || (currentUser as any).isAdmin !== 1) {
-        return res.status(403).json({ error: "Admin access required" });
-      }
-
-      const { userId, amount } = req.body;
-      if (!userId || !amount || amount <= 0) {
-        return res.status(400).json({ error: "Invalid user or amount" });
-      }
-
-      let user;
-      if (isMongoConnected()) {
-        user = await mongoStorage.getUser(String(userId));
-        if (user) await mongoStorage.addMilestoneAmount(String(userId), String(amount));
-      } else {
-        user = await storage.getUser(userId);
-        if (user) await storage.addMilestoneAmount(userId, String(amount));
-      }
-
-      if (!user) return res.status(404).json({ error: "User not found" });
-
-      res.json({ success: true, message: `Added ${amount} to ${(user as any).username}'s balance` });
-    } catch (error) {
-      console.error("Create deposit error:", error);
-      res.status(500).json({ error: "Failed to create deposit" });
-    }
-  });
-
-  // Commission history
-  app.get("/api/admin/commissions", async (req, res) => {
-    try {
-      if (!req.session.userId) return res.status(401).send("Not authenticated");
-      
-      const currentUser = await getAdminUser(req.session.userId);
-      if (!currentUser || (currentUser as any).isAdmin !== 1) {
-        return res.status(403).send("Admin access required");
-      }
-
-      res.json([]);
-    } catch (error) {
-      console.error("Get commissions error:", error);
-      res.status(500).send("Failed to fetch commissions");
-    }
-  });
-
-  // ========================================
-  // SETTINGS API - MONGODB STORAGE
+  // SETTINGS API (IN-MEMORY)
   // ========================================
   
   // Contact Settings
   app.get("/api/admin/settings/contact", async (req, res) => {
     try {
-      if (isMongoConnected()) {
-        const settings = await mongoStorage.getSettings("contact");
-        res.json(settings.map(s => ({ type: s.type, data: s.data })));
-      } else {
-        res.json([]);
-      }
+      res.json(settingsStore.contact.map(s => ({ type: s.type, data: s.data || s })));
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch contact settings" });
     }
@@ -911,21 +949,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/settings/contact", async (req, res) => {
     try {
       if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
-      
-      const currentUser = await getAdminUser(req.session.userId);
-      if (!currentUser || (currentUser as any).isAdmin !== 1) {
-        return res.status(403).json({ error: "Admin access required" });
-      }
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) return res.status(403).json({ error: "Admin access required" });
 
       const { type, items, data } = req.body;
-      if (isMongoConnected()) {
-        if (items) {
-          for (const item of items) {
-            await mongoStorage.saveSettings("contact", item.type || type, item);
-          }
-        } else {
-          await mongoStorage.saveSettings("contact", type, data);
+      if (items) {
+        for (const item of items) {
+          const idx = settingsStore.contact.findIndex(s => s.type === (item.type || type));
+          if (idx >= 0) settingsStore.contact[idx] = { type: item.type || type, data: item };
+          else settingsStore.contact.push({ type: item.type || type, data: item });
         }
+      } else {
+        const idx = settingsStore.contact.findIndex(s => s.type === type);
+        if (idx >= 0) settingsStore.contact[idx] = { type, data };
+        else settingsStore.contact.push({ type, data });
       }
       res.json({ success: true });
     } catch (error) {
@@ -936,12 +973,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Pages Settings
   app.get("/api/admin/settings/pages", async (req, res) => {
     try {
-      if (isMongoConnected()) {
-        const settings = await mongoStorage.getSettings("pages");
-        res.json(settings.map(s => ({ type: s.type, ...s.data })));
-      } else {
-        res.json([]);
-      }
+      res.json(settingsStore.pages.map(s => ({ type: s.type, ...s.data })));
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch pages" });
     }
@@ -950,16 +982,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/settings/pages", async (req, res) => {
     try {
       if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
-      
-      const currentUser = await getAdminUser(req.session.userId);
-      if (!currentUser || (currentUser as any).isAdmin !== 1) {
-        return res.status(403).json({ error: "Admin access required" });
-      }
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) return res.status(403).json({ error: "Admin access required" });
 
       const { type, title, content, isActive, data } = req.body;
-      if (isMongoConnected()) {
-        await mongoStorage.saveSettings("pages", type, { title, content, isActive, ...data });
-      }
+      const idx = settingsStore.pages.findIndex(s => s.type === type);
+      const pageData = { type, data: { title, content, isActive, ...data } };
+      if (idx >= 0) settingsStore.pages[idx] = pageData;
+      else settingsStore.pages.push(pageData);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to save page" });
@@ -969,12 +999,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Content Settings
   app.get("/api/admin/settings/content", async (req, res) => {
     try {
-      if (isMongoConnected()) {
-        const settings = await mongoStorage.getSettings("content");
-        res.json(settings.map(s => ({ type: s.type, data: s.data })));
-      } else {
-        res.json([]);
-      }
+      res.json(settingsStore.content.map(s => ({ type: s.type, data: s.data })));
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch content settings" });
     }
@@ -983,16 +1008,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/settings/content", async (req, res) => {
     try {
       if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
-      
-      const currentUser = await getAdminUser(req.session.userId);
-      if (!currentUser || (currentUser as any).isAdmin !== 1) {
-        return res.status(403).json({ error: "Admin access required" });
-      }
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) return res.status(403).json({ error: "Admin access required" });
 
       const { type, data } = req.body;
-      if (isMongoConnected()) {
-        await mongoStorage.saveSettings("content", type, data);
-      }
+      const idx = settingsStore.content.findIndex(s => s.type === type);
+      if (idx >= 0) settingsStore.content[idx] = { type, data };
+      else settingsStore.content.push({ type, data });
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to save content" });
@@ -1002,12 +1024,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Theme Settings
   app.get("/api/admin/settings/theme", async (req, res) => {
     try {
-      if (isMongoConnected()) {
-        const settings = await mongoStorage.getSettings("theme");
-        res.json(settings.map(s => ({ type: s.type, data: s.data })));
-      } else {
-        res.json([]);
-      }
+      res.json(settingsStore.theme.map(s => ({ type: s.type, data: s.data })));
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch theme settings" });
     }
@@ -1016,16 +1033,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/settings/theme", async (req, res) => {
     try {
       if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
-      
-      const currentUser = await getAdminUser(req.session.userId);
-      if (!currentUser || (currentUser as any).isAdmin !== 1) {
-        return res.status(403).json({ error: "Admin access required" });
-      }
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) return res.status(403).json({ error: "Admin access required" });
 
       const { type, data } = req.body;
-      if (isMongoConnected()) {
-        await mongoStorage.saveSettings("theme", type || "theme", data);
-      }
+      const idx = settingsStore.theme.findIndex(s => s.type === (type || "theme"));
+      if (idx >= 0) settingsStore.theme[idx] = { type: type || "theme", data };
+      else settingsStore.theme.push({ type: type || "theme", data });
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to save theme" });
@@ -1035,12 +1049,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Branding Settings
   app.get("/api/admin/settings/branding", async (req, res) => {
     try {
-      if (isMongoConnected()) {
-        const settings = await mongoStorage.getSettings("branding");
-        res.json(settings.map(s => ({ type: s.type, data: s.data })));
-      } else {
-        res.json([]);
-      }
+      res.json(settingsStore.branding.map(s => ({ type: s.type, data: s.data })));
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch branding settings" });
     }
@@ -1049,31 +1058,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/settings/branding", async (req, res) => {
     try {
       if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
-      
-      const currentUser = await getAdminUser(req.session.userId);
-      if (!currentUser || (currentUser as any).isAdmin !== 1) {
-        return res.status(403).json({ error: "Admin access required" });
-      }
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) return res.status(403).json({ error: "Admin access required" });
 
       const { type, data } = req.body;
-      if (isMongoConnected()) {
-        await mongoStorage.saveSettings("branding", type || "branding", data);
-      }
+      const idx = settingsStore.branding.findIndex(s => s.type === (type || "branding"));
+      if (idx >= 0) settingsStore.branding[idx] = { type: type || "branding", data };
+      else settingsStore.branding.push({ type: type || "branding", data });
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to save branding" });
     }
   });
 
-  // Slideshow Settings
+  // ========================================
+  // SLIDESHOW SETTINGS
+  // ========================================
+  
   app.get("/api/admin/settings/slideshow", async (req, res) => {
     try {
-      if (isMongoConnected()) {
-        const slides = await mongoStorage.getSlideshow();
-        res.json(slides);
-      } else {
-        res.json([]);
-      }
+      res.json(settingsStore.slideshow);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch slideshow" });
     }
@@ -1081,12 +1085,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/slideshow", async (req, res) => {
     try {
-      if (isMongoConnected()) {
-        const slides = await mongoStorage.getSlideshow();
-        res.json(slides.filter((s: any) => s.isActive !== false));
-      } else {
-        res.json([]);
-      }
+      res.json(settingsStore.slideshow.filter(s => s.isActive !== false));
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch slideshow" });
     }
@@ -1095,18 +1094,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/settings/slideshow", async (req, res) => {
     try {
       if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
-      
-      const currentUser = await getAdminUser(req.session.userId);
-      if (!currentUser || (currentUser as any).isAdmin !== 1) {
-        return res.status(403).json({ error: "Admin access required" });
-      }
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) return res.status(403).json({ error: "Admin access required" });
 
-      if (isMongoConnected()) {
-        const slide = await mongoStorage.addSlide(req.body);
-        res.json({ success: true, slide });
-      } else {
-        res.json({ success: true });
-      }
+      const slide = { ...req.body, id: Date.now().toString() };
+      settingsStore.slideshow.push(slide);
+      res.json({ success: true, slide });
     } catch (error) {
       res.status(500).json({ error: "Failed to save slideshow" });
     }
@@ -1115,19 +1108,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/admin/settings/slideshow/:id", async (req, res) => {
     try {
       if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
-      
-      const currentUser = await getAdminUser(req.session.userId);
-      if (!currentUser || (currentUser as any).isAdmin !== 1) {
-        return res.status(403).json({ error: "Admin access required" });
-      }
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) return res.status(403).json({ error: "Admin access required" });
 
-      if (isMongoConnected()) {
-        const slide = await mongoStorage.updateSlide(req.params.id, req.body);
-        if (!slide) return res.status(404).json({ error: "Slide not found" });
-        res.json({ success: true, slide });
-      } else {
-        res.json({ success: true });
-      }
+      const idx = settingsStore.slideshow.findIndex(s => s.id === req.params.id);
+      if (idx < 0) return res.status(404).json({ error: "Slide not found" });
+      
+      settingsStore.slideshow[idx] = { ...settingsStore.slideshow[idx], ...req.body };
+      res.json({ success: true, slide: settingsStore.slideshow[idx] });
     } catch (error) {
       res.status(500).json({ error: "Failed to update slideshow" });
     }
@@ -1136,65 +1124,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/admin/settings/slideshow/:id", async (req, res) => {
     try {
       if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
-      
-      const currentUser = await getAdminUser(req.session.userId);
-      if (!currentUser || (currentUser as any).isAdmin !== 1) {
-        return res.status(403).json({ error: "Admin access required" });
-      }
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.isAdmin !== 1) return res.status(403).json({ error: "Admin access required" });
 
-      if (isMongoConnected()) {
-        await mongoStorage.deleteSlide(req.params.id);
-      }
+      settingsStore.slideshow = settingsStore.slideshow.filter(s => s.id !== req.params.id);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete slideshow" });
     }
   });
 
-  // Public settings API
+  // ========================================
+  // PUBLIC SETTINGS API
+  // ========================================
+  
   app.get("/api/public/settings", async (req, res) => {
     try {
-      if (isMongoConnected()) {
-        const [contact, pages, content, theme, branding] = await Promise.all([
-          mongoStorage.getSettings("contact"),
-          mongoStorage.getSettings("pages"),
-          mongoStorage.getSettings("content"),
-          mongoStorage.getSettings("theme"),
-          mongoStorage.getSettings("branding"),
-        ]);
-        const slideshow = await mongoStorage.getSlideshow();
-        
-        res.json({
-          contact: contact.map(s => ({ type: s.type, data: s.data })),
-          pages: pages.map(s => ({ type: s.type, ...s.data })),
-          content: content.map(s => ({ type: s.type, data: s.data })),
-          theme: theme.map(s => ({ type: s.type, data: s.data })),
-          branding: branding.map(s => ({ type: s.type, data: s.data })),
-          slideshow: slideshow.filter((s: any) => s.isActive !== false),
-        });
-      } else {
-        res.json({ contact: [], pages: [], content: [], theme: [], branding: [], slideshow: [] });
-      }
+      res.json({
+        contact: settingsStore.contact.map(s => ({ type: s.type, data: s.data || s })),
+        pages: settingsStore.pages.map(s => ({ type: s.type, ...s.data })),
+        content: settingsStore.content.map(s => ({ type: s.type, data: s.data })),
+        theme: settingsStore.theme.map(s => ({ type: s.type, data: s.data })),
+        branding: settingsStore.branding.map(s => ({ type: s.type, data: s.data })),
+        slideshow: settingsStore.slideshow.filter(s => s.isActive !== false),
+      });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch settings" });
     }
   });
 
-  // Settings API for dashboard
   app.get("/api/settings", async (req, res) => {
     try {
-      if (isMongoConnected()) {
-        const theme = await mongoStorage.getSettings("theme");
-        const themeData = theme.find(t => t.type === "theme");
-        res.json(themeData?.data || {});
-      } else {
-        res.json({});
-      }
+      const themeData = settingsStore.theme.find(t => t.type === "theme");
+      res.json(themeData?.data || {});
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch settings" });
     }
   });
 
+  // ========================================
+  // REGISTER PREMIUM ROUTES & CREATE SERVER
+  // ========================================
+  
   registerPremiumRoutes(app);
 
   const httpServer = createServer(app);
