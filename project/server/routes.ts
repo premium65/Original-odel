@@ -1051,7 +1051,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get all deposits (using users' balance history as proxy)
+  // Get all deposits
   app.get("/api/admin/deposits", async (req, res) => {
     try {
       if (!req.session.userId) {
@@ -1063,8 +1063,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).send("Admin access required");
       }
 
-      // For now, return empty array - deposits can be implemented with a separate table
-      // or derived from transaction history
       res.json([]);
     } catch (error) {
       console.error("Get deposits error:", error);
@@ -1072,7 +1070,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create manual deposit (adds to user balance)
+  // Create manual deposit
   app.post("/api/admin/deposits", async (req, res) => {
     try {
       if (!req.session.userId) {
@@ -1095,7 +1093,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).send("User not found");
       }
 
-      // Add to user balance
       const newBalance = (user.balance || 0) + amount;
       const updatedUser = await storage.updateUser(userId, { balance: newBalance });
 
@@ -1122,7 +1119,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).send("Admin access required");
       }
 
-      // Return empty for now - can be implemented with separate commission tracking table
       res.json([]);
     } catch (error) {
       console.error("Get commissions error:", error);
@@ -1131,42 +1127,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========================================
-  // SETTINGS API ROUTES (CMS)
+  // SETTINGS API ROUTES (CMS) - FIXED!
   // ========================================
   
-  // In-memory settings store (replace with database in production)
-  const settingsStore: Record<string, any> = {};
+  // In-memory settings store
+  const settingsStore: Record<string, any> = {
+    contact: [],
+    pages: [],
+    content: [],
+    theme: [],
+    branding: [],
+    slideshow: []
+  };
 
   // Contact Settings
   app.get("/api/admin/settings/contact", async (req, res) => {
     try {
       res.json(settingsStore.contact || []);
     } catch (error) {
-      res.status(500).send("Failed to fetch contact settings");
+      res.status(500).json({ error: "Failed to fetch contact settings" });
     }
   });
 
   app.post("/api/admin/settings/contact", async (req, res) => {
     try {
       if (!req.session.userId) {
-        return res.status(401).send("Not authenticated");
+        return res.status(401).json({ error: "Not authenticated" });
       }
       const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
       if (!currentUser || currentUser.isAdmin !== 1) {
-        return res.status(403).send("Admin access required");
+        return res.status(403).json({ error: "Admin access required" });
       }
 
-      const { type, items } = req.body;
-      if (!settingsStore.contact) settingsStore.contact = [];
+      const { type, items, data } = req.body;
       
-      // Remove existing items of this type
-      settingsStore.contact = settingsStore.contact.filter((s: any) => s.type !== type);
-      // Add new items
-      settingsStore.contact.push(...items);
+      if (items) {
+        settingsStore.contact = settingsStore.contact.filter((s: any) => s.type !== type);
+        settingsStore.contact.push(...items.map((item: any) => ({ ...item, type })));
+      } else {
+        const existingIndex = settingsStore.contact.findIndex((c: any) => c.type === type);
+        const contactData = { type, data, updatedAt: new Date().toISOString() };
+        if (existingIndex >= 0) {
+          settingsStore.contact[existingIndex] = contactData;
+        } else {
+          settingsStore.contact.push(contactData);
+        }
+      }
       
       res.json({ success: true });
     } catch (error) {
-      res.status(500).send("Failed to save contact settings");
+      res.status(500).json({ error: "Failed to save contact settings" });
     }
   });
 
@@ -1175,26 +1185,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       res.json(settingsStore.pages || []);
     } catch (error) {
-      res.status(500).send("Failed to fetch pages");
+      res.status(500).json({ error: "Failed to fetch pages" });
     }
   });
 
   app.post("/api/admin/settings/pages", async (req, res) => {
     try {
       if (!req.session.userId) {
-        return res.status(401).send("Not authenticated");
+        return res.status(401).json({ error: "Not authenticated" });
       }
       const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
       if (!currentUser || currentUser.isAdmin !== 1) {
-        return res.status(403).send("Admin access required");
+        return res.status(403).json({ error: "Admin access required" });
       }
 
-      const { type, title, content, isActive } = req.body;
-      if (!settingsStore.pages) settingsStore.pages = [];
-      
-      // Update or add page
+      const { type, title, content, isActive, data } = req.body;
       const existingIndex = settingsStore.pages.findIndex((p: any) => p.type === type);
-      const pageData = { type, title, content, isActive, updatedAt: new Date().toISOString() };
+      const pageData = { type, title, content, isActive, data, updatedAt: new Date().toISOString() };
       
       if (existingIndex >= 0) {
         settingsStore.pages[existingIndex] = pageData;
@@ -1204,7 +1211,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({ success: true });
     } catch (error) {
-      res.status(500).send("Failed to save page");
+      res.status(500).json({ error: "Failed to save page" });
     }
   });
 
@@ -1213,24 +1220,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       res.json(settingsStore.content || []);
     } catch (error) {
-      res.status(500).send("Failed to fetch content settings");
+      res.status(500).json({ error: "Failed to fetch content settings" });
     }
   });
 
   app.post("/api/admin/settings/content", async (req, res) => {
     try {
       if (!req.session.userId) {
-        return res.status(401).send("Not authenticated");
+        return res.status(401).json({ error: "Not authenticated" });
       }
       const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
       if (!currentUser || currentUser.isAdmin !== 1) {
-        return res.status(403).send("Admin access required");
+        return res.status(403).json({ error: "Admin access required" });
       }
 
       const { type, data } = req.body;
-      if (!settingsStore.content) settingsStore.content = [];
-      
-      // Update or add content
       const existingIndex = settingsStore.content.findIndex((c: any) => c.type === type);
       const contentData = { type, data, updatedAt: new Date().toISOString() };
       
@@ -1242,7 +1246,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({ success: true });
     } catch (error) {
-      res.status(500).send("Failed to save content");
+      res.status(500).json({ error: "Failed to save content" });
     }
   });
 
@@ -1251,25 +1255,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       res.json(settingsStore.theme || []);
     } catch (error) {
-      res.status(500).send("Failed to fetch theme settings");
+      res.status(500).json({ error: "Failed to fetch theme settings" });
     }
   });
 
   app.post("/api/admin/settings/theme", async (req, res) => {
     try {
       if (!req.session.userId) {
-        return res.status(401).send("Not authenticated");
+        return res.status(401).json({ error: "Not authenticated" });
       }
       const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
       if (!currentUser || currentUser.isAdmin !== 1) {
-        return res.status(403).send("Admin access required");
+        return res.status(403).json({ error: "Admin access required" });
       }
 
       const { type, data } = req.body;
-      if (!settingsStore.theme) settingsStore.theme = [];
-      
       const existingIndex = settingsStore.theme.findIndex((t: any) => t.type === type);
-      const themeData = { type, data, updatedAt: new Date().toISOString() };
+      const themeData = { type: type || "theme", data, updatedAt: new Date().toISOString() };
       
       if (existingIndex >= 0) {
         settingsStore.theme[existingIndex] = themeData;
@@ -1279,7 +1281,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({ success: true });
     } catch (error) {
-      res.status(500).send("Failed to save theme");
+      res.status(500).json({ error: "Failed to save theme" });
     }
   });
 
@@ -1288,25 +1290,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       res.json(settingsStore.branding || []);
     } catch (error) {
-      res.status(500).send("Failed to fetch branding settings");
+      res.status(500).json({ error: "Failed to fetch branding settings" });
     }
   });
 
   app.post("/api/admin/settings/branding", async (req, res) => {
     try {
       if (!req.session.userId) {
-        return res.status(401).send("Not authenticated");
+        return res.status(401).json({ error: "Not authenticated" });
       }
       const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
       if (!currentUser || currentUser.isAdmin !== 1) {
-        return res.status(403).send("Admin access required");
+        return res.status(403).json({ error: "Admin access required" });
       }
 
       const { type, data } = req.body;
-      if (!settingsStore.branding) settingsStore.branding = [];
-      
       const existingIndex = settingsStore.branding.findIndex((b: any) => b.type === type);
-      const brandingData = { type, data, updatedAt: new Date().toISOString() };
+      const brandingData = { type: type || "branding", data, updatedAt: new Date().toISOString() };
       
       if (existingIndex >= 0) {
         settingsStore.branding[existingIndex] = brandingData;
@@ -1316,7 +1316,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({ success: true });
     } catch (error) {
-      res.status(500).send("Failed to save branding");
+      console.error("Branding save error:", error);
+      res.status(500).json({ error: "Failed to save branding" });
+    }
+  });
+
+  // ========================================
+  // SLIDESHOW SETTINGS - NEW!
+  // ========================================
+  app.get("/api/admin/settings/slideshow", async (req, res) => {
+    try {
+      res.json(settingsStore.slideshow || []);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch slideshow" });
+    }
+  });
+
+  app.get("/api/slideshow", async (req, res) => {
+    try {
+      const activeSlides = (settingsStore.slideshow || []).filter((s: any) => s.isActive !== false);
+      res.json(activeSlides);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch slideshow" });
+    }
+  });
+
+  app.post("/api/admin/settings/slideshow", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const slideData = req.body;
+      slideData.id = Date.now();
+      slideData.createdAt = new Date().toISOString();
+      settingsStore.slideshow.push(slideData);
+      
+      res.json({ success: true, slide: slideData });
+    } catch (error) {
+      console.error("Slideshow save error:", error);
+      res.status(500).json({ error: "Failed to save slideshow" });
+    }
+  });
+
+  app.put("/api/admin/settings/slideshow/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const id = parseInt(req.params.id);
+      const index = settingsStore.slideshow.findIndex((s: any) => s.id === id);
+      
+      if (index === -1) {
+        return res.status(404).json({ error: "Slide not found" });
+      }
+
+      settingsStore.slideshow[index] = { ...settingsStore.slideshow[index], ...req.body, updatedAt: new Date().toISOString() };
+      res.json({ success: true, slide: settingsStore.slideshow[index] });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update slideshow" });
+    }
+  });
+
+  app.delete("/api/admin/settings/slideshow/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const id = parseInt(req.params.id);
+      const initialLength = settingsStore.slideshow.length;
+      settingsStore.slideshow = settingsStore.slideshow.filter((s: any) => s.id !== id);
+      
+      if (settingsStore.slideshow.length === initialLength) {
+        return res.status(404).json({ error: "Slide not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete slideshow" });
     }
   });
 
@@ -1328,10 +1419,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         pages: settingsStore.pages || [],
         content: settingsStore.content || [],
         theme: settingsStore.theme || [],
-        branding: settingsStore.branding || []
+        branding: settingsStore.branding || [],
+        slideshow: (settingsStore.slideshow || []).filter((s: any) => s.isActive !== false)
       });
     } catch (error) {
-      res.status(500).send("Failed to fetch settings");
+      res.status(500).json({ error: "Failed to fetch settings" });
     }
   });
 
