@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { AdminSidebar } from "@/components/admin-sidebar";
+import AdminSidebar from "@/components/admin-sidebar";
 import { Button } from "@/components/ui/button";
 import { LogOut, Bell, Sun, Search, Menu } from "lucide-react";
 import { useLocation } from "wouter";

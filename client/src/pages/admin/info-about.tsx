@@ -1,30 +1,150 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Info, Save } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { FileText, Save, Eye } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AdminInfoAbout() {
-  const [content, setContent] = useState({ title: "About OdelADS", description: "OdelADS is a leading digital advertising platform...", mission: "Our mission is to revolutionize digital advertising...", vision: "To be the most trusted advertising platform..." });
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [content, setContent] = useState({
+    title: "About Us",
+    content: "",
+    isActive: true
+  });
+
+  const { data: pages = [] } = useQuery<any[]>({
+    queryKey: ["/api/admin/settings/pages"],
+  });
+
+  useEffect(() => {
+    const aboutPage = pages.find(p => p.type === "about");
+    if (aboutPage) {
+      setContent({
+        title: aboutPage.title || "About Us",
+        content: aboutPage.content || "",
+        isActive: aboutPage.isActive ?? true
+      });
+    }
+  }, [pages]);
+
+  const saveMutation = useMutation({
+    mutationFn: async (data: typeof content) => {
+      const res = await fetch("/api/admin/settings/pages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "about", ...data }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/pages"] });
+      toast({ title: "Success", description: "About Us page saved successfully" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to save About Us page", variant: "destructive" });
+    },
+  });
+
+  const handleSave = () => {
+    saveMutation.mutate(content);
+  };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="p-2 rounded-lg bg-[#8b5cf6]"><Info className="h-6 w-6 text-white" /></div>
-        <div><h1 className="text-2xl font-bold text-white">About Us</h1><p className="text-[#9ca3af]">Edit about us page</p></div>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-white">About Us</h1>
+          <p className="text-[#9ca3af] mt-1">Edit your About Us page content</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <a
+            href="/about"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 px-4 py-2.5 bg-[#2a3a4d] text-white rounded-xl hover:bg-[#3a4a5d] transition-colors"
+          >
+            <Eye className="w-5 h-5" />
+            <span className="font-medium">Preview</span>
+          </a>
+          <button
+            onClick={handleSave}
+            disabled={saveMutation.isPending}
+            className="flex items-center gap-2 px-5 py-2.5 bg-[#10b981] text-white rounded-xl hover:bg-[#059669] transition-colors"
+          >
+            <Save className="w-5 h-5" />
+            <span className="font-medium">{saveMutation.isPending ? "Saving..." : "Save Changes"}</span>
+          </button>
+        </div>
       </div>
-      <Card className="bg-[#1a2332] border-[#2a3a4d]">
-        <CardHeader><CardTitle className="text-white">Page Content</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2"><Label className="text-[#9ca3af]">Title</Label><Input value={content.title} onChange={(e) => setContent({...content, title: e.target.value})} className="bg-[#0f1419] border-[#2a3a4d] text-white" /></div>
-          <div className="space-y-2"><Label className="text-[#9ca3af]">Description</Label><Textarea value={content.description} onChange={(e) => setContent({...content, description: e.target.value})} className="bg-[#0f1419] border-[#2a3a4d] text-white min-h-[100px]" /></div>
-          <div className="space-y-2"><Label className="text-[#9ca3af]">Mission</Label><Textarea value={content.mission} onChange={(e) => setContent({...content, mission: e.target.value})} className="bg-[#0f1419] border-[#2a3a4d] text-white min-h-[100px]" /></div>
-          <div className="space-y-2"><Label className="text-[#9ca3af]">Vision</Label><Textarea value={content.vision} onChange={(e) => setContent({...content, vision: e.target.value})} className="bg-[#0f1419] border-[#2a3a4d] text-white min-h-[100px]" /></div>
-          <Button className="bg-[#8b5cf6] hover:bg-[#8b5cf6]/80"><Save className="h-4 w-4 mr-2" />Save Changes</Button>
-        </CardContent>
-      </Card>
+
+      {/* Editor */}
+      <div className="bg-[#1a2332] rounded-xl border border-[#2a3a4d] overflow-hidden">
+        <div className="p-5 border-b border-[#2a3a4d]">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#0ea5e9]/20 flex items-center justify-center">
+              <FileText className="w-5 h-5 text-[#0ea5e9]" />
+            </div>
+            <h2 className="text-lg font-semibold text-white">Page Content</h2>
+          </div>
+        </div>
+        
+        <div className="p-5 space-y-5">
+          <div>
+            <label className="block text-sm font-medium text-[#9ca3af] mb-2">Page Title</label>
+            <input
+              type="text"
+              value={content.title}
+              onChange={(e) => setContent({ ...content, title: e.target.value })}
+              placeholder="About Us"
+              className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white placeholder:text-[#6b7280] focus:border-[#10b981] focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-[#9ca3af] mb-2">Content (HTML supported)</label>
+            <textarea
+              value={content.content}
+              onChange={(e) => setContent({ ...content, content: e.target.value })}
+              placeholder="Write your About Us content here... HTML tags are supported."
+              rows={15}
+              className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white placeholder:text-[#6b7280] focus:border-[#10b981] focus:outline-none resize-none font-mono text-sm"
+            />
+            <p className="text-xs text-[#6b7280] mt-2">
+              Tip: You can use HTML tags like &lt;h2&gt;, &lt;p&gt;, &lt;ul&gt;, &lt;strong&gt; for formatting
+            </p>
+          </div>
+
+          <div>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={content.isActive}
+                onChange={(e) => setContent({ ...content, isActive: e.target.checked })}
+                className="w-5 h-5 rounded border-[#2a3a4d] bg-[#0f1419] text-[#10b981] focus:ring-[#10b981]"
+              />
+              <span className="text-white">Page is published</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      {/* Live Preview */}
+      <div className="bg-[#1a2332] rounded-xl border border-[#2a3a4d] overflow-hidden">
+        <div className="p-5 border-b border-[#2a3a4d]">
+          <h3 className="text-lg font-semibold text-white">Live Preview</h3>
+        </div>
+        <div className="p-5">
+          <div className="bg-white rounded-xl p-6">
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">{content.title}</h1>
+            <div 
+              className="prose prose-sm max-w-none text-gray-700"
+              dangerouslySetInnerHTML={{ __html: content.content || '<p class="text-gray-400">No content yet...</p>' }}
+            />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
