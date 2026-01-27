@@ -36,12 +36,7 @@ function useScrollAnimation() {
 }
 
 // Animated section wrapper component
-function AnimatedSection({
-  children,
-  className = "",
-  animation = "fade-up",
-  delay = 0
-}: {
+function AnimatedSection({ children, className = "", animation = "fade-up", delay = 0 }: {
   children: React.ReactNode;
   className?: string;
   animation?: "fade-up" | "fade-left" | "fade-right" | "zoom-in" | "fade";
@@ -72,7 +67,7 @@ function AnimatedSection({
 
 // Interface for slideshow items from API
 interface SlideshowItem {
-  id: number;
+  id: string;
   title: string;
   description: string | null;
   imageUrl: string;
@@ -114,43 +109,13 @@ const defaultColors: SiteColors = {
 // Default slideshow items (fallback if no items in database)
 const defaultSlideshowItems = [
   {
-    id: 1,
-    title: "SUMMER SALE",
-    description: "-70% ON EVERYTHING",
-    imageUrl: "https://raw.githubusercontent.com/premium65/GameSitePro/main/project/client/public/slide-fashion-male.png",
-    buttonText: "SHOP NOW",
+    id: "1",
+    title: "WELCOME TO RATING-ADS",
+    description: "Earn money by watching ads",
+    imageUrl: "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1200",
+    buttonText: "START EARNING",
     linkUrl: "/rating",
     order: 1,
-    isActive: true,
-  },
-  {
-    id: 2,
-    title: "SPECIAL FASHION SALE",
-    description: "50% Off - Shop Now",
-    imageUrl: "https://raw.githubusercontent.com/premium65/GameSitePro/main/project/client/public/slide-fashion-female.png",
-    buttonText: "SHOP NOW",
-    linkUrl: "/rating",
-    order: 2,
-    isActive: true,
-  },
-  {
-    id: 3,
-    title: "FASHION WEEK",
-    description: "Special Collection - November 2025",
-    imageUrl: "https://raw.githubusercontent.com/premium65/GameSitePro/main/project/client/public/slide-fashion-week.jpg",
-    buttonText: "EXPLORE",
-    linkUrl: "/rating",
-    order: 3,
-    isActive: true,
-  },
-  {
-    id: 4,
-    title: "NEW COLLECTION",
-    description: "Up to 50% Off",
-    imageUrl: "https://raw.githubusercontent.com/premium65/GameSitePro/main/project/client/public/slide-new-reels.jpg",
-    buttonText: "BOOK NOW",
-    linkUrl: "/rating",
-    order: 4,
     isActive: true,
   },
 ];
@@ -183,18 +148,12 @@ function MarqueeBanner({ colors }: { colors: SiteColors }) {
 
 // Countdown Timer Component
 function CountdownTimer({ colors }: { colors: SiteColors }) {
-  const [timeLeft, setTimeLeft] = useState({
-    days: 1,
-    hours: 23,
-    minutes: 59,
-    seconds: 59
-  });
+  const [timeLeft, setTimeLeft] = useState({ days: 1, hours: 23, minutes: 59, seconds: 59 });
 
   useEffect(() => {
     const timer = setInterval(() => {
       setTimeLeft(prev => {
         let { days, hours, minutes, seconds } = prev;
-        
         if (seconds > 0) {
           seconds--;
         } else {
@@ -213,7 +172,6 @@ function CountdownTimer({ colors }: { colors: SiteColors }) {
             }
           }
         }
-        
         return { days, hours, minutes, seconds };
       });
     }, 1000);
@@ -243,7 +201,7 @@ function CountdownTimer({ colors }: { colors: SiteColors }) {
   );
 }
 
-// Media Slideshow Component - Fetches from API
+// Media Slideshow Component
 function MediaSlideshow({ slideshowItems, colors }: { slideshowItems: SlideshowItem[]; colors: SiteColors }) {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
@@ -251,10 +209,12 @@ function MediaSlideshow({ slideshowItems, colors }: { slideshowItems: SlideshowI
   const items = slideshowItems.length > 0 ? slideshowItems : defaultSlideshowItems;
 
   useEffect(() => {
-    if (!isPlaying) return;
+    if (!isPlaying || items.length <= 1) return;
+
     const interval = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % items.length);
     }, 5000);
+
     return () => clearInterval(interval);
   }, [isPlaying, items.length]);
 
@@ -272,46 +232,56 @@ function MediaSlideshow({ slideshowItems, colors }: { slideshowItems: SlideshowI
             src={currentItem.imageUrl}
             alt={currentItem.title}
             className="w-full h-full object-cover transition-opacity duration-500"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1200";
+            }}
           />
         </div>
+
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+
         <div className="absolute bottom-0 left-0 right-0 p-6" style={{ color: colors.text_color }}>
           <h3 className="text-2xl font-bold mb-2">{currentItem.title}</h3>
           <p style={{ opacity: 0.8 }}>{currentItem.description}</p>
           {currentItem.buttonText && (
-            <Button
-              className="mt-4 font-bold"
-              style={{ backgroundColor: colors.button_color, color: colors.marquee_text_color }}
-            >
+            <Button className="mt-4 font-bold" style={{ backgroundColor: colors.button_color, color: colors.marquee_text_color }}>
               {currentItem.buttonText}
             </Button>
           )}
         </div>
-        <button onClick={prevSlide} className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110" style={{ color: colors.text_color }}>
-          <ChevronLeft className="w-6 h-6" />
-        </button>
-        <button onClick={nextSlide} className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110" style={{ color: colors.text_color }}>
-          <ChevronRight className="w-6 h-6" />
-        </button>
-        <div className="absolute top-4 right-4 bg-black/50 px-3 py-1 rounded-full text-sm" style={{ color: colors.text_color }}>
-          {currentSlide + 1} / {items.length}
-        </div>
-        <button onClick={() => setIsPlaying(!isPlaying)} className="absolute top-4 left-4 w-8 h-8 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center transition-colors" style={{ color: colors.text_color }}>
-          {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-        </button>
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 flex gap-2">
-          {items.map((_, index) => (
-            <button
-              key={index}
-              onClick={() => goToSlide(index)}
-              className="w-3 h-3 rounded-full transition-all duration-300"
-              style={{
-                backgroundColor: index === currentSlide ? colors.primary_color : "rgba(255,255,255,0.5)",
-                width: index === currentSlide ? "2rem" : "0.75rem",
-              }}
-            />
-          ))}
-        </div>
+
+        {items.length > 1 && (
+          <>
+            <button onClick={prevSlide} className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110" style={{ color: colors.text_color }}>
+              <ChevronLeft className="w-6 h-6" />
+            </button>
+            <button onClick={nextSlide} className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110" style={{ color: colors.text_color }}>
+              <ChevronRight className="w-6 h-6" />
+            </button>
+
+            <div className="absolute top-4 right-4 bg-black/50 px-3 py-1 rounded-full text-sm" style={{ color: colors.text_color }}>
+              {currentSlide + 1} / {items.length}
+            </div>
+
+            <button onClick={() => setIsPlaying(!isPlaying)} className="absolute top-4 left-4 w-8 h-8 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center transition-colors" style={{ color: colors.text_color }}>
+              {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+            </button>
+
+            <div className="absolute bottom-20 left-1/2 -translate-x-1/2 flex gap-2">
+              {items.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => goToSlide(index)}
+                  className="h-3 rounded-full transition-all duration-300"
+                  style={{
+                    backgroundColor: index === currentSlide ? colors.primary_color : "rgba(255,255,255,0.5)",
+                    width: index === currentSlide ? "2rem" : "0.75rem",
+                  }}
+                />
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </Card>
   );
@@ -321,7 +291,6 @@ function MediaSlideshow({ slideshowItems, colors }: { slideshowItems: SlideshowI
 function Footer({ colors }: { colors: SiteColors }) {
   return (
     <footer style={{ backgroundColor: colors.footer_bg_color }}>
-      {/* Newsletter Section */}
       <div className="py-8" style={{ backgroundColor: colors.primary_color }}>
         <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4">
           <div>
@@ -329,22 +298,14 @@ function Footer({ colors }: { colors: SiteColors }) {
             <p className="text-sm" style={{ color: colors.marquee_text_color, opacity: 0.7 }}>Get the latest updates and offers</p>
           </div>
           <div className="flex gap-2 w-full md:w-auto">
-            <Input
-              type="email"
-              placeholder="Enter your email address"
-              className="bg-white border-none min-w-[300px]"
-            />
-            <Button style={{ backgroundColor: colors.nav_bg_color, color: colors.text_color }}>
-              Subscribe
-            </Button>
+            <Input type="email" placeholder="Enter your email address" className="bg-white border-none min-w-[300px]" />
+            <Button style={{ backgroundColor: colors.nav_bg_color, color: colors.text_color }}>Subscribe</Button>
           </div>
         </div>
       </div>
 
-      {/* Main Footer */}
       <div className="max-w-7xl mx-auto px-4 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-          {/* Customer Care */}
           <div>
             <h4 className="font-bold text-lg mb-4" style={{ color: colors.text_color }}>Customer Care</h4>
             <ul className="space-y-2">
@@ -355,8 +316,6 @@ function Footer({ colors }: { colors: SiteColors }) {
               ))}
             </ul>
           </div>
-
-          {/* Get To Know Us */}
           <div>
             <h4 className="font-bold text-lg mb-4" style={{ color: colors.text_color }}>Get To Know Us</h4>
             <ul className="space-y-2">
@@ -366,22 +325,14 @@ function Footer({ colors }: { colors: SiteColors }) {
                 </li>
               ))}
             </ul>
-            {/* Social Icons */}
             <div className="flex gap-3 mt-4">
               {[Facebook, Twitter, Instagram, Youtube].map((Icon, i) => (
-                <a
-                  key={i}
-                  href="#"
-                  className="w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110"
-                  style={{ backgroundColor: colors.card_bg_color, color: colors.text_color }}
-                >
+                <a key={i} href="#" className="w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110" style={{ backgroundColor: colors.card_bg_color, color: colors.text_color }}>
                   <Icon className="w-5 h-5" />
                 </a>
               ))}
             </div>
           </div>
-
-          {/* Let Us Help You */}
           <div>
             <h4 className="font-bold text-lg mb-4" style={{ color: colors.text_color }}>Let Us Help You</h4>
             <ul className="space-y-2">
@@ -392,8 +343,6 @@ function Footer({ colors }: { colors: SiteColors }) {
               ))}
             </ul>
           </div>
-
-          {/* Contact Info */}
           <div>
             <h4 className="font-bold text-lg mb-4" style={{ color: colors.text_color }}>Contact Info</h4>
             <ul className="space-y-3">
@@ -414,11 +363,9 @@ function Footer({ colors }: { colors: SiteColors }) {
         </div>
       </div>
 
-      {/* Payment Methods & Copyright */}
       <div className="border-t" style={{ borderColor: colors.card_bg_color }}>
         <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            {/* Payment Icons */}
             <div className="flex items-center gap-4">
               <span className="text-sm" style={{ color: colors.text_color, opacity: 0.6 }}>We Accept:</span>
               <div className="flex gap-2">
@@ -429,9 +376,8 @@ function Footer({ colors }: { colors: SiteColors }) {
                 ))}
               </div>
             </div>
-            {/* Copyright */}
             <p className="text-sm" style={{ color: colors.text_color, opacity: 0.6 }}>
-              Copyright ©2026 Rating-Ads. All rights reserved
+              Copyright ©{new Date().getFullYear()} Rating-Ads. All rights reserved
             </p>
           </div>
         </div>
@@ -463,14 +409,28 @@ export default function Dashboard() {
     queryKey: ["/api/ratings/my"],
   });
 
-  // Fetch slideshow items from API
+  // FIXED: Fetch slideshow items from API with fresh data
   const { data: slideshowItems } = useQuery<SlideshowItem[]>({
     queryKey: ["/api/slideshow"],
+    queryFn: async () => {
+      const res = await fetch("/api/slideshow", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    staleTime: 0, // Always fetch fresh
+    refetchOnWindowFocus: true,
   });
 
-  // Fetch site settings (colors)
+  // FIXED: Fetch site settings (colors) with fresh data
   const { data: siteSettings } = useQuery<Record<string, string>>({
     queryKey: ["/api/settings"],
+    queryFn: async () => {
+      const res = await fetch("/api/settings", { credentials: "include" });
+      if (!res.ok) return {};
+      return res.json();
+    },
+    staleTime: 0, // Always fetch fresh
+    refetchOnWindowFocus: true,
   });
 
   // Merge settings with defaults
@@ -480,7 +440,7 @@ export default function Dashboard() {
   } as SiteColors;
 
   const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
+    await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     toast({ title: "Logged out successfully" });
     setLocation("/");
   };
@@ -541,22 +501,12 @@ export default function Dashboard() {
                   { href: "#event-space", label: "EVENT SPACE" },
                   { href: "#contact", label: "CONTACT US" },
                 ].map((item) => (
-                  <a
-                    key={item.label}
-                    href={item.href}
-                    className="font-bold text-sm uppercase transition-all duration-300 hover:scale-105"
-                    style={{ color: colors.primary_color }}
-                  >
+                  <a key={item.label} href={item.href} className="font-bold text-sm uppercase transition-all duration-300 hover:scale-105" style={{ color: colors.primary_color }}>
                     {item.label}
                   </a>
                 ))}
               </div>
-              <Button
-                variant="ghost"
-                onClick={handleLogout}
-                className="transition-all duration-300"
-                style={{ color: colors.primary_color }}
-              >
+              <Button variant="ghost" onClick={handleLogout} className="transition-all duration-300" style={{ color: colors.primary_color }}>
                 <LogOut className="h-4 w-4 mr-2" />
                 Logout
               </Button>
@@ -609,7 +559,7 @@ export default function Dashboard() {
           </Card>
         </AnimatedSection>
 
-        {/* Media Slideshow */}
+        {/* Media Slideshow - LOADS FROM API */}
         <AnimatedSection animation="zoom-in" delay={200}>
           <MediaSlideshow slideshowItems={slideshowItems || []} colors={colors} />
         </AnimatedSection>
@@ -696,10 +646,7 @@ export default function Dashboard() {
         <section id="event-space" className="mt-12 scroll-mt-20">
           <AnimatedSection animation="fade-up" delay={500}>
             <Card className="overflow-hidden" style={{ backgroundColor: colors.card_bg_color }}>
-              <div
-                className="h-64 bg-cover bg-center relative"
-                style={{ backgroundImage: "url('https://images.unsplash.com/photo-1540575467063-178a50c2df87?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80')" }}
-              >
+              <div className="h-64 bg-cover bg-center relative" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1540575467063-178a50c2df87?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80')" }}>
                 <div className="absolute inset-0" style={{ background: `linear-gradient(to right, ${colors.nav_bg_color}cc, transparent)` }} />
                 <div className="absolute inset-0 flex items-center p-8">
                   <div style={{ color: colors.text_color }}>
