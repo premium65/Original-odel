@@ -31,6 +31,7 @@ export default function AdminInfoPrivacy() {
     mutationFn: async (data: typeof content) => {
       const res = await fetch("/api/admin/settings/pages", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "privacy", ...data }),
       });
