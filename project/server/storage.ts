@@ -1,576 +1,458 @@
-// Referenced from javascript_database integration blueprint for DatabaseStorage pattern
-import { users, ratings, ads, adClicks, withdrawals, siteSettings, slideshowImages, type User, type InsertUser, type Rating, type InsertRating, type Ad, type AdClick, type InsertAd, type InsertAdClick, type Withdrawal, type InsertWithdrawal } from "@shared/schema";
-import { db } from "./db";
-import { eq, desc, sql, and, inArray } from "drizzle-orm";
+import { getUsersCollection, getDb } from "./mongoConnection";
+import bcrypt from "bcrypt";
+import { ObjectId } from "mongodb";
 
-export interface IStorage {
-  // User operations
-  getUser(id: number): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  getUserByEmail(email: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
-  getAllUsers(): Promise<User[]>;
-  updateUserStatus(id: number, status: string): Promise<User | undefined>;
-  updateUserDetails(id: number, data: { username?: string; mobileNumber?: string; password?: string }): Promise<User | undefined>;
-  updateUserBankDetails(id: number, data: { bankName?: string; accountNumber?: string; accountHolderName?: string; branchName?: string }): Promise<User | undefined>;
+const SALT_ROUNDS = 10;
 
-  // Rating operations
-  createRating(rating: InsertRating & { userId: number }): Promise<Rating>;
-  getRatingsByUser(userId: number): Promise<Rating[]>;
-  getAllRatings(): Promise<Rating[]>;
-  deleteRating(id: number): Promise<boolean>;
-
-  // Ad operations
-  getAllAds(): Promise<Ad[]>;
-  getAd(id: number): Promise<Ad | undefined>;
-  createAd(ad: InsertAd): Promise<Ad>;
-  updateAd(id: number, ad: Partial<InsertAd>): Promise<Ad | undefined>;
-  deleteAd(id: number): Promise<boolean>;
-  
-  // Ad Click operations
-  recordAdClick(userId: number, adId: number): Promise<AdClick>;
-  getUserAdClicks(userId: number): Promise<AdClick[]>;
-
-  // Financial operations
-  addMilestoneAmount(userId: number, amount: string): Promise<User | undefined>;
-  addMilestoneReward(userId: number, amount: string): Promise<User | undefined>;
-  resetUserField(userId: number, field: string): Promise<User | undefined>;
-  addUserFieldValue(userId: number, field: string, amount: string): Promise<User | undefined>;
-  getUserAdClickCount(userId: number): Promise<number>;
-  resetDestinationAmount(userId: number): Promise<User | undefined>;
-  incrementAdsCompleted(userId: number): Promise<User | undefined>;
-  
-  // Restriction operations
-  setUserRestriction(userId: number, adsLimit: number, deposit: string, commission: string): Promise<User | undefined>;
-  removeUserRestriction(userId: number): Promise<User | undefined>;
-  incrementRestrictedAds(userId: number): Promise<User | undefined>;
-  
-  // Withdrawal operations
-  createWithdrawal(userId: number, amount: string, bankDetails: { fullName: string; accountNumber: string; bankName: string; branch: string }): Promise<Withdrawal>;
-  getUserWithdrawals(userId: number): Promise<Withdrawal[]>;
-  getAllWithdrawals(): Promise<Withdrawal[]>;
-  getPendingWithdrawals(): Promise<Withdrawal[]>;
-  approveWithdrawal(id: number, adminId: number): Promise<Withdrawal | undefined>;
-  rejectWithdrawal(id: number, adminId: number, notes: string): Promise<Withdrawal | undefined>;
+async function hashPassword(password: string): Promise<string> {
+  return await bcrypt.hash(password, SALT_ROUNDS);
 }
 
-export class DatabaseStorage implements IStorage {
-  // User operations
-  async getUser(id: number): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user || undefined;
+export interface User {
+  _id?: ObjectId;
+  username: string;
+  email: string;
+  password: string;
+  fullName: string;
+  mobileNumber: string;
+  status: string;
+  isAdmin: number;
+  destinationAmount: string;
+  milestoneAmount: string;
+  milestoneReward: string;
+  ongoingMilestone: string;
+  totalAdsCompleted: number;
+  points: number;
+  restrictionAdsLimit: number | null;
+  restrictionDeposit: string | null;
+  restrictionCommission: string | null;
+  restrictedAdsCompleted: number;
+  bankName: string | null;
+  accountNumber: string | null;
+  accountHolderName: string | null;
+  branchName: string | null;
+  createdAt: Date;
+}
+
+// Get settings collection
+function getSettingsCollection() {
+  const db = getDb();
+  return db.collection("settings");
+}
+
+export class MongoStorage {
+  // ============ USER QUERIES ============
+  async getUserByUsername(username: string): Promise<User | null> {
+    const collection = getUsersCollection();
+    return (await collection.findOne({ username })) as User | null;
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
-    return user || undefined;
+  async getUserByEmail(email: string): Promise<User | null> {
+    const collection = getUsersCollection();
+    return (await collection.findOne({ email })) as User | null;
   }
 
-  async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email));
-    return user || undefined;
+  async getUser(userId: string): Promise<User | null> {
+    const collection = getUsersCollection();
+    try {
+      return (await collection.findOne({ _id: new ObjectId(userId) })) as User | null;
+    } catch (e) {
+      return (await collection.findOne({ id: parseInt(userId) })) as User | null;
+    }
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const [user] = await db
-      .insert(users)
-      .values(insertUser)
-      .returning();
-    return user;
+  async createUser(userData: Omit<User, "_id">): Promise<User> {
+    const collection = getUsersCollection();
+    const result = await collection.insertOne({
+      ...userData,
+      destinationAmount: userData.destinationAmount || "0",
+      milestoneAmount: userData.milestoneAmount || "0",
+      milestoneReward: userData.milestoneReward || "0",
+      ongoingMilestone: userData.ongoingMilestone || "0",
+      totalAdsCompleted: userData.totalAdsCompleted || 0,
+      points: userData.points || 0,
+      restrictionAdsLimit: null,
+      restrictionDeposit: null,
+      restrictionCommission: null,
+      restrictedAdsCompleted: 0,
+      createdAt: new Date(),
+    });
+    return { ...userData, _id: result.insertedId, createdAt: new Date() } as User;
   }
 
   async getAllUsers(): Promise<User[]> {
-    return await db.select().from(users).orderBy(desc(users.registeredAt));
+    const collection = getUsersCollection();
+    return (await collection.find({}).sort({ createdAt: -1 }).toArray()) as User[];
   }
 
-  async updateUserStatus(id: number, status: string): Promise<User | undefined> {
-    const [user] = await db
-      .update(users)
-      .set({ status })
-      .where(eq(users.id, id))
-      .returning();
-    return user || undefined;
+  // ============ USER STATUS ============
+  async updateUserStatus(userId: string, status: string): Promise<User | null> {
+    const collection = getUsersCollection();
+    const result = await collection.findOneAndUpdate(
+      { _id: new ObjectId(userId) },
+      { $set: { status } },
+      { returnDocument: "after" }
+    );
+    return result as User | null;
   }
 
-  async updateUserDetails(id: number, data: { username?: string; mobileNumber?: string; password?: string }): Promise<User | undefined> {
-    const updateData: any = {};
-    
-    if (data.username) {
-      updateData.username = data.username;
-    }
-    if (data.mobileNumber !== undefined) {
-      updateData.mobileNumber = data.mobileNumber;
-    }
-    if (data.password) {
-      const bcrypt = await import('bcrypt');
-      updateData.password = await bcrypt.hash(data.password, 10);
-    }
-
-    const [user] = await db
-      .update(users)
-      .set(updateData)
-      .where(eq(users.id, id))
-      .returning();
-    return user || undefined;
+  // ============ GENERAL UPDATE ============
+  async updateUser(userId: string, updates: Partial<User>): Promise<User | null> {
+    const collection = getUsersCollection();
+    const result = await collection.findOneAndUpdate(
+      { _id: new ObjectId(userId) },
+      { $set: updates },
+      { returnDocument: "after" }
+    );
+    return result as User | null;
   }
 
-  async updateUserBankDetails(id: number, data: { bankName?: string; accountNumber?: string; accountHolderName?: string; branchName?: string }): Promise<User | undefined> {
-    const updateData: any = {};
-    
-    if (data.bankName !== undefined) {
-      updateData.bankName = data.bankName;
-    }
-    if (data.accountNumber !== undefined) {
-      updateData.accountNumber = data.accountNumber;
-    }
-    if (data.accountHolderName !== undefined) {
-      updateData.accountHolderName = data.accountHolderName;
-    }
-    if (data.branchName !== undefined) {
-      updateData.branchName = data.branchName;
-    }
-
-    const [user] = await db
-      .update(users)
-      .set(updateData)
-      .where(eq(users.id, id))
-      .returning();
-    return user || undefined;
+  // ============ PASSWORD ============
+  async updateUserPassword(userId: string, newPassword: string): Promise<User | null> {
+    const collection = getUsersCollection();
+    const hashedPassword = await hashPassword(newPassword);
+    const result = await collection.findOneAndUpdate(
+      { _id: new ObjectId(userId) },
+      { $set: { password: hashedPassword } },
+      { returnDocument: "after" }
+    );
+    return result as User | null;
   }
 
-  // Rating operations
-  async createRating(ratingData: InsertRating & { userId: number }): Promise<Rating> {
-    const [rating] = await db
-      .insert(ratings)
-      .values(ratingData)
-      .returning();
-    return rating;
-  }
-
-  async getRatingsByUser(userId: number): Promise<Rating[]> {
-    return await db
-      .select()
-      .from(ratings)
-      .where(eq(ratings.userId, userId))
-      .orderBy(desc(ratings.createdAt));
-  }
-
-  async getAllRatings(): Promise<Rating[]> {
-    return await db.select().from(ratings).orderBy(desc(ratings.createdAt));
-  }
-
-  async deleteRating(id: number): Promise<boolean> {
-    const result = await db
-      .delete(ratings)
-      .where(eq(ratings.id, id))
-      .returning();
-    return result.length > 0;
-  }
-
-  // Ad operations
-  async getAllAds(): Promise<Ad[]> {
-    return await db.select().from(ads).orderBy(desc(ads.createdAt));
-  }
-
-  async getAd(id: number): Promise<Ad | undefined> {
-    const [ad] = await db.select().from(ads).where(eq(ads.id, id));
-    return ad || undefined;
-  }
-
-  async createAd(adData: InsertAd): Promise<Ad> {
-    const [ad] = await db
-      .insert(ads)
-      .values(adData)
-      .returning();
-    return ad;
-  }
-
-  async updateAd(id: number, adData: Partial<InsertAd>): Promise<Ad | undefined> {
-    const [ad] = await db
-      .update(ads)
-      .set(adData)
-      .where(eq(ads.id, id))
-      .returning();
-    return ad || undefined;
-  }
-
-  async deleteAd(id: number): Promise<boolean> {
-    const result = await db.delete(ads).where(eq(ads.id, id));
-    return result.rowCount !== null && result.rowCount > 0;
-  }
-
-  // Ad Click operations
-  async recordAdClick(userId: number, adId: number): Promise<AdClick> {
-    const [click] = await db
-      .insert(adClicks)
-      .values({ userId, adId })
-      .returning();
-    return click;
-  }
-
-  async getUserAdClicks(userId: number): Promise<AdClick[]> {
-    return await db
-      .select()
-      .from(adClicks)
-      .where(eq(adClicks.userId, userId))
-      .orderBy(desc(adClicks.clickedAt));
-  }
-
-  // Financial operations
-  async addMilestoneAmount(userId: number, amount: string): Promise<User | undefined> {
-    const [user] = await db
-      .update(users)
-      .set({
-        milestoneAmount: sql`${users.milestoneAmount} + ${amount}`,
-      })
-      .where(eq(users.id, userId))
-      .returning();
-    return user || undefined;
-  }
-
-  async addMilestoneReward(userId: number, amount: string): Promise<User | undefined> {
-    const [user] = await db
-      .update(users)
-      .set({
-        milestoneReward: sql`${users.milestoneReward} + ${amount}`,
-      })
-      .where(eq(users.id, userId))
-      .returning();
-    return user || undefined;
-  }
-
-  async resetUserField(userId: number, field: string): Promise<User | undefined> {
-    const fieldMap: Record<string, any> = {
-      'booking': { totalAdsCompleted: 0, restrictedAdsCompleted: 0 },
-      'points': { milestoneAmount: '0.00' },
-      'premiumTreasure': { milestoneReward: '0.00' },
-      'normalTreasure': { destinationAmount: '0.00' },
-      'bookingValue': { milestoneAmount: '0.00' },
-      'ongoingMilestone': { ongoingMilestone: '0.00' },
-    };
-
-    const updateData = fieldMap[field];
-    if (!updateData) {
-      throw new Error(`Invalid field: ${field}`);
-    }
-
-    if (field === 'booking') {
-      await db.delete(adClicks).where(eq(adClicks.userId, userId));
-    }
-
-    const [user] = await db
-      .update(users)
-      .set(updateData)
-      .where(eq(users.id, userId))
-      .returning();
-    return user || undefined;
-  }
-
-  async resetAllMilestoneRewards(): Promise<void> {
-    await db
-      .update(users)
-      .set({
-        milestoneReward: '0.00',
-      })
-      .where(sql`1=1`);
-  }
-
-  async addUserFieldValue(userId: number, field: string, amount: string): Promise<User | undefined> {
-    const numValue = parseFloat(amount);
-    
-    if (field === 'points' && numValue > 100) {
-      throw new Error('Points cannot exceed 100');
-    }
-    
-    const fieldMap: Record<string, any> = {
-      'points': { points: numValue },
-      'premiumTreasure': { milestoneReward: sql`${users.milestoneReward} + ${amount}` },
-      'normalTreasure': { destinationAmount: sql`${users.destinationAmount} + ${amount}` },
-      'bookingValue': { milestoneAmount: sql`${users.milestoneAmount} + ${amount}` },
-    };
-
-    const updateData = fieldMap[field];
-    if (!updateData) {
-      throw new Error(`Invalid field: ${field}`);
-    }
-
-    const [user] = await db
-      .update(users)
-      .set(updateData)
-      .where(eq(users.id, userId))
-      .returning();
-    return user || undefined;
-  }
-
-  async getUserAdClickCount(userId: number): Promise<number> {
-    const clicks = await db
-      .select()
-      .from(adClicks)
-      .where(eq(adClicks.userId, userId));
-    return clicks.length;
-  }
-
-  async resetDestinationAmount(userId: number): Promise<User | undefined> {
-    const [user] = await db
-      .update(users)
-      .set({
-        destinationAmount: "0.00",
-      })
-      .where(eq(users.id, userId))
-      .returning();
-    return user || undefined;
-  }
-
-  async incrementAdsCompleted(userId: number): Promise<User | undefined> {
-    const [user] = await db
-      .update(users)
-      .set({
-        totalAdsCompleted: sql`${users.totalAdsCompleted} + 1`,
-      })
-      .where(eq(users.id, userId))
-      .returning();
-    return user || undefined;
-  }
-
-  // Restriction operations
-  async setUserRestriction(userId: number, adsLimit: number, deposit: string, commission: string, pendingAmount?: string): Promise<User | undefined> {
-    const depositNum = parseFloat(deposit);
-    const commissionNum = parseFloat(commission);
-    const pendingNum = pendingAmount ? parseFloat(pendingAmount) : depositNum;
-    
-    if (isNaN(depositNum) || depositNum <= 0) {
-      throw new Error("Invalid deposit amount");
-    }
-    if (isNaN(commissionNum) || commissionNum <= 0) {
-      throw new Error("Invalid commission amount");
-    }
-    
-    const existingUser = await this.getUser(userId);
-    const isEditing = existingUser && existingUser.restrictionAdsLimit !== null && existingUser.restrictionAdsLimit !== undefined;
-    
-    const updateData: any = {
-      restrictionAdsLimit: adsLimit,
-      restrictionDeposit: depositNum.toFixed(2),
-      restrictionCommission: commissionNum.toFixed(2),
-      ongoingMilestone: pendingNum.toFixed(2),
-    };
-    
-    if (!isEditing) {
-      updateData.restrictedAdsCompleted = 0;
-      updateData.milestoneAmount = sql`${users.milestoneAmount} - ${depositNum}::numeric`;
-    }
-    
-    const [user] = await db
-      .update(users)
-      .set(updateData)
-      .where(eq(users.id, userId))
-      .returning();
-    return user || undefined;
-  }
-
-  async removeUserRestriction(userId: number): Promise<User | undefined> {
-    const [user] = await db
-      .update(users)
-      .set({
-        restrictionAdsLimit: null,
-        restrictionDeposit: null,
-        restrictionCommission: null,
-        restrictedAdsCompleted: 0,
-        ongoingMilestone: "0.00",
-      })
-      .where(eq(users.id, userId))
-      .returning();
-    return user || undefined;
-  }
-
-  async incrementRestrictedAds(userId: number): Promise<User | undefined> {
-    const [user] = await db
-      .update(users)
-      .set({
-        restrictedAdsCompleted: sql`${users.restrictedAdsCompleted} + 1`,
-      })
-      .where(eq(users.id, userId))
-      .returning();
-    return user || undefined;
-  }
-
-  // Withdrawal operations
-  async createWithdrawal(userId: number, amount: string, bankDetails: { fullName: string; accountNumber: string; bankName: string; branch: string }): Promise<Withdrawal> {
+  // ============ MILESTONE AMOUNTS ============
+  async addMilestoneAmount(userId: string, amount: string): Promise<User | null> {
+    const collection = getUsersCollection();
     const user = await this.getUser(userId);
-    if (!user) {
-      throw new Error("User not found");
+    if (!user) return null;
+    
+    const currentAmount = parseFloat(user.milestoneAmount || "0");
+    const newAmount = currentAmount + parseFloat(amount);
+    
+    const result = await collection.findOneAndUpdate(
+      { _id: new ObjectId(userId) },
+      { $set: { milestoneAmount: newAmount.toFixed(2) } },
+      { returnDocument: "after" }
+    );
+    return result as User | null;
+  }
+
+  async addMilestoneReward(userId: string, amount: string): Promise<User | null> {
+    const collection = getUsersCollection();
+    const user = await this.getUser(userId);
+    if (!user) return null;
+    
+    const currentAmount = parseFloat(user.milestoneReward || "0");
+    const newAmount = currentAmount + parseFloat(amount);
+    
+    const result = await collection.findOneAndUpdate(
+      { _id: new ObjectId(userId) },
+      { $set: { milestoneReward: newAmount.toFixed(2) } },
+      { returnDocument: "after" }
+    );
+    return result as User | null;
+  }
+
+  async addDestinationAmount(userId: string, amount: string): Promise<User | null> {
+    const collection = getUsersCollection();
+    const user = await this.getUser(userId);
+    if (!user) return null;
+    
+    const currentAmount = parseFloat(user.destinationAmount || "0");
+    const newAmount = currentAmount + parseFloat(amount);
+    
+    const result = await collection.findOneAndUpdate(
+      { _id: new ObjectId(userId) },
+      { $set: { destinationAmount: newAmount.toFixed(2) } },
+      { returnDocument: "after" }
+    );
+    return result as User | null;
+  }
+
+  // ============ RESET FIELDS ============
+  async resetDestinationAmount(userId: string): Promise<User | null> {
+    const collection = getUsersCollection();
+    const result = await collection.findOneAndUpdate(
+      { _id: new ObjectId(userId) },
+      { $set: { destinationAmount: "0" } },
+      { returnDocument: "after" }
+    );
+    return result as User | null;
+  }
+
+  async resetUserField(userId: string, field: string): Promise<User | null> {
+    const collection = getUsersCollection();
+    const result = await collection.findOneAndUpdate(
+      { _id: new ObjectId(userId) },
+      { $set: { [field]: field === "points" || field === "totalAdsCompleted" ? 0 : "0" } },
+      { returnDocument: "after" }
+    );
+    return result as User | null;
+  }
+
+  // ============ ADD FIELD VALUE (Premium Manage) ============
+  async addUserFieldValue(userId: string, field: string, amount: string): Promise<User | null> {
+    const collection = getUsersCollection();
+    const user = await this.getUser(userId);
+    if (!user) return null;
+
+    let newValue: any;
+    const numAmount = parseFloat(amount);
+
+    switch (field) {
+      case "points":
+        newValue = Math.min(100, (user.points || 0) + numAmount);
+        break;
+      case "milestoneAmount":
+      case "bookingValue":
+        newValue = (parseFloat(user.milestoneAmount || "0") + numAmount).toFixed(2);
+        field = "milestoneAmount";
+        break;
+      case "milestoneReward":
+      case "premiumTreasure":
+        newValue = (parseFloat(user.milestoneReward || "0") + numAmount).toFixed(2);
+        field = "milestoneReward";
+        break;
+      case "destinationAmount":
+      case "normalTreasure":
+        newValue = (parseFloat(user.destinationAmount || "0") + numAmount).toFixed(2);
+        field = "destinationAmount";
+        break;
+      case "ongoingMilestone":
+        newValue = (parseFloat(user.ongoingMilestone || "0") + numAmount).toFixed(2);
+        break;
+      default:
+        newValue = numAmount;
     }
-    
-    const milestoneAmount = parseFloat(user.milestoneAmount);
-    const withdrawalAmount = parseFloat(amount);
-    
-    if (withdrawalAmount > milestoneAmount) {
-      throw new Error("Insufficient balance");
+
+    const result = await collection.findOneAndUpdate(
+      { _id: new ObjectId(userId) },
+      { $set: { [field]: newValue } },
+      { returnDocument: "after" }
+    );
+    return result as User | null;
+  }
+
+  // ============ RESTRICTION / PROMOTION ============
+  async setUserRestriction(userId: string, adsLimit: number, deposit: string, commission: string, pendingAmount?: string): Promise<User | null> {
+    const collection = getUsersCollection();
+    const user = await this.getUser(userId);
+    if (!user) return null;
+
+    const currentMilestone = parseFloat(user.milestoneAmount || "0");
+    const depositAmount = parseFloat(deposit);
+    const newMilestoneAmount = (currentMilestone - depositAmount).toFixed(2);
+
+    const result = await collection.findOneAndUpdate(
+      { _id: new ObjectId(userId) },
+      {
+        $set: {
+          restrictionAdsLimit: adsLimit,
+          restrictionDeposit: deposit,
+          restrictionCommission: commission,
+          restrictedAdsCompleted: 0,
+          ongoingMilestone: pendingAmount || deposit,
+          milestoneAmount: newMilestoneAmount,
+        },
+      },
+      { returnDocument: "after" }
+    );
+    return result as User | null;
+  }
+
+  async removeUserRestriction(userId: string): Promise<User | null> {
+    const collection = getUsersCollection();
+    const result = await collection.findOneAndUpdate(
+      { _id: new ObjectId(userId) },
+      {
+        $set: {
+          restrictionAdsLimit: null,
+          restrictionDeposit: null,
+          restrictionCommission: null,
+          restrictedAdsCompleted: 0,
+          ongoingMilestone: "0",
+        },
+      },
+      { returnDocument: "after" }
+    );
+    return result as User | null;
+  }
+
+  async incrementRestrictedAds(userId: string): Promise<User | null> {
+    const collection = getUsersCollection();
+    const result = await collection.findOneAndUpdate(
+      { _id: new ObjectId(userId) },
+      { $inc: { restrictedAdsCompleted: 1 } },
+      { returnDocument: "after" }
+    );
+    return result as User | null;
+  }
+
+  // ============ ADS ============
+  async incrementAdsCompleted(userId: string): Promise<User | null> {
+    const collection = getUsersCollection();
+    const result = await collection.findOneAndUpdate(
+      { _id: new ObjectId(userId) },
+      { $inc: { totalAdsCompleted: 1 } },
+      { returnDocument: "after" }
+    );
+    return result as User | null;
+  }
+
+  async getUserAdClickCount(userId: string): Promise<number> {
+    const user = await this.getUser(userId);
+    return user?.totalAdsCompleted || 0;
+  }
+
+  // ============ USER DETAILS ============
+  async updateUserDetails(userId: string, details: { username?: string; mobileNumber?: string; password?: string }): Promise<User | null> {
+    const collection = getUsersCollection();
+    const updates: any = {};
+
+    if (details.username) updates.username = details.username;
+    if (details.mobileNumber) updates.mobileNumber = details.mobileNumber;
+    if (details.password) updates.password = await hashPassword(details.password);
+
+    if (Object.keys(updates).length === 0) return this.getUser(userId);
+
+    const result = await collection.findOneAndUpdate(
+      { _id: new ObjectId(userId) },
+      { $set: updates },
+      { returnDocument: "after" }
+    );
+    return result as User | null;
+  }
+
+  // ============ BANK DETAILS ============
+  async updateUserBankDetails(userId: string, bankDetails: { bankName?: string; accountNumber?: string; accountHolderName?: string; branchName?: string }): Promise<User | null> {
+    const collection = getUsersCollection();
+    const updates: any = {};
+
+    if (bankDetails.bankName !== undefined) updates.bankName = bankDetails.bankName;
+    if (bankDetails.accountNumber !== undefined) updates.accountNumber = bankDetails.accountNumber;
+    if (bankDetails.accountHolderName !== undefined) updates.accountHolderName = bankDetails.accountHolderName;
+    if (bankDetails.branchName !== undefined) updates.branchName = bankDetails.branchName;
+
+    if (Object.keys(updates).length === 0) return this.getUser(userId);
+
+    const result = await collection.findOneAndUpdate(
+      { _id: new ObjectId(userId) },
+      { $set: updates },
+      { returnDocument: "after" }
+    );
+    return result as User | null;
+  }
+
+  // ============ ADMIN TOGGLE ============
+  async toggleAdmin(userId: string, isAdmin: number): Promise<User | null> {
+    const collection = getUsersCollection();
+    const result = await collection.findOneAndUpdate(
+      { _id: new ObjectId(userId) },
+      { $set: { isAdmin } },
+      { returnDocument: "after" }
+    );
+    return result as User | null;
+  }
+
+  // ============================================================
+  // SETTINGS STORAGE (MongoDB - PERSISTENT!)
+  // ============================================================
+  
+  async getSettings(category: string): Promise<any[]> {
+    try {
+      const collection = getSettingsCollection();
+      const settings = await collection.find({ category }).toArray();
+      return settings;
+    } catch (error) {
+      console.error(`Error getting ${category} settings:`, error);
+      return [];
     }
-    
-    const [withdrawal] = await db
-      .insert(withdrawals)
-      .values({ 
-        userId, 
-        amount,
-        bankFullName: bankDetails.fullName,
-        bankAccountNumber: bankDetails.accountNumber,
-        bankName: bankDetails.bankName,
-        bankBranch: bankDetails.branch,
-      })
-      .returning();
-    return withdrawal;
   }
 
-  async getUserWithdrawals(userId: number): Promise<Withdrawal[]> {
-    return await db
-      .select()
-      .from(withdrawals)
-      .where(eq(withdrawals.userId, userId))
-      .orderBy(desc(withdrawals.requestedAt));
-  }
-
-  async getAllWithdrawals(): Promise<Withdrawal[]> {
-    return await db.select().from(withdrawals).orderBy(desc(withdrawals.requestedAt));
-  }
-
-  async getPendingWithdrawals(): Promise<Withdrawal[]> {
-    return await db
-      .select()
-      .from(withdrawals)
-      .where(eq(withdrawals.status, "pending"))
-      .orderBy(desc(withdrawals.requestedAt));
-  }
-
-  async approveWithdrawal(id: number, adminId: number): Promise<Withdrawal | undefined> {
-    const [withdrawal] = await db.select().from(withdrawals).where(eq(withdrawals.id, id));
-    if (!withdrawal) {
-      throw new Error("Withdrawal not found");
+  async saveSettings(category: string, type: string, data: any): Promise<boolean> {
+    try {
+      const collection = getSettingsCollection();
+      await collection.updateOne(
+        { category, type },
+        { 
+          $set: { 
+            category,
+            type,
+            data,
+            updatedAt: new Date()
+          }
+        },
+        { upsert: true }
+      );
+      return true;
+    } catch (error) {
+      console.error(`Error saving ${category} settings:`, error);
+      return false;
     }
-    
-    if (withdrawal.status !== "pending") {
-      throw new Error("Withdrawal already processed");
+  }
+
+  async deleteSettings(category: string, type: string): Promise<boolean> {
+    try {
+      const collection = getSettingsCollection();
+      await collection.deleteOne({ category, type });
+      return true;
+    } catch (error) {
+      console.error(`Error deleting ${category} settings:`, error);
+      return false;
     }
-
-    await db
-      .update(users)
-      .set({
-        milestoneAmount: sql`${users.milestoneAmount} - ${withdrawal.amount}`,
-      })
-      .where(eq(users.id, withdrawal.userId));
-
-    const [updated] = await db
-      .update(withdrawals)
-      .set({
-        status: "approved",
-        processedAt: new Date(),
-        processedBy: adminId,
-      })
-      .where(eq(withdrawals.id, id))
-      .returning();
-    
-    return updated || undefined;
   }
 
-  async rejectWithdrawal(id: number, adminId: number, notes: string): Promise<Withdrawal | undefined> {
-    const [updated] = await db
-      .update(withdrawals)
-      .set({
-        status: "rejected",
-        processedAt: new Date(),
-        processedBy: adminId,
-        notes,
-      })
-      .where(eq(withdrawals.id, id))
-      .returning();
-    
-    return updated || undefined;
+  // Slideshow specific
+  async getSlideshow(): Promise<any[]> {
+    try {
+      const collection = getSettingsCollection();
+      const slides = await collection.find({ category: "slideshow" }).sort({ createdAt: -1 }).toArray();
+      return slides.map(s => ({ ...s.data, id: s._id.toString() }));
+    } catch (error) {
+      console.error("Error getting slideshow:", error);
+      return [];
+    }
   }
 
-  // =============================================
-  // SITE SETTINGS METHODS (CMS)
-  // =============================================
-
-  async getSettingsByCategory(category: string): Promise<any[]> {
-    return await db
-      .select({
-        setting_key: siteSettings.settingKey,
-        setting_value: siteSettings.settingValue,
-      })
-      .from(siteSettings)
-      .where(eq(siteSettings.category, category));
-  }
-
-  async upsertSetting(category: string, key: string, value: string): Promise<void> {
-    // Try to update first
-    const existing = await db
-      .select()
-      .from(siteSettings)
-      .where(and(eq(siteSettings.category, category), eq(siteSettings.settingKey, key)));
-    
-    if (existing.length > 0) {
-      await db
-        .update(siteSettings)
-        .set({ settingValue: value, updatedAt: new Date() })
-        .where(and(eq(siteSettings.category, category), eq(siteSettings.settingKey, key)));
-    } else {
-      await db.insert(siteSettings).values({
-        category,
-        settingKey: key,
-        settingValue: value,
+  async addSlide(slideData: any): Promise<any> {
+    try {
+      const collection = getSettingsCollection();
+      const result = await collection.insertOne({
+        category: "slideshow",
+        type: "slide",
+        data: slideData,
+        createdAt: new Date()
       });
+      return { ...slideData, id: result.insertedId.toString() };
+    } catch (error) {
+      console.error("Error adding slide:", error);
+      return null;
     }
   }
 
-  async getPublicSettings(): Promise<any[]> {
-    return await db
-      .select({
-        category: siteSettings.category,
-        setting_key: siteSettings.settingKey,
-        setting_value: siteSettings.settingValue,
-      })
-      .from(siteSettings)
-      .where(inArray(siteSettings.category, ['contact', 'branding', 'theme', 'home', 'legal']));
+  async updateSlide(slideId: string, slideData: any): Promise<any> {
+    try {
+      const collection = getSettingsCollection();
+      await collection.updateOne(
+        { _id: new ObjectId(slideId) },
+        { $set: { data: slideData, updatedAt: new Date() } }
+      );
+      return { ...slideData, id: slideId };
+    } catch (error) {
+      console.error("Error updating slide:", error);
+      return null;
+    }
   }
 
-  // =============================================
-  // SLIDESHOW METHODS (CMS)
-  // =============================================
-
-  async getSlideshowImages(page: string): Promise<any[]> {
-    return await db
-      .select()
-      .from(slideshowImages)
-      .where(eq(slideshowImages.page, page))
-      .orderBy(slideshowImages.displayOrder);
-  }
-
-  async getActiveSlideshowImages(page: string): Promise<any[]> {
-    return await db
-      .select()
-      .from(slideshowImages)
-      .where(and(eq(slideshowImages.page, page), eq(slideshowImages.isActive, 1)))
-      .orderBy(slideshowImages.displayOrder);
-  }
-
-  async addSlideshowImage(title: string, imageUrl: string, linkUrl: string, page: string): Promise<{ id: number }> {
-    const [result] = await db
-      .insert(slideshowImages)
-      .values({ title, imageUrl, linkUrl, page })
-      .returning({ id: slideshowImages.id });
-    return result;
-  }
-
-  async updateSlideshowImage(id: number, title: string, imageUrl: string, linkUrl: string, displayOrder: number, isActive: number): Promise<void> {
-    await db
-      .update(slideshowImages)
-      .set({ title, imageUrl, linkUrl, displayOrder, isActive })
-      .where(eq(slideshowImages.id, id));
-  }
-
-  async deleteSlideshowImage(id: number): Promise<void> {
-    await db.delete(slideshowImages).where(eq(slideshowImages.id, id));
+  async deleteSlide(slideId: string): Promise<boolean> {
+    try {
+      const collection = getSettingsCollection();
+      await collection.deleteOne({ _id: new ObjectId(slideId) });
+      return true;
+    } catch (error) {
+      console.error("Error deleting slide:", error);
+      return false;
+    }
   }
 }
 
-export const storage = new DatabaseStorage();
+export const mongoStorage = new MongoStorage();
