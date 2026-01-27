@@ -1020,161 +1020,318 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-
-  // =============================================
-  // SITE SETTINGS API ROUTES (CMS)
-  // =============================================
-
-  // Get all settings by category
-  app.get("/api/admin/settings/:category", async (req, res) => {
+  // Toggle admin status
+  app.post("/api/admin/users/:userId/toggle-admin", async (req, res) => {
     try {
       if (!req.session.userId) {
         return res.status(401).send("Not authenticated");
       }
+
       const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
       if (!currentUser || currentUser.isAdmin !== 1) {
         return res.status(403).send("Admin access required");
       }
-      const { category } = req.params;
-      const settings = await storage.getSettingsByCategory(category);
-      const result: Record<string, string> = {};
-      settings.forEach((s: any) => {
-        result[s.setting_key] = s.setting_value || "";
+
+      const userId = parseInt(req.params.userId);
+      const { isAdmin } = req.body;
+
+      const updatedUser = await storage.updateUser(userId, { 
+        isAdmin: isAdmin ? 1 : 0 
       });
-      res.json(result);
-    } catch (error) {
-      console.error("Fetch settings error:", error);
-      res.status(500).send("Failed to fetch settings");
-    }
-  });
-
-  // Update settings by category (bulk)
-  app.put("/api/admin/settings/:category", async (req, res) => {
-    try {
-      if (!req.session.userId) {
-        return res.status(401).send("Not authenticated");
-      }
-      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
-      if (!currentUser || currentUser.isAdmin !== 1) {
-        return res.status(403).send("Admin access required");
-      }
-      const { category } = req.params;
-      const settings = req.body;
       
-      for (const [key, value] of Object.entries(settings)) {
-        await storage.upsertSetting(category, key, value as string);
+      if (!updatedUser) {
+        return res.status(404).send("User not found");
       }
-      res.json({ success: true });
+
+      const { password: _, ...userWithoutPassword } = updatedUser;
+      res.json(userWithoutPassword);
     } catch (error) {
-      console.error("Update settings error:", error);
-      res.status(500).send("Failed to update settings");
+      console.error("Toggle admin error:", error);
+      res.status(500).send("Failed to update admin status");
     }
   });
 
-  // Get slideshow images
-  app.get("/api/admin/slideshow", async (req, res) => {
+  // Get all deposits (using users' balance history as proxy)
+  app.get("/api/admin/deposits", async (req, res) => {
     try {
       if (!req.session.userId) {
         return res.status(401).send("Not authenticated");
       }
+
       const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
       if (!currentUser || currentUser.isAdmin !== 1) {
         return res.status(403).send("Admin access required");
       }
-      const page = (req.query.page as string) || "home";
-      const images = await storage.getSlideshowImages(page);
-      res.json(images);
+
+      // For now, return empty array - deposits can be implemented with a separate table
+      // or derived from transaction history
+      res.json([]);
     } catch (error) {
-      console.error("Fetch slideshow error:", error);
-      res.status(500).send("Failed to fetch slideshow images");
+      console.error("Get deposits error:", error);
+      res.status(500).send("Failed to fetch deposits");
     }
   });
 
-  // Add slideshow image
-  app.post("/api/admin/slideshow", async (req, res) => {
+  // Create manual deposit (adds to user balance)
+  app.post("/api/admin/deposits", async (req, res) => {
     try {
       if (!req.session.userId) {
         return res.status(401).send("Not authenticated");
       }
+
       const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
       if (!currentUser || currentUser.isAdmin !== 1) {
         return res.status(403).send("Admin access required");
       }
-      const { title, image_url, link_url, page } = req.body;
-      const result = await storage.addSlideshowImage(title || "", image_url, link_url || "", page || "home");
-      res.json({ id: result.id, success: true });
-    } catch (error) {
-      console.error("Add slideshow error:", error);
-      res.status(500).send("Failed to add slideshow image");
-    }
-  });
 
-  // Update slideshow image
-  app.put("/api/admin/slideshow/:id", async (req, res) => {
-    try {
-      if (!req.session.userId) {
-        return res.status(401).send("Not authenticated");
+      const { userId, amount, notes } = req.body;
+      
+      if (!userId || !amount || amount <= 0) {
+        return res.status(400).send("Invalid user or amount");
       }
-      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
-      if (!currentUser || currentUser.isAdmin !== 1) {
-        return res.status(403).send("Admin access required");
-      }
-      const { id } = req.params;
-      const { title, image_url, link_url, display_order, is_active } = req.body;
-      await storage.updateSlideshowImage(parseInt(id), title, image_url, link_url, display_order ?? 0, is_active ?? 1);
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Update slideshow error:", error);
-      res.status(500).send("Failed to update slideshow image");
-    }
-  });
 
-  // Delete slideshow image
-  app.delete("/api/admin/slideshow/:id", async (req, res) => {
-    try {
-      if (!req.session.userId) {
-        return res.status(401).send("Not authenticated");
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).send("User not found");
       }
-      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
-      if (!currentUser || currentUser.isAdmin !== 1) {
-        return res.status(403).send("Admin access required");
-      }
-      await storage.deleteSlideshowImage(parseInt(req.params.id));
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Delete slideshow error:", error);
-      res.status(500).send("Failed to delete slideshow image");
-    }
-  });
 
-  // =============================================
-  // PUBLIC SETTINGS API (no auth required)
-  // =============================================
+      // Add to user balance
+      const newBalance = (user.balance || 0) + amount;
+      const updatedUser = await storage.updateUser(userId, { balance: newBalance });
 
-  // Get public settings
-  app.get("/api/settings/public", async (_req, res) => {
-    try {
-      const settings = await storage.getPublicSettings();
-      const result: Record<string, Record<string, string>> = {};
-      settings.forEach((s: any) => {
-        if (!result[s.category]) result[s.category] = {};
-        result[s.category][s.setting_key] = s.setting_value || "";
+      res.json({ 
+        success: true, 
+        message: `Added ${amount} to ${user.username}'s balance`,
+        newBalance 
       });
-      res.json(result);
     } catch (error) {
-      console.error("Fetch public settings error:", error);
-      res.status(500).send("Failed to fetch settings");
+      console.error("Create deposit error:", error);
+      res.status(500).send("Failed to create deposit");
     }
   });
 
-  // Get public slideshow
-  app.get("/api/slideshow/:page", async (req, res) => {
+  // Get commission history
+  app.get("/api/admin/commissions", async (req, res) => {
     try {
-      const images = await storage.getActiveSlideshowImages(req.params.page);
-      res.json(images);
+      if (!req.session.userId) {
+        return res.status(401).send("Not authenticated");
+      }
+
+      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).send("Admin access required");
+      }
+
+      // Return empty for now - can be implemented with separate commission tracking table
+      res.json([]);
     } catch (error) {
-      console.error("Fetch public slideshow error:", error);
-      res.status(500).send("Failed to fetch slideshow");
+      console.error("Get commissions error:", error);
+      res.status(500).send("Failed to fetch commissions");
+    }
+  });
+
+  // ========================================
+  // SETTINGS API ROUTES (CMS)
+  // ========================================
+  
+  // In-memory settings store (replace with database in production)
+  const settingsStore: Record<string, any> = {};
+
+  // Contact Settings
+  app.get("/api/admin/settings/contact", async (req, res) => {
+    try {
+      res.json(settingsStore.contact || []);
+    } catch (error) {
+      res.status(500).send("Failed to fetch contact settings");
+    }
+  });
+
+  app.post("/api/admin/settings/contact", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).send("Not authenticated");
+      }
+      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).send("Admin access required");
+      }
+
+      const { type, items } = req.body;
+      if (!settingsStore.contact) settingsStore.contact = [];
+      
+      // Remove existing items of this type
+      settingsStore.contact = settingsStore.contact.filter((s: any) => s.type !== type);
+      // Add new items
+      settingsStore.contact.push(...items);
+      
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).send("Failed to save contact settings");
+    }
+  });
+
+  // Pages Settings (About, Terms, Privacy)
+  app.get("/api/admin/settings/pages", async (req, res) => {
+    try {
+      res.json(settingsStore.pages || []);
+    } catch (error) {
+      res.status(500).send("Failed to fetch pages");
+    }
+  });
+
+  app.post("/api/admin/settings/pages", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).send("Not authenticated");
+      }
+      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).send("Admin access required");
+      }
+
+      const { type, title, content, isActive } = req.body;
+      if (!settingsStore.pages) settingsStore.pages = [];
+      
+      // Update or add page
+      const existingIndex = settingsStore.pages.findIndex((p: any) => p.type === type);
+      const pageData = { type, title, content, isActive, updatedAt: new Date().toISOString() };
+      
+      if (existingIndex >= 0) {
+        settingsStore.pages[existingIndex] = pageData;
+      } else {
+        settingsStore.pages.push(pageData);
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).send("Failed to save page");
+    }
+  });
+
+  // Content Settings (Home, Dashboard, Labels)
+  app.get("/api/admin/settings/content", async (req, res) => {
+    try {
+      res.json(settingsStore.content || []);
+    } catch (error) {
+      res.status(500).send("Failed to fetch content settings");
+    }
+  });
+
+  app.post("/api/admin/settings/content", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).send("Not authenticated");
+      }
+      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).send("Admin access required");
+      }
+
+      const { type, data } = req.body;
+      if (!settingsStore.content) settingsStore.content = [];
+      
+      // Update or add content
+      const existingIndex = settingsStore.content.findIndex((c: any) => c.type === type);
+      const contentData = { type, data, updatedAt: new Date().toISOString() };
+      
+      if (existingIndex >= 0) {
+        settingsStore.content[existingIndex] = contentData;
+      } else {
+        settingsStore.content.push(contentData);
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).send("Failed to save content");
+    }
+  });
+
+  // Theme Settings
+  app.get("/api/admin/settings/theme", async (req, res) => {
+    try {
+      res.json(settingsStore.theme || []);
+    } catch (error) {
+      res.status(500).send("Failed to fetch theme settings");
+    }
+  });
+
+  app.post("/api/admin/settings/theme", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).send("Not authenticated");
+      }
+      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).send("Admin access required");
+      }
+
+      const { type, data } = req.body;
+      if (!settingsStore.theme) settingsStore.theme = [];
+      
+      const existingIndex = settingsStore.theme.findIndex((t: any) => t.type === type);
+      const themeData = { type, data, updatedAt: new Date().toISOString() };
+      
+      if (existingIndex >= 0) {
+        settingsStore.theme[existingIndex] = themeData;
+      } else {
+        settingsStore.theme.push(themeData);
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).send("Failed to save theme");
+    }
+  });
+
+  // Branding Settings
+  app.get("/api/admin/settings/branding", async (req, res) => {
+    try {
+      res.json(settingsStore.branding || []);
+    } catch (error) {
+      res.status(500).send("Failed to fetch branding settings");
+    }
+  });
+
+  app.post("/api/admin/settings/branding", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).send("Not authenticated");
+      }
+      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
+      if (!currentUser || currentUser.isAdmin !== 1) {
+        return res.status(403).send("Admin access required");
+      }
+
+      const { type, data } = req.body;
+      if (!settingsStore.branding) settingsStore.branding = [];
+      
+      const existingIndex = settingsStore.branding.findIndex((b: any) => b.type === type);
+      const brandingData = { type, data, updatedAt: new Date().toISOString() };
+      
+      if (existingIndex >= 0) {
+        settingsStore.branding[existingIndex] = brandingData;
+      } else {
+        settingsStore.branding.push(brandingData);
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).send("Failed to save branding");
+    }
+  });
+
+  // Public API for frontend to load settings
+  app.get("/api/public/settings", async (req, res) => {
+    try {
+      res.json({
+        contact: settingsStore.contact || [],
+        pages: settingsStore.pages || [],
+        content: settingsStore.content || [],
+        theme: settingsStore.theme || [],
+        branding: settingsStore.branding || []
+      });
+    } catch (error) {
+      res.status(500).send("Failed to fetch settings");
     }
   });
 
