@@ -12,7 +12,6 @@ export async function connectMongo(): Promise<void> {
     }
 
     // Use MONGO_URI from environment variable (for Render/production)
-    // Falls back to localhost for local development
     const mongoUri = process.env.MONGO_URI || process.env.MONGODB_URI || "mongodb://127.0.0.1:27017";
     
     console.log("Connecting to MongoDB...");
@@ -22,11 +21,10 @@ export async function connectMongo(): Promise<void> {
     await mongoClient.connect();
     db = mongoClient.db("odeladspro");
     usersCollection = db.collection("users");
-    console.log("✅ Connected to MongoDB successfully!");
+    console.log("Connected to MongoDB successfully!");
   } catch (error) {
-    console.error("❌ MongoDB connection error:", error);
+    console.error("MongoDB connection error:", error);
     console.log("MongoDB is not available. Using PostgreSQL instead.");
-    // Reset to null so isMongoConnected returns false
     mongoClient = null;
     db = null;
     usersCollection = null;
