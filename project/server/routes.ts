@@ -1147,20 +1147,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // SETTINGS API ROUTES (CMS) - FIXED!
   // ========================================
   
-  // In-memory settings store
-  const settingsStore: Record<string, any> = {
-    contact: [],
-    pages: [],
-    content: [],
-    theme: [],
-    branding: [],
-    slideshow: []
-  };
+
+  // ========================================
+  // SETTINGS API ROUTES (CMS) - MONGODB STORAGE
+  // ========================================
 
   // Contact Settings
   app.get("/api/admin/settings/contact", async (req, res) => {
     try {
-      res.json(settingsStore.contact || []);
+      if (isMongoConnected()) {
+        const settings = await mongoStorage.getSettings("contact");
+        res.json(settings.map(s => ({ type: s.type, data: s.data })));
+      } else {
+        res.json([]);
+      }
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch contact settings" });
     }
@@ -1177,20 +1177,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { type, items, data } = req.body;
-      
-      if (items) {
-        settingsStore.contact = settingsStore.contact.filter((s: any) => s.type !== type);
-        settingsStore.contact.push(...items.map((item: any) => ({ ...item, type })));
-      } else {
-        const existingIndex = settingsStore.contact.findIndex((c: any) => c.type === type);
-        const contactData = { type, data, updatedAt: new Date().toISOString() };
-        if (existingIndex >= 0) {
-          settingsStore.contact[existingIndex] = contactData;
+      if (isMongoConnected()) {
+        if (items) {
+          for (const item of items) {
+            await mongoStorage.saveSettings("contact", item.type || type, item);
+          }
         } else {
-          settingsStore.contact.push(contactData);
+          await mongoStorage.saveSettings("contact", type, data);
         }
       }
-      
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to save contact settings" });
@@ -1200,7 +1195,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Pages Settings (About, Terms, Privacy)
   app.get("/api/admin/settings/pages", async (req, res) => {
     try {
-      res.json(settingsStore.pages || []);
+      if (isMongoConnected()) {
+        const settings = await mongoStorage.getSettings("pages");
+        res.json(settings.map(s => ({ type: s.type, ...s.data })));
+      } else {
+        res.json([]);
+      }
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch pages" });
     }
@@ -1217,15 +1217,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { type, title, content, isActive, data } = req.body;
-      const existingIndex = settingsStore.pages.findIndex((p: any) => p.type === type);
-      const pageData = { type, title, content, isActive, data, updatedAt: new Date().toISOString() };
-      
-      if (existingIndex >= 0) {
-        settingsStore.pages[existingIndex] = pageData;
-      } else {
-        settingsStore.pages.push(pageData);
+      if (isMongoConnected()) {
+        await mongoStorage.saveSettings("pages", type, { title, content, isActive, ...data });
       }
-      
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to save page" });
@@ -1235,7 +1229,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Content Settings (Home, Dashboard, Labels)
   app.get("/api/admin/settings/content", async (req, res) => {
     try {
-      res.json(settingsStore.content || []);
+      if (isMongoConnected()) {
+        const settings = await mongoStorage.getSettings("content");
+        res.json(settings.map(s => ({ type: s.type, data: s.data })));
+      } else {
+        res.json([]);
+      }
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch content settings" });
     }
@@ -1252,15 +1251,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { type, data } = req.body;
-      const existingIndex = settingsStore.content.findIndex((c: any) => c.type === type);
-      const contentData = { type, data, updatedAt: new Date().toISOString() };
-      
-      if (existingIndex >= 0) {
-        settingsStore.content[existingIndex] = contentData;
-      } else {
-        settingsStore.content.push(contentData);
+      if (isMongoConnected()) {
+        await mongoStorage.saveSettings("content", type, data);
       }
-      
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to save content" });
@@ -1270,7 +1263,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Theme Settings
   app.get("/api/admin/settings/theme", async (req, res) => {
     try {
-      res.json(settingsStore.theme || []);
+      if (isMongoConnected()) {
+        const settings = await mongoStorage.getSettings("theme");
+        res.json(settings.map(s => ({ type: s.type, data: s.data })));
+      } else {
+        res.json([]);
+      }
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch theme settings" });
     }
@@ -1287,15 +1285,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { type, data } = req.body;
-      const existingIndex = settingsStore.theme.findIndex((t: any) => t.type === type);
-      const themeData = { type: type || "theme", data, updatedAt: new Date().toISOString() };
-      
-      if (existingIndex >= 0) {
-        settingsStore.theme[existingIndex] = themeData;
-      } else {
-        settingsStore.theme.push(themeData);
+      if (isMongoConnected()) {
+        await mongoStorage.saveSettings("theme", type || "theme", data);
       }
-      
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to save theme" });
@@ -1305,7 +1297,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Branding Settings
   app.get("/api/admin/settings/branding", async (req, res) => {
     try {
-      res.json(settingsStore.branding || []);
+      if (isMongoConnected()) {
+        const settings = await mongoStorage.getSettings("branding");
+        res.json(settings.map(s => ({ type: s.type, data: s.data })));
+      } else {
+        res.json([]);
+      }
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch branding settings" });
     }
@@ -1322,15 +1319,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { type, data } = req.body;
-      const existingIndex = settingsStore.branding.findIndex((b: any) => b.type === type);
-      const brandingData = { type: type || "branding", data, updatedAt: new Date().toISOString() };
-      
-      if (existingIndex >= 0) {
-        settingsStore.branding[existingIndex] = brandingData;
-      } else {
-        settingsStore.branding.push(brandingData);
+      if (isMongoConnected()) {
+        await mongoStorage.saveSettings("branding", type || "branding", data);
       }
-      
       res.json({ success: true });
     } catch (error) {
       console.error("Branding save error:", error);
@@ -1339,11 +1330,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========================================
-  // SLIDESHOW SETTINGS - NEW!
+  // SLIDESHOW SETTINGS - MONGODB STORAGE
   // ========================================
   app.get("/api/admin/settings/slideshow", async (req, res) => {
     try {
-      res.json(settingsStore.slideshow || []);
+      if (isMongoConnected()) {
+        const slides = await mongoStorage.getSlideshow();
+        res.json(slides);
+      } else {
+        res.json([]);
+      }
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch slideshow" });
     }
@@ -1351,8 +1347,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/slideshow", async (req, res) => {
     try {
-      const activeSlides = (settingsStore.slideshow || []).filter((s: any) => s.isActive !== false);
-      res.json(activeSlides);
+      if (isMongoConnected()) {
+        const slides = await mongoStorage.getSlideshow();
+        const activeSlides = slides.filter((s: any) => s.isActive !== false);
+        res.json(activeSlides);
+      } else {
+        res.json([]);
+      }
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch slideshow" });
     }
@@ -1368,12 +1369,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Admin access required" });
       }
 
-      const slideData = req.body;
-      slideData.id = Date.now();
-      slideData.createdAt = new Date().toISOString();
-      settingsStore.slideshow.push(slideData);
-      
-      res.json({ success: true, slide: slideData });
+      if (isMongoConnected()) {
+        const slideData = req.body;
+        const slide = await mongoStorage.addSlide(slideData);
+        res.json({ success: true, slide });
+      } else {
+        res.json({ success: true });
+      }
     } catch (error) {
       console.error("Slideshow save error:", error);
       res.status(500).json({ error: "Failed to save slideshow" });
@@ -1390,15 +1392,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Admin access required" });
       }
 
-      const id = parseInt(req.params.id);
-      const index = settingsStore.slideshow.findIndex((s: any) => s.id === id);
-      
-      if (index === -1) {
-        return res.status(404).json({ error: "Slide not found" });
+      if (isMongoConnected()) {
+        const slide = await mongoStorage.updateSlide(req.params.id, req.body);
+        if (!slide) {
+          return res.status(404).json({ error: "Slide not found" });
+        }
+        res.json({ success: true, slide });
+      } else {
+        res.json({ success: true });
       }
-
-      settingsStore.slideshow[index] = { ...settingsStore.slideshow[index], ...req.body, updatedAt: new Date().toISOString() };
-      res.json({ success: true, slide: settingsStore.slideshow[index] });
     } catch (error) {
       res.status(500).json({ error: "Failed to update slideshow" });
     }
@@ -1414,14 +1416,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Admin access required" });
       }
 
-      const id = parseInt(req.params.id);
-      const initialLength = settingsStore.slideshow.length;
-      settingsStore.slideshow = settingsStore.slideshow.filter((s: any) => s.id !== id);
-      
-      if (settingsStore.slideshow.length === initialLength) {
-        return res.status(404).json({ error: "Slide not found" });
+      if (isMongoConnected()) {
+        const deleted = await mongoStorage.deleteSlide(req.params.id);
+        if (!deleted) {
+          return res.status(404).json({ error: "Slide not found" });
+        }
       }
-      
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete slideshow" });
@@ -1431,20 +1431,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Public API for frontend to load settings
   app.get("/api/public/settings", async (req, res) => {
     try {
-      res.json({
-        contact: settingsStore.contact || [],
-        pages: settingsStore.pages || [],
-        content: settingsStore.content || [],
-        theme: settingsStore.theme || [],
-        branding: settingsStore.branding || [],
-        slideshow: (settingsStore.slideshow || []).filter((s: any) => s.isActive !== false)
-      });
+      if (isMongoConnected()) {
+        const [contact, pages, content, theme, branding] = await Promise.all([
+          mongoStorage.getSettings("contact"),
+          mongoStorage.getSettings("pages"),
+          mongoStorage.getSettings("content"),
+          mongoStorage.getSettings("theme"),
+          mongoStorage.getSettings("branding"),
+        ]);
+        const slideshow = await mongoStorage.getSlideshow();
+        
+        res.json({
+          contact: contact.map(s => ({ type: s.type, data: s.data })),
+          pages: pages.map(s => ({ type: s.type, ...s.data })),
+          content: content.map(s => ({ type: s.type, data: s.data })),
+          theme: theme.map(s => ({ type: s.type, data: s.data })),
+          branding: branding.map(s => ({ type: s.type, data: s.data })),
+          slideshow: slideshow.filter((s: any) => s.isActive !== false),
+        });
+      } else {
+        res.json({
+          contact: [],
+          pages: [],
+          content: [],
+          theme: [],
+          branding: [],
+          slideshow: []
+        });
+      }
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch settings" });
+    }
+  });
+
+  // Settings API for dashboard colors
+  app.get("/api/settings", async (req, res) => {
+    try {
+      if (isMongoConnected()) {
+        const theme = await mongoStorage.getSettings("theme");
+        const themeData = theme.find(t => t.type === "theme");
+        res.json(themeData?.data || {});
+      } else {
+        res.json({});
+      }
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch settings" });
     }
   });
 
   registerPremiumRoutes(app);
+
   const httpServer = createServer(app);
   return httpServer;
 }
