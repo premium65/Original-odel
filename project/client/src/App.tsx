@@ -19,12 +19,25 @@ import AdminWithdrawals from "@/pages/admin/withdrawals";
 import AdminAds from "@/pages/admin/ads";
 import AdminTransactions from "@/pages/admin/transactions";
 import AdminPremium from "@/pages/admin/premium";
+import AdminPremiumManage from "@/pages/admin/premium-manage";
 import AdminDeposits from "@/pages/admin/deposits";
 import AdminCommission from "@/pages/admin/commission";
-import AdminSocialMedia from "@/pages/admin/social-media";
 import AdminAdmins from "@/pages/admin/admins";
 import AdminSlideshow from "@/pages/admin/admin-slideshow";
 import AdminThemeSettings from "@/pages/admin/admin-theme-settings";
+// NEW PAGES
+import AdminTransactionUsers from "@/pages/admin/transaction-users";
+import AdminContactPhone from "@/pages/admin/contact-phone";
+import AdminContactEmail from "@/pages/admin/contact-email";
+import AdminContactWhatsapp from "@/pages/admin/contact-whatsapp";
+import AdminContactTelegram from "@/pages/admin/contact-telegram";
+import AdminInfoAbout from "@/pages/admin/info-about";
+import AdminInfoTerms from "@/pages/admin/info-terms";
+import AdminInfoPrivacy from "@/pages/admin/info-privacy";
+import AdminContentHome from "@/pages/admin/content-home";
+import AdminContentDashboard from "@/pages/admin/content-dashboard";
+import AdminContentText from "@/pages/admin/content-text";
+import AdminBranding from "@/pages/admin/branding";
 import Features from "@/pages/features";
 import PointsPage from "@/pages/points";
 import WithdrawPage from "@/pages/withdraw";
@@ -33,6 +46,7 @@ import WalletPage from "@/pages/wallet";
 function Router() {
   return (
     <Switch>
+      {/* Public Routes */}
       <Route path="/" component={Home} />
       <Route path="/register" component={Register} />
       <Route path="/login" component={Login} />
@@ -43,11 +57,14 @@ function Router() {
       <Route path="/wallet" component={WalletPage} />
       <Route path="/points" component={PointsPage} />
 
+      {/* Admin Dashboard */}
       <Route path="/admin">
         <AdminLayout>
           <AdminDashboard />
         </AdminLayout>
       </Route>
+
+      {/* USER MANAGEMENT */}
       <Route path="/admin/users">
         <AdminLayout>
           <AdminUsers />
@@ -58,24 +75,31 @@ function Router() {
           <AdminPending />
         </AdminLayout>
       </Route>
+      <Route path="/admin/admins">
+        <AdminLayout>
+          <AdminAdmins />
+        </AdminLayout>
+      </Route>
       <Route path="/admin/users/:id">
         <AdminLayout>
           <AdminUserDetail />
         </AdminLayout>
       </Route>
-      <Route path="/admin/ratings">
+
+      {/* TRANSACTION */}
+      <Route path="/admin/transaction-users">
         <AdminLayout>
-          <AdminRatings />
+          <AdminTransactionUsers />
         </AdminLayout>
       </Route>
-      <Route path="/admin/withdrawals">
+      <Route path="/admin/premium-manage">
         <AdminLayout>
-          <AdminWithdrawals />
+          <AdminPremiumManage />
         </AdminLayout>
       </Route>
-      <Route path="/admin/ads">
+      <Route path="/admin/premium">
         <AdminLayout>
-          <AdminAds />
+          <AdminPremium />
         </AdminLayout>
       </Route>
       <Route path="/admin/transactions">
@@ -83,9 +107,9 @@ function Router() {
           <AdminTransactions />
         </AdminLayout>
       </Route>
-      <Route path="/admin/premium">
+      <Route path="/admin/withdrawals">
         <AdminLayout>
-          <AdminPremium />
+          <AdminWithdrawals />
         </AdminLayout>
       </Route>
       <Route path="/admin/deposits">
@@ -98,14 +122,67 @@ function Router() {
           <AdminCommission />
         </AdminLayout>
       </Route>
-      <Route path="/admin/social-media">
+
+      {/* ADS MANAGEMENT */}
+      <Route path="/admin/ads">
         <AdminLayout>
-          <AdminSocialMedia />
+          <AdminAds />
         </AdminLayout>
       </Route>
-      <Route path="/admin/admins">
+      <Route path="/admin/ratings">
         <AdminLayout>
-          <AdminAdmins />
+          <AdminRatings />
+        </AdminLayout>
+      </Route>
+
+      {/* SOCIAL MEDIA - Contact Us */}
+      <Route path="/admin/contact/phone">
+        <AdminLayout>
+          <AdminContactPhone />
+        </AdminLayout>
+      </Route>
+      <Route path="/admin/contact/email">
+        <AdminLayout>
+          <AdminContactEmail />
+        </AdminLayout>
+      </Route>
+      <Route path="/admin/contact/whatsapp">
+        <AdminLayout>
+          <AdminContactWhatsapp />
+        </AdminLayout>
+      </Route>
+      <Route path="/admin/contact/telegram">
+        <AdminLayout>
+          <AdminContactTelegram />
+        </AdminLayout>
+      </Route>
+
+      {/* SOCIAL MEDIA - Info */}
+      <Route path="/admin/info/about">
+        <AdminLayout>
+          <AdminInfoAbout />
+        </AdminLayout>
+      </Route>
+      <Route path="/admin/info/terms">
+        <AdminLayout>
+          <AdminInfoTerms />
+        </AdminLayout>
+      </Route>
+      <Route path="/admin/info/privacy">
+        <AdminLayout>
+          <AdminInfoPrivacy />
+        </AdminLayout>
+      </Route>
+
+      {/* SITE CONTENT */}
+      <Route path="/admin/content/home">
+        <AdminLayout>
+          <AdminContentHome />
+        </AdminLayout>
+      </Route>
+      <Route path="/admin/content/dashboard">
+        <AdminLayout>
+          <AdminContentDashboard />
         </AdminLayout>
       </Route>
       <Route path="/admin/slideshow">
@@ -113,9 +190,21 @@ function Router() {
           <AdminSlideshow />
         </AdminLayout>
       </Route>
+      <Route path="/admin/content/text">
+        <AdminLayout>
+          <AdminContentText />
+        </AdminLayout>
+      </Route>
+
+      {/* APPEARANCE */}
       <Route path="/admin/theme-settings">
         <AdminLayout>
           <AdminThemeSettings />
+        </AdminLayout>
+      </Route>
+      <Route path="/admin/branding">
+        <AdminLayout>
+          <AdminBranding />
         </AdminLayout>
       </Route>
 
