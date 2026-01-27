@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { 
-  PiggyBank, 
+import {
+  PiggyBank,
   Search,
   Check,
   X,
@@ -68,6 +68,7 @@ export default function AdminDeposits() {
     mutationFn: async (depositId: number) => {
       const res = await fetch(`/api/admin/deposits/${depositId}/approve`, {
         method: "POST",
+        credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to approve deposit");
       return res.json();
@@ -87,6 +88,7 @@ export default function AdminDeposits() {
     mutationFn: async (depositId: number) => {
       const res = await fetch(`/api/admin/deposits/${depositId}/reject`, {
         method: "POST",
+        credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to reject deposit");
       return res.json();
@@ -106,6 +108,7 @@ export default function AdminDeposits() {
       const res = await fetch("/api/admin/deposits", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error("Failed to create deposit");
@@ -127,8 +130,7 @@ export default function AdminDeposits() {
 
   // Filter deposits
   const filteredDeposits = deposits.filter(deposit => {
-    const matchesSearch = 
-      deposit.user?.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = deposit.user?.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       deposit.user?.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       deposit.transactionId?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || deposit.status === statusFilter;
@@ -278,11 +280,9 @@ export default function AdminDeposits() {
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${
-                        deposit.status === 'approved' 
-                          ? 'bg-[#10b981]/20 text-[#10b981]'
-                          : deposit.status === 'pending'
-                          ? 'bg-[#f59e0b]/20 text-[#f59e0b]'
-                          : 'bg-[#ef4444]/20 text-[#ef4444]'
+                        deposit.status === 'approved' ? 'bg-[#10b981]/20 text-[#10b981]' :
+                        deposit.status === 'pending' ? 'bg-[#f59e0b]/20 text-[#f59e0b]' :
+                        'bg-[#ef4444]/20 text-[#ef4444]'
                       }`}>
                         {deposit.status}
                       </span>
