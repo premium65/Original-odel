@@ -1,214 +1,278 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarHeader,
-} from "@/components/ui/sidebar";
 import { 
-  LayoutDashboard, Users, Star, Crown, Calendar, BookOpen, TrendingUp,
-  ChevronDown, ChevronRight, Globe, Phone, Mail, MessageCircle, 
-  FileText, Shield, Home, Image, Type, Palette, Settings, Megaphone, 
-  Receipt, Gem, Building, Wallet, Percent, Clock, UserCog
+  LayoutDashboard,
+  Users,
+  UserCheck,
+  ShieldCheck,
+  CreditCard,
+  Crown,
+  FileText,
+  Wallet,
+  PiggyBank,
+  Percent,
+  Megaphone,
+  Globe,
+  Phone,
+  Mail,
+  MessageCircle,
+  Send,
+  Info,
+  FileQuestion,
+  Shield,
+  Layout,
+  Home,
+  SlidersHorizontal,
+  Image,
+  Type,
+  Palette,
+  ImageIcon,
+  ChevronDown,
+  ChevronRight,
+  LogOut
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface MenuItem {
-  title: string;
-  url: string;
-  icon: any;
-  isNew?: boolean;
-  hasGoldBadge?: boolean;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  path?: string;
+  badge?: string;
+  badgeType?: "star" | "new";
+  children?: MenuItem[];
 }
 
 interface MenuGroup {
-  label: string;
-  emoji: string;
-  icon: any;
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
   color: string;
-  isNew?: boolean;
+  badge?: string;
   items: MenuItem[];
-  single?: boolean;
-  url?: string;
 }
 
-const menuGroups: MenuGroup[] = [
-  { 
-    label: "Dashboard", 
-    emoji: "🏠",
-    icon: Home, 
-    color: "from-[#10b981] to-[#059669]", 
-    single: true,
-    url: "/admin",
-    items: []
-  },
-  { 
-    label: "USER MANAGEMENT", 
-    emoji: "👤",
-    icon: Users, 
-    color: "from-[#06b6d4] to-[#0891b2]",
+const menuStructure: MenuGroup[] = [
+  {
+    title: "USER MANAGEMENT",
+    icon: Users,
+    color: "text-[#06b6d4]", // Cyan
     items: [
-      { title: "All Users", url: "/admin/users", icon: Users },
-      { title: "Pending Users", url: "/admin/pending", icon: Clock },
-      { title: "Admins", url: "/admin/admins", icon: UserCog },
+      { label: "All Users", icon: Users, path: "/admin/users" },
+      { label: "Pending Users", icon: UserCheck, path: "/admin/pending" },
+      { label: "Admins", icon: ShieldCheck, path: "/admin/admins" },
     ]
   },
-  { 
-    label: "TRANSACTION", 
-    emoji: "📋",
-    icon: Receipt, 
-    color: "from-[#f59e0b] to-[#d97706]",
+  {
+    title: "TRANSACTION",
+    icon: CreditCard,
+    color: "text-[#10b981]", // Green
     items: [
-      { title: "Users", url: "/admin/transaction-users", icon: Users },
-      { title: "Premium Manage", url: "/admin/premium-manage", icon: Crown, hasGoldBadge: true },
-      { title: "Premium", url: "/admin/premium", icon: Gem, hasGoldBadge: true, isNew: true },
-      { title: "Transaction Details", url: "/admin/transactions", icon: TrendingUp },
-      { title: "Withdraw List", url: "/admin/withdrawals", icon: BookOpen },
-      { title: "Deposit Details", url: "/admin/deposits", icon: Wallet },
-      { title: "Commission", url: "/admin/commission", icon: Percent },
+      { label: "Users", icon: Users, path: "/admin/transaction-users" },
+      { label: "Premium Manage", icon: Crown, path: "/admin/premium-manage", badge: "⭐", badgeType: "star" },
+      { label: "Premium", icon: Crown, path: "/admin/premium", badge: "NEW", badgeType: "new" },
+      { label: "Transaction Details", icon: FileText, path: "/admin/transactions" },
+      { label: "Withdraw List", icon: Wallet, path: "/admin/withdrawals" },
+      { label: "Deposit Details", icon: PiggyBank, path: "/admin/deposits" },
+      { label: "Commission", icon: Percent, path: "/admin/commission" },
     ]
   },
-  { 
-    label: "ADS MANAGEMENT", 
-    emoji: "📢",
-    icon: Megaphone, 
-    color: "from-[#3b82f6] to-[#2563eb]",
+  {
+    title: "ADS MANAGEMENT",
+    icon: Megaphone,
+    color: "text-[#f59e0b]", // Orange
     items: [
-      { title: "Manage Ads", url: "/admin/ads", icon: Calendar },
+      { label: "Manage Ads", icon: Megaphone, path: "/admin/ads" },
     ]
   },
-  { 
-    label: "SOCIAL MEDIA", 
-    emoji: "🌐",
-    icon: Globe, 
-    color: "from-[#ec4899] to-[#db2777]",
-    isNew: true,
-    single: true,
-    url: "/admin/social-media",
-    items: []
+  {
+    title: "SOCIAL MEDIA",
+    icon: Globe,
+    color: "text-[#10b981]", // Green
+    badge: "NEW",
+    items: [
+      { 
+        label: "Contact Us", 
+        icon: Phone,
+        children: [
+          { label: "Phone", icon: Phone, path: "/admin/contact/phone" },
+          { label: "Email", icon: Mail, path: "/admin/contact/email" },
+          { label: "WhatsApp", icon: MessageCircle, path: "/admin/contact/whatsapp" },
+          { label: "Telegram", icon: Send, path: "/admin/contact/telegram" },
+        ]
+      },
+      { 
+        label: "Info", 
+        icon: Info,
+        children: [
+          { label: "About Us", icon: Info, path: "/admin/info/about" },
+          { label: "Terms & Conditions", icon: FileQuestion, path: "/admin/info/terms" },
+          { label: "Privacy Policy", icon: Shield, path: "/admin/info/privacy" },
+        ]
+      },
+    ]
   },
-  { 
-    label: "SITE CONTENT", 
-    emoji: "🧩",
-    icon: Globe, 
-    color: "from-[#8b5cf6] to-[#7c3aed]",
-    isNew: true,
-    single: true,
-    url: "/admin/site-content",
-    items: []
+  {
+    title: "SITE CONTENT",
+    icon: Layout,
+    color: "text-[#8b5cf6]", // Purple
+    badge: "NEW",
+    items: [
+      { label: "Home Page", icon: Home, path: "/admin/content/home" },
+      { label: "Dashboard Page", icon: SlidersHorizontal, path: "/admin/content/dashboard" },
+      { label: "Slideshow Images", icon: Image, path: "/admin/slideshow" },
+      { label: "Text & Labels", icon: Type, path: "/admin/content/text" },
+    ]
   },
-  { 
-    label: "APPEARANCE", 
-    emoji: "⚙️",
-    icon: Settings, 
-    color: "from-[#ef4444] to-[#dc2626]",
-    isNew: true,
-    single: true,
-    url: "/admin/appearance",
-    items: []
+  {
+    title: "APPEARANCE",
+    icon: Palette,
+    color: "text-[#ec4899]", // Pink
+    badge: "NEW",
+    items: [
+      { label: "Theme Colors", icon: Palette, path: "/admin/theme-settings" },
+      { label: "Logo & Branding", icon: ImageIcon, path: "/admin/branding" },
+    ]
   },
 ];
 
-export function AdminSidebar() {
+export default function AdminSidebar() {
   const [location] = useLocation();
-  const [expandedGroups, setExpandedGroups] = useState<string[]>(["USER MANAGEMENT", "TRANSACTION", "ADS MANAGEMENT"]);
+  const [expandedGroups, setExpandedGroups] = useState<string[]>(["USER MANAGEMENT", "TRANSACTION", "ADS MANAGEMENT", "SOCIAL MEDIA"]);
+  const [expandedSubmenus, setExpandedSubmenus] = useState<string[]>([]);
 
-  const toggleGroup = (label: string) => {
+  const toggleGroup = (title: string) => {
     setExpandedGroups(prev => 
-      prev.includes(label) ? prev.filter(g => g !== label) : [...prev, label]
+      prev.includes(title) ? prev.filter(g => g !== title) : [...prev, title]
     );
   };
 
-  const isActive = (url: string) => location === url;
+  const toggleSubmenu = (label: string) => {
+    setExpandedSubmenus(prev => 
+      prev.includes(label) ? prev.filter(s => s !== label) : [...prev, label]
+    );
+  };
+
+  const isActive = (path?: string) => path && location === path;
+
+  const renderMenuItem = (item: MenuItem, depth: number = 0) => {
+    const hasChildren = item.children && item.children.length > 0;
+    const isExpanded = expandedSubmenus.includes(item.label);
+    const active = isActive(item.path);
+
+    if (hasChildren) {
+      return (
+        <div key={item.label}>
+          <button
+            onClick={() => toggleSubmenu(item.label)}
+            className="w-full flex items-center justify-between px-4 py-2 text-sm text-[#9ca3af] hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <item.icon className="h-4 w-4" />
+              <span>{item.label}</span>
+            </div>
+            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          </button>
+          {isExpanded && (
+            <div className="ml-6 mt-1 space-y-1">
+              {item.children!.map(child => renderMenuItem(child, depth + 1))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <Link key={item.path} href={item.path || "#"}>
+        <div
+          className={cn(
+            "flex items-center justify-between px-4 py-2 text-sm rounded-lg cursor-pointer transition-colors",
+            active 
+              ? "bg-[#10b981]/20 text-[#10b981]" 
+              : "text-[#9ca3af] hover:text-white hover:bg-white/5"
+          )}
+        >
+          <div className="flex items-center gap-3">
+            <item.icon className="h-4 w-4" />
+            <span>{item.label}</span>
+          </div>
+          {item.badge && item.badgeType === "star" && (
+            <span className="text-[#f59e0b] text-lg">⭐</span>
+          )}
+          {item.badge && item.badgeType === "new" && (
+            <span className="px-1.5 py-0.5 text-[10px] font-bold bg-[#ef4444] text-white rounded">NEW</span>
+          )}
+        </div>
+      </Link>
+    );
+  };
 
   return (
-    <Sidebar className="bg-gradient-to-b from-[#1a2332] to-[#141c27] border-r border-[#2a3a4d]">
-      <SidebarHeader className="p-5 border-b border-[#2a3a4d]">
+    <div className="w-64 bg-[#1a2332] border-r border-[#2a3a4d] min-h-screen flex flex-col">
+      {/* Logo */}
+      <div className="p-4 border-b border-[#2a3a4d]">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#f59e0b] to-[#eab308] flex items-center justify-center shadow-lg">
-            <Star className="h-5 w-5 text-white" />
+          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#10b981] to-[#06b6d4] flex items-center justify-center">
+            <span className="text-white font-bold text-lg">O</span>
           </div>
           <div>
-            <span className="text-lg font-bold text-white block">OdelADS</span>
-            <span className="text-[10px] text-[#6b7280] uppercase tracking-widest">Admin Panel</span>
+            <h1 className="text-white font-bold">OdelADS</h1>
+            <p className="text-[#6b7280] text-xs">Admin Panel</p>
           </div>
         </div>
-      </SidebarHeader>
-      
-      <SidebarContent className="bg-transparent py-3 px-2 overflow-y-auto">
-        {menuGroups.map((group) => (
-          <div key={group.label} className="mb-1">
-            {group.single ? (
-              <Link href={group.url || "/admin"}>
-                <button
-                  className={`w-full px-4 py-3.5 rounded-xl flex items-center gap-3 transition-all ${
-                    isActive(group.url || "/admin")
-                      ? `bg-gradient-to-r ${group.color} text-white shadow-lg`
-                      : "text-[#9ca3af] hover:bg-[#2a3a4d]/50 hover:text-white"
-                  }`}
-                >
-                  <span className="text-lg">{group.emoji}</span>
-                  <span className="text-sm font-semibold">{group.label}</span>
-                  {group.isNew && (
-                    <span className="px-1.5 py-0.5 text-[8px] bg-[#ef4444] text-white rounded font-bold ml-auto">NEW</span>
-                  )}
-                </button>
-              </Link>
-            ) : (
-              <>
-                <button
-                  onClick={() => toggleGroup(group.label)}
-                  className={`w-full px-4 py-3 rounded-xl flex items-center justify-between transition-all ${
-                    expandedGroups.includes(group.label)
-                      ? "text-[#10b981] border-l-2 border-[#10b981] bg-[#10b981]/5"
-                      : "text-[#9ca3af] hover:bg-[#2a3a4d]/50 hover:text-white"
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">{group.emoji}</span>
-                    <span className="text-xs font-semibold uppercase tracking-wider">{group.label}</span>
-                    {group.isNew && (
-                      <span className="px-1.5 py-0.5 text-[8px] bg-[#ef4444] text-white rounded font-bold">NEW</span>
-                    )}
-                  </div>
-                  {expandedGroups.includes(group.label) 
-                    ? <ChevronDown className="w-4 h-4" /> 
-                    : <ChevronRight className="w-4 h-4" />
-                  }
-                </button>
+      </div>
 
-                <div className={`overflow-hidden transition-all duration-300 ${
-                  expandedGroups.includes(group.label) ? "max-h-[600px] mt-1" : "max-h-0"
-                }`}>
-                  <div className="ml-4 pl-3 border-l border-[#2a3a4d] space-y-0.5 py-1">
-                    {group.items.map((item) => (
-                      <Link key={item.title} href={item.url}>
-                        <button
-                          className={`w-full px-3 py-2 rounded-lg flex items-center gap-2 text-sm transition-all ${
-                            isActive(item.url)
-                              ? "bg-[#10b981]/20 text-[#10b981] font-medium"
-                              : "text-[#9ca3af] hover:text-white hover:bg-[#2a3a4d]/30"
-                          }`}
-                        >
-                          <item.icon className={`w-4 h-4 ${item.hasGoldBadge ? "text-[#f59e0b]" : ""}`} />
-                          <span className="flex-1 text-left">{item.title}</span>
-                          {item.hasGoldBadge && (
-                            <Star className="w-3 h-3 text-[#f59e0b] fill-[#f59e0b]" />
-                          )}
-                          {item.isNew && (
-                            <span className="px-1.5 py-0.5 text-[8px] bg-[#ef4444] text-white rounded font-bold">
-                              NEW
-                            </span>
-                          )}
-                        </button>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              </>
+      {/* Navigation */}
+      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+        {/* Dashboard */}
+        <Link href="/admin">
+          <div
+            className={cn(
+              "flex items-center gap-3 px-4 py-2.5 rounded-lg cursor-pointer transition-colors",
+              location === "/admin"
+                ? "bg-[#10b981]/20 text-[#10b981] border border-[#10b981]/30"
+                : "text-[#9ca3af] hover:text-white hover:bg-white/5"
+            )}
+          >
+            <LayoutDashboard className="h-5 w-5" />
+            <span className="font-medium">Dashboard</span>
+          </div>
+        </Link>
+
+        {/* Menu Groups */}
+        {menuStructure.map(group => (
+          <div key={group.title} className="pt-3">
+            <button
+              onClick={() => toggleGroup(group.title)}
+              className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <group.icon className={cn("h-4 w-4", group.color)} />
+                <span className={group.color}>{group.title}</span>
+                {group.badge && (
+                  <span className="px-1.5 py-0.5 text-[10px] font-bold bg-[#f59e0b] text-white rounded">{group.badge}</span>
+                )}
+              </div>
+              {expandedGroups.includes(group.title) ? (
+                <ChevronDown className={cn("h-4 w-4", group.color)} />
+              ) : (
+                <ChevronRight className={cn("h-4 w-4", group.color)} />
+              )}
+            </button>
+            {expandedGroups.includes(group.title) && (
+              <div className="mt-1 space-y-1 ml-2">
+                {group.items.map(item => renderMenuItem(item))}
+              </div>
             )}
           </div>
         ))}
-      </SidebarContent>
-    </Sidebar>
+      </nav>
+
+      {/* Logout */}
+      <div className="p-3 border-t border-[#2a3a4d]">
+        <button className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-[#ef4444] hover:bg-[#ef4444]/10 transition-colors">
+          <LogOut className="h-5 w-5" />
+          <span>Logout</span>
+        </button>
+      </div>
+    </div>
   );
 }
