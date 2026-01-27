@@ -40,6 +40,7 @@ export default function AdminBranding() {
       const res = await fetch("/api/admin/settings/branding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ type: "branding", data }),
       });
       if (!res.ok) throw new Error("Failed to save");
@@ -61,6 +62,10 @@ export default function AdminBranding() {
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        toast({ title: "Error", description: "Logo must be less than 2MB", variant: "destructive" });
+        return;
+      }
       const reader = new FileReader();
       reader.onloadend = () => {
         const base64 = reader.result as string;
@@ -74,6 +79,10 @@ export default function AdminBranding() {
   const handleFaviconUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 1 * 1024 * 1024) {
+        toast({ title: "Error", description: "Favicon must be less than 1MB", variant: "destructive" });
+        return;
+      }
       const reader = new FileReader();
       reader.onloadend = () => {
         const base64 = reader.result as string;
@@ -95,201 +104,134 @@ export default function AdminBranding() {
         <button
           onClick={handleSave}
           disabled={saveMutation.isPending}
-          className="flex items-center gap-2 px-5 py-2.5 bg-[#10b981] text-white rounded-xl hover:bg-[#059669] transition-colors"
+          className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-500 text-white rounded-xl font-semibold hover:from-emerald-600 hover:to-green-600 transition-all disabled:opacity-50"
         >
-          <Save className="w-5 h-5" />
-          <span className="font-medium">{saveMutation.isPending ? "Saving..." : "Save Changes"}</span>
+          <Save className="h-5 w-5" />
+          {saveMutation.isPending ? "Saving..." : "Save Changes"}
         </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Site Identity */}
-        <div className="bg-[#1a2332] rounded-xl border border-[#2a3a4d] overflow-hidden">
-          <div className="p-5 border-b border-[#2a3a4d]">
-            <h2 className="text-lg font-semibold text-white">Site Identity</h2>
-          </div>
-          <div className="p-5 space-y-5">
+        <div className="bg-[#1a2332] rounded-xl border border-[#2a3a4d] p-6">
+          <h2 className="text-xl font-semibold text-white mb-6">Site Identity</h2>
+          <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-[#9ca3af] mb-2">Site Name</label>
+              <label className="block text-sm text-gray-400 mb-2">Site Name</label>
               <input
                 type="text"
                 value={branding.siteName}
                 onChange={(e) => setBranding({ ...branding, siteName: e.target.value })}
-                placeholder="OdelADS"
-                className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white placeholder:text-[#6b7280] focus:border-[#10b981] focus:outline-none"
+                className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-lg text-white"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-[#9ca3af] mb-2">Tagline</label>
+              <label className="block text-sm text-gray-400 mb-2">Tagline</label>
               <input
                 type="text"
                 value={branding.siteTagline}
                 onChange={(e) => setBranding({ ...branding, siteTagline: e.target.value })}
-                placeholder="ADS PRO"
-                className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white placeholder:text-[#6b7280] focus:border-[#10b981] focus:outline-none"
+                className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-lg text-white"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-[#9ca3af] mb-2">Site Description</label>
+              <label className="block text-sm text-gray-400 mb-2">Site Description</label>
               <textarea
                 value={branding.siteDescription}
                 onChange={(e) => setBranding({ ...branding, siteDescription: e.target.value })}
-                placeholder="Where Luxury and Rewards Meet"
                 rows={3}
-                className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white placeholder:text-[#6b7280] focus:border-[#10b981] focus:outline-none resize-none"
+                className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-lg text-white resize-none"
               />
             </div>
           </div>
         </div>
 
-        {/* Logo Upload */}
-        <div className="bg-[#1a2332] rounded-xl border border-[#2a3a4d] overflow-hidden">
-          <div className="p-5 border-b border-[#2a3a4d]">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[#8b5cf6]/20 flex items-center justify-center">
-                <ImageIcon className="w-5 h-5 text-[#8b5cf6]" />
-              </div>
-              <h2 className="text-lg font-semibold text-white">Logo</h2>
+        {/* Logo */}
+        <div className="bg-[#1a2332] rounded-xl border border-[#2a3a4d] p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 rounded-lg bg-purple-500/20">
+              <ImageIcon className="h-5 w-5 text-purple-400" />
             </div>
+            <h2 className="text-xl font-semibold text-white">Logo</h2>
           </div>
-          <div className="p-5">
-            <input
-              ref={logoInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleLogoUpload}
-              className="hidden"
-            />
-            
+          <div
+            onClick={() => logoInputRef.current?.click()}
+            className="border-2 border-dashed border-[#2a3a4d] rounded-xl p-8 text-center cursor-pointer hover:border-purple-500/50 transition-colors"
+          >
             {logoPreview ? (
-              <div className="relative">
-                <div className="w-full h-40 bg-[#0f1419] rounded-xl flex items-center justify-center p-4">
-                  <img src={logoPreview} alt="Logo" className="max-h-full max-w-full object-contain" />
-                </div>
+              <div className="relative inline-block">
+                <img src={logoPreview} alt="Logo" className="max-h-24 mx-auto" />
                 <button
-                  onClick={() => {
-                    setLogoPreview(null);
-                    setBranding({ ...branding, logoUrl: "" });
-                  }}
-                  className="absolute top-2 right-2 p-1.5 bg-[#ef4444] text-white rounded-lg hover:bg-[#dc2626]"
+                  onClick={(e) => { e.stopPropagation(); setLogoPreview(null); setBranding({ ...branding, logoUrl: "" }); }}
+                  className="absolute -top-2 -right-2 p-1 bg-red-500 rounded-full"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="h-4 w-4 text-white" />
                 </button>
               </div>
             ) : (
-              <button
-                onClick={() => logoInputRef.current?.click()}
-                className="w-full h-40 border-2 border-dashed border-[#2a3a4d] rounded-xl flex flex-col items-center justify-center hover:border-[#10b981] transition-colors"
-              >
-                <Upload className="w-8 h-8 text-[#6b7280] mb-2" />
-                <span className="text-[#9ca3af]">Click to upload logo</span>
-                <span className="text-xs text-[#6b7280] mt-1">PNG, JPG, SVG (max 2MB)</span>
-              </button>
+              <>
+                <Upload className="h-8 w-8 text-gray-500 mx-auto mb-2" />
+                <p className="text-gray-400">Click to upload logo</p>
+                <p className="text-gray-500 text-sm mt-1">PNG, JPG, SVG (max 2MB)</p>
+              </>
             )}
           </div>
+          <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
         </div>
+      </div>
 
-        {/* Favicon Upload */}
-        <div className="bg-[#1a2332] rounded-xl border border-[#2a3a4d] overflow-hidden">
-          <div className="p-5 border-b border-[#2a3a4d]">
-            <h2 className="text-lg font-semibold text-white">Favicon</h2>
-          </div>
-          <div className="p-5">
-            <input
-              ref={faviconInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFaviconUpload}
-              className="hidden"
-            />
-            
-            <div className="flex items-center gap-4">
-              {faviconPreview ? (
-                <div className="relative">
-                  <div className="w-16 h-16 bg-[#0f1419] rounded-xl flex items-center justify-center p-2">
-                    <img src={faviconPreview} alt="Favicon" className="max-h-full max-w-full object-contain" />
-                  </div>
-                  <button
-                    onClick={() => {
-                      setFaviconPreview(null);
-                      setBranding({ ...branding, faviconUrl: "" });
-                    }}
-                    className="absolute -top-2 -right-2 p-1 bg-[#ef4444] text-white rounded-full hover:bg-[#dc2626]"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              ) : (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Favicon */}
+        <div className="bg-[#1a2332] rounded-xl border border-[#2a3a4d] p-6">
+          <h2 className="text-xl font-semibold text-white mb-4">Favicon</h2>
+          <div
+            onClick={() => faviconInputRef.current?.click()}
+            className="border-2 border-dashed border-[#2a3a4d] rounded-xl p-6 text-center cursor-pointer hover:border-purple-500/50 transition-colors flex items-center gap-4"
+          >
+            {faviconPreview ? (
+              <div className="relative">
+                <img src={faviconPreview} alt="Favicon" className="w-16 h-16 object-contain" />
                 <button
-                  onClick={() => faviconInputRef.current?.click()}
-                  className="w-16 h-16 border-2 border-dashed border-[#2a3a4d] rounded-xl flex items-center justify-center hover:border-[#10b981] transition-colors"
+                  onClick={(e) => { e.stopPropagation(); setFaviconPreview(null); setBranding({ ...branding, faviconUrl: "" }); }}
+                  className="absolute -top-2 -right-2 p-1 bg-red-500 rounded-full"
                 >
-                  <Upload className="w-6 h-6 text-[#6b7280]" />
+                  <X className="h-3 w-3 text-white" />
                 </button>
-              )}
-              <div>
-                <p className="text-[#9ca3af] text-sm">Upload a square image (32x32 or 64x64 recommended)</p>
-                <p className="text-xs text-[#6b7280] mt-1">This appears in browser tabs</p>
               </div>
+            ) : (
+              <div className="w-16 h-16 bg-[#0f1419] rounded-lg flex items-center justify-center">
+                <Upload className="h-6 w-6 text-gray-500" />
+              </div>
+            )}
+            <div className="text-left">
+              <p className="text-gray-400">Upload a square image (32x32 or 64x64 recommended)</p>
+              <p className="text-gray-500 text-sm">This appears in browser tabs</p>
             </div>
           </div>
+          <input ref={faviconInputRef} type="file" accept="image/*" onChange={handleFaviconUpload} className="hidden" />
         </div>
 
-        {/* Footer Settings */}
-        <div className="bg-[#1a2332] rounded-xl border border-[#2a3a4d] overflow-hidden">
-          <div className="p-5 border-b border-[#2a3a4d]">
-            <h2 className="text-lg font-semibold text-white">Footer Branding</h2>
-          </div>
-          <div className="p-5 space-y-5">
+        {/* Footer */}
+        <div className="bg-[#1a2332] rounded-xl border border-[#2a3a4d] p-6">
+          <h2 className="text-xl font-semibold text-white mb-4">Footer Branding</h2>
+          <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-[#9ca3af] mb-2">Footer Text</label>
+              <label className="block text-sm text-gray-400 mb-2">Footer Text</label>
               <input
                 type="text"
                 value={branding.footerText}
                 onChange={(e) => setBranding({ ...branding, footerText: e.target.value })}
-                placeholder="© 2024 OdelAdsPro. All rights reserved."
-                className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white placeholder:text-[#6b7280] focus:border-[#10b981] focus:outline-none"
+                className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-lg text-white"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-[#9ca3af] mb-2">Copyright Year</label>
+              <label className="block text-sm text-gray-400 mb-2">Copyright Year</label>
               <input
                 type="text"
                 value={branding.copyrightYear}
                 onChange={(e) => setBranding({ ...branding, copyrightYear: e.target.value })}
-                placeholder="2024"
-                className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white placeholder:text-[#6b7280] focus:border-[#10b981] focus:outline-none"
+                className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-lg text-white"
               />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Preview */}
-      <div className="bg-[#1a2332] rounded-xl border border-[#2a3a4d] overflow-hidden">
-        <div className="p-5 border-b border-[#2a3a4d]">
-          <h2 className="text-lg font-semibold text-white">Preview</h2>
-        </div>
-        <div className="p-5">
-          <div className="bg-[#0f1419] rounded-xl p-6">
-            {/* Logo Preview */}
-            <div className="flex items-center gap-3 mb-6">
-              {logoPreview ? (
-                <img src={logoPreview} alt="Logo" className="h-10 object-contain" />
-              ) : (
-                <div className="border-2 border-white px-3 py-1">
-                  <span className="text-white text-xl font-serif tracking-wider">{branding.siteName}</span>
-                  <span className="text-white text-[10px] block -mt-1 tracking-widest">{branding.siteTagline}</span>
-                </div>
-              )}
-            </div>
-            
-            {/* Description */}
-            <p className="text-[#9ca3af] mb-6">{branding.siteDescription}</p>
-            
-            {/* Footer Preview */}
-            <div className="pt-4 border-t border-[#2a3a4d]">
-              <p className="text-[#6b7280] text-sm">{branding.footerText}</p>
             </div>
           </div>
         </div>
