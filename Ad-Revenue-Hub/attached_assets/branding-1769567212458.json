@@ -1,0 +1,133 @@
+{
+  "colorScheme": "light",
+  "fonts": [
+    {
+      "family": "system-ui",
+      "count": 78
+    },
+    {
+      "family": "sans-serif",
+      "count": 78
+    },
+    {
+      "family": "GeistSans",
+      "count": 74
+    },
+    {
+      "family": "GeistSans Fallback",
+      "count": 74
+    },
+    {
+      "family": "ui-sans-serif",
+      "count": 74
+    },
+    {
+      "family": "Apple Color Emoji",
+      "count": 74
+    },
+    {
+      "family": "Segoe UI Emoji",
+      "count": 74
+    },
+    {
+      "family": "Segoe UI Symbol",
+      "count": 74
+    },
+    {
+      "family": "Noto Color Emoji",
+      "count": 74
+    },
+    {
+      "family": "codicon",
+      "count": 8
+    }
+  ],
+  "colors": {
+    "primary": "#519ABA",
+    "accent": "#498BA7",
+    "background": "#FAFAFA",
+    "textPrimary": "#171717",
+    "link": "#498BA7"
+  },
+  "typography": {
+    "fontFamilies": {
+      "primary": "GeistSans",
+      "heading": "GeistSans"
+    },
+    "fontStacks": {
+      "body": [
+        "GeistSans",
+        "GeistSans Fallback",
+        "ui-sans-serif",
+        "system-ui",
+        "sans-serif",
+        "Apple Color Emoji",
+        "Segoe UI Emoji",
+        "Segoe UI Symbol",
+        "Noto Color Emoji"
+      ],
+      "heading": [
+        "GeistSans",
+        "GeistSans Fallback",
+        "ui-sans-serif",
+        "system-ui",
+        "sans-serif",
+        "Apple Color Emoji",
+        "Segoe UI Emoji",
+        "Segoe UI Symbol",
+        "Noto Color Emoji"
+      ],
+      "paragraph": [
+        "GeistSans",
+        "GeistSans Fallback",
+        "ui-sans-serif",
+        "system-ui",
+        "sans-serif",
+        "Apple Color Emoji",
+        "Segoe UI Emoji",
+        "Segoe UI Symbol",
+        "Noto Color Emoji"
+      ]
+    },
+    "fontSizes": {
+      "h1": "16px",
+      "h2": "14px",
+      "body": "14px"
+    }
+  },
+  "spacing": {
+    "baseUnit": 4,
+    "borderRadius": "4px"
+  },
+  "components": {},
+  "images": {
+    "logo": "File saved at: attached_assets/logo.svg",
+    "favicon": "File saved at: attached_assets/favicon.png",
+    "ogImage": "https://v0.app/chat/api/og/t/xsWGOZF9wTT"
+  },
+  "__framework_hints": [],
+  "__llm_logo_reasoning": {
+    "selectedIndex": 0,
+    "reasoning": "Logo rejected: Red flags detected (small square icon). Strong indicators: variant bonus (+8), in header, header location, visible, top-left position, small square icon (likely UI icon, heavy penalty), SVG format. Score: 69 (clear winner by 41 points)",
+    "confidence": 0.9,
+    "rejected": true
+  },
+  "__llm_button_reasoning": {
+    "primary": {
+      "index": -1,
+      "text": "N/A",
+      "reasoning": "LLM failed"
+    },
+    "secondary": {
+      "index": -1,
+      "text": "N/A",
+      "reasoning": "LLM failed"
+    },
+    "confidence": 0
+  },
+  "confidence": {
+    "buttons": 0,
+    "colors": 0,
+    "overall": 0
+  }
+}

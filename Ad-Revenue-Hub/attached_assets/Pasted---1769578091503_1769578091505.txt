@@ -1,0 +1,756 @@
+================================================================================
+================================================================================
+                    ODELADS - COMPLETE PROCESS EXPLANATION
+================================================================================
+================================================================================
+
+
+================================================================================
+                         TABLE OF CONTENTS
+================================================================================
+
+PART 1: NEW USER REGISTRATION (25000 BONUS)
+PART 2: FIRST AD CLICK (BONUS CLEARED TO 0)
+PART 3: NON-PROMOTION USER (ADMIN SETS VALUES)
+PART 4: DEPOSIT BLOCKING RULE
+PART 5: AD CLICKING PROCESS
+PART 6: PAYOUT UNLOCK (28 ADS)
+PART 7: COMPLETE USER JOURNEY
+PART 8: FIELD REFERENCE
+PART 9: NAVIGATION MENU NAMES
+
+
+================================================================================
+================================================================================
+                    PART 1: NEW USER REGISTRATION (25000 BONUS)
+================================================================================
+================================================================================
+
+
+WHAT HAPPENS WHEN NEW USER REGISTERS:
+-------------------------------------
+
+Step 1: User fills registration form
+        - Username
+        - Email
+        - Password
+        - Full Name
+        - Mobile Number
+
+Step 2: System creates user with:
+        - status = "pending"
+        - milestoneAmount = 25000 (BONUS!)
+
+Step 3: User sees message:
+        "Registration successful! Waiting for admin approval."
+
+Step 4: Admin approves user
+        - status = "active"
+        - User can now login
+
+
+WHAT CUSTOMER SEES AFTER LOGIN:
+-------------------------------
+
+┌─────────────────────────────────────────────────────────────────┐
+│                      📊 DASHBOARD                                │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  🎉 WELCOME! You received 25,000 LKR Welcome Bonus!             │
+│                                                                  │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │                                                           │   │
+│  │  Milestone Amount: 25,000 LKR  ← BONUS!                  │   │
+│  │                                                           │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│                                                                  │
+│  [🎯 Go to Ad's Hub - Start Earning!]                           │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+
+
+IMPORTANT:
+----------
+- This 25000 is DISPLAY ONLY to attract users
+- It is NOT real money
+- It will be CLEARED after first ad click
+
+
+================================================================================
+================================================================================
+                    PART 2: FIRST AD CLICK (BONUS CLEARED TO 0)
+================================================================================
+================================================================================
+
+
+WHAT HAPPENS WHEN NEW USER CLICKS FIRST AD:
+-------------------------------------------
+
+BEFORE FIRST CLICK:
+  milestoneAmount = 25,000 LKR (bonus)
+  totalAdsCompleted = 0
+
+USER CLICKS FIRST AD...
+
+AFTER FIRST CLICK:
+  milestoneAmount = 0 LKR (BONUS GONE!)
+  totalAdsCompleted = 1
+
+
+WHAT CUSTOMER SEES:
+-------------------
+
+BEFORE CLICK:
+┌─────────────────────────────────────────────────────────────────┐
+│  Milestone Amount: 25,000 LKR  🎉                               │
+└─────────────────────────────────────────────────────────────────┘
+
+AFTER FIRST CLICK:
+┌─────────────────────────────────────────────────────────────────┐
+│  Milestone Amount: 0 LKR                                        │
+│                                                                  │
+│  Your welcome bonus has been cleared.                           │
+│  Now start earning real money!                                  │
+└─────────────────────────────────────────────────────────────────┘
+
+
+CODE LOGIC:
+-----------
+IF milestoneAmount == 25000 AND totalAdsCompleted == 0:
+    milestoneAmount = 0
+    totalAdsCompleted = 1
+
+
+================================================================================
+================================================================================
+                    PART 3: NON-PROMOTION USER (ADMIN SETS VALUES)
+================================================================================
+================================================================================
+
+
+WHAT IS NON-PROMOTION USER:
+---------------------------
+A user who is NOT in special promotion mode.
+Admin manually sets their balance values.
+
+
+ADMIN SETS 3 VALUES:
+--------------------
+
+┌────────────────────┬────────────────────┬────────────────────────────────────┐
+│ ADMIN SETS         │ DATABASE FIELD     │ CUSTOMER SEES AS                   │
+├────────────────────┼────────────────────┼────────────────────────────────────┤
+│ Negative Amount    │ milestoneAmount    │ Milestone Amount (NEGATIVE)        │
+│ Example: -5000     │                    │ Shows: -5,000 LKR                  │
+├────────────────────┼────────────────────┼────────────────────────────────────┤
+│ Pending Amount     │ ongoingMilestone   │ Ongoing Milestone (LOCKED)         │
+│ Example: 10000     │                    │ Shows: 10,000 LKR                  │
+├────────────────────┼────────────────────┼────────────────────────────────────┤
+│ Commission Amount  │ milestoneReward    │ Milestone Reward (PER AD)          │
+│ Example: 100       │                    │ Shows: 100 LKR                     │
+└────────────────────┴────────────────────┴────────────────────────────────────┘
+
+
+EXAMPLE - ADMIN SETS:
+---------------------
+Admin goes to: Premium Manage → Select User → Set values:
+
+  Negative Amount: -5000
+  Pending Amount: 10000
+  Commission: 100
+
+
+WHAT CUSTOMER SEES IN DASHBOARD:
+--------------------------------
+
+┌─────────────────────────────────────────────────────────────────┐
+│                      📊 DASHBOARD                                │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌────────────────┐ │
+│  │ Milestone Amount │  │ Ongoing Milestone│  │ Milestone      │ │
+│  │                  │  │                  │  │ Reward         │ │
+│  │                  │  │                  │  │                │ │
+│  │ -5,000 LKR       │  │ 10,000 LKR       │  │ 100 LKR        │ │
+│  │                  │  │                  │  │                │ │
+│  │ ❌ NEGATIVE      │  │ 🔒 PENDING       │  │ 💰 PER AD      │ │
+│  │ (You owe this)   │  │ (Locked amount)  │  │ (Commission)   │ │
+│  └──────────────────┘  └──────────────────┘  └────────────────┘ │
+│                                                                  │
+│  ⚠️ You must deposit to start clicking ads                      │
+│                                                                  │
+│  🎯 Ad's Hub: 🔒 LOCKED                                         │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+
+
+FIELD MEANINGS:
+---------------
+
+1. MILESTONE AMOUNT (-5000):
+   - This is MAIN BALANCE
+   - Shows NEGATIVE to customer
+   - Customer must click ads to increase this
+   - Each ad click: -5000 + 100 = -4900
+   - Must reach POSITIVE to request payout
+
+2. ONGOING MILESTONE (10000):
+   - This is PENDING/LOCKED amount
+   - Customer CANNOT withdraw this
+   - Just for display - shows target
+   - Motivates customer to complete ads
+
+3. MILESTONE REWARD (100):
+   - This is COMMISSION per ad
+   - Customer earns this for each ad click
+   - Added to Milestone Amount each click
+
+
+================================================================================
+================================================================================
+                    PART 4: DEPOSIT BLOCKING RULE
+================================================================================
+================================================================================
+
+
+THE RULE:
+---------
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                              │
+│  ⚠️ IMPORTANT BLOCKING RULE:                                                │
+│                                                                              │
+│  If customer has NEGATIVE balance in Milestone Amount                       │
+│  AND has NOT deposited yet                                                  │
+│  → Customer CANNOT click ads!                                               │
+│  → 🎯 Ad's Hub is LOCKED!                                                   │
+│                                                                              │
+│  Customer must DEPOSIT FIRST to unlock ad clicking.                         │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+BLOCKING CONDITIONS:
+--------------------
+
+┌────────────────────────────────────┬───────────────────┬────────────────────┐
+│ CONDITION                          │ CAN CLICK ADS?    │ MESSAGE            │
+├────────────────────────────────────┼───────────────────┼────────────────────┤
+│ Negative balance + NO deposit      │ ❌ BLOCKED        │ "Deposit required" │
+├────────────────────────────────────┼───────────────────┼────────────────────┤
+│ Negative balance + HAS deposited   │ ✅ CAN CLICK      │ "Start earning!"   │
+├────────────────────────────────────┼───────────────────┼────────────────────┤
+│ Zero balance                       │ ✅ CAN CLICK      │ Normal mode        │
+├────────────────────────────────────┼───────────────────┼────────────────────┤
+│ Positive balance                   │ ✅ CAN CLICK      │ Normal mode        │
+└────────────────────────────────────┴───────────────────┴────────────────────┘
+
+
+WHAT CUSTOMER SEES WHEN BLOCKED:
+--------------------------------
+
+┌─────────────────────────────────────────────────────────────────┐
+│                      📊 DASHBOARD                                │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Milestone Amount: -5,000 LKR                                   │
+│  Ongoing Milestone: 10,000 LKR                                  │
+│  Milestone Reward: 100 LKR                                      │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │  ⚠️ DEPOSIT REQUIRED                                       │ │
+│  │                                                             │ │
+│  │  You must deposit to start clicking ads.                   │ │
+│  │  Contact admin to make your deposit.                       │ │
+│  │                                                             │ │
+│  │  [📞 Contact Admin]                                        │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │  🎯 Ad's Hub                                               │ │
+│  │                                                             │ │
+│  │  🔒 LOCKED - Deposit required to unlock                    │ │
+│  │                                                             │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+
+
+WHAT CUSTOMER SEES AFTER DEPOSIT:
+---------------------------------
+
+┌─────────────────────────────────────────────────────────────────┐
+│                      📊 DASHBOARD                                │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Milestone Amount: -5,000 LKR                                   │
+│  Ongoing Milestone: 10,000 LKR                                  │
+│  Milestone Reward: 100 LKR                                      │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │  ✅ DEPOSIT CONFIRMED                                      │ │
+│  │                                                             │ │
+│  │  You can now start clicking ads to earn money!             │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │  🎯 Ad's Hub                                               │ │
+│  │                                                             │ │
+│  │  ✅ UNLOCKED - Start clicking to earn!                     │ │
+│  │                                                             │ │
+│  │  [🎯 Go to Ad's Hub]                                       │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+
+
+DEPOSIT PROCESS:
+----------------
+
+1. Customer contacts admin (WhatsApp/Telegram/Phone)
+2. Customer makes payment (bank transfer)
+3. Admin confirms payment received
+4. Admin marks customer as "deposit confirmed"
+5. Customer's 🎯 Ad's Hub becomes UNLOCKED
+6. Customer can now click ads
+
+
+================================================================================
+================================================================================
+                    PART 5: AD CLICKING PROCESS
+================================================================================
+================================================================================
+
+
+AFTER DEPOSIT - CUSTOMER CLICKS ADS:
+------------------------------------
+
+Starting values:
+  Milestone Amount: -5,000 LKR
+  Milestone Reward: 100 LKR (commission per ad)
+
+
+EACH AD CLICK:
+--------------
+
+Click 1:
+  Before: -5,000 LKR
+  + Commission: 100 LKR
+  After: -5,000 + 100 = -4,900 LKR
+
+Click 2:
+  Before: -4,900 LKR
+  + Commission: 100 LKR
+  After: -4,900 + 100 = -4,800 LKR
+
+Click 3:
+  Before: -4,800 LKR
+  + Commission: 100 LKR
+  After: -4,800 + 100 = -4,700 LKR
+
+... continues ...
+
+Click 50:
+  Before: -100 LKR
+  + Commission: 100 LKR
+  After: -100 + 100 = 0 LKR  ← REACHED ZERO!
+
+Click 51:
+  Before: 0 LKR
+  + Commission: 100 LKR
+  After: 0 + 100 = +100 LKR  ← NOW POSITIVE! ✅
+
+
+CALCULATION TABLE:
+------------------
+
+┌─────────┬─────────────┬─────────────┬─────────────┬────────────────┐
+│ Click # │ Before      │ + Commission│ After       │ Status         │
+├─────────┼─────────────┼─────────────┼─────────────┼────────────────┤
+│ 1       │ -5,000      │ +100        │ -4,900      │ ❌ Negative    │
+│ 2       │ -4,900      │ +100        │ -4,800      │ ❌ Negative    │
+│ 3       │ -4,800      │ +100        │ -4,700      │ ❌ Negative    │
+│ 5       │ -4,600      │ +100        │ -4,500      │ ❌ Negative    │
+│ 10      │ -4,100      │ +100        │ -4,000      │ ❌ Negative    │
+│ 20      │ -3,100      │ +100        │ -3,000      │ ❌ Negative    │
+│ 30      │ -2,100      │ +100        │ -2,000      │ ❌ Negative    │
+│ 40      │ -1,100      │ +100        │ -1,000      │ ❌ Negative    │
+│ 49      │ -200        │ +100        │ -100        │ ❌ Negative    │
+│ 50      │ -100        │ +100        │ 0           │ ⚪ Zero        │
+│ 51      │ 0           │ +100        │ +100        │ ✅ POSITIVE!   │
+│ 52      │ +100        │ +100        │ +200        │ ✅ Positive    │
+│ 60      │ +900        │ +100        │ +1,000      │ ✅ Positive    │
+└─────────┴─────────────┴─────────────┴─────────────┴────────────────┘
+
+
+INSTANT UPDATE:
+---------------
+Balance updates INSTANTLY after each click.
+Customer sees change immediately on screen.
+No need to refresh or wait.
+
+
+================================================================================
+================================================================================
+                    PART 6: PAYOUT UNLOCK (28 ADS)
+================================================================================
+================================================================================
+
+
+PAYOUT BUTTON RULE:
+-------------------
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                              │
+│  💸 PAYOUTS BUTTON VISIBILITY:                                              │
+│                                                                              │
+│  IF totalAdsCompleted < 28  → 💸 Payouts button is HIDDEN                   │
+│  IF totalAdsCompleted >= 28 → 💸 Payouts button is VISIBLE                  │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+EXAMPLES:
+---------
+
+Ads Completed: 15  → 💸 Payouts: HIDDEN
+Ads Completed: 27  → 💸 Payouts: HIDDEN
+Ads Completed: 28  → 💸 Payouts: VISIBLE ✅
+Ads Completed: 50  → 💸 Payouts: VISIBLE ✅
+Ads Completed: 100 → 💸 Payouts: VISIBLE ✅
+
+
+WHAT CUSTOMER SEES (Before 28 ads):
+-----------------------------------
+
+┌─────────────────────────────────────────────────────────────────┐
+│                      💸 PAYOUTS                                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ⚠️ PAYOUT LOCKED                                               │
+│                                                                  │
+│  Complete 13 more ads to unlock payout.                         │
+│                                                                  │
+│  Progress: [███████████░░░░░░░░░░░░] 15/28 ads                  │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+
+
+WHAT CUSTOMER SEES (After 28 ads):
+----------------------------------
+
+┌─────────────────────────────────────────────────────────────────┐
+│                      💸 PAYOUTS                                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ✅ PAYOUT UNLOCKED                                             │
+│                                                                  │
+│  Available Balance: 1,000 LKR                                   │
+│                                                                  │
+│  [Request Payout]                                               │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+
+
+PAYOUT REQUIREMENTS:
+--------------------
+
+1. Must complete 28 ads (totalAdsCompleted >= 28)
+2. Must have POSITIVE balance (milestoneAmount > 0)
+3. Must fill bank details
+4. Admin must approve
+
+
+================================================================================
+================================================================================
+                    PART 7: COMPLETE USER JOURNEY
+================================================================================
+================================================================================
+
+
+STEP-BY-STEP FLOW:
+------------------
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                              │
+│  STEP 1: USER REGISTERS                                                      │
+│          ├── Fills registration form                                        │
+│          ├── status = "pending"                                             │
+│          └── milestoneAmount = 25,000 (BONUS)                               │
+│                                                                              │
+│                              ↓                                               │
+│                                                                              │
+│  STEP 2: ADMIN APPROVES                                                      │
+│          ├── status = "active"                                              │
+│          └── User can now login                                             │
+│                                                                              │
+│                              ↓                                               │
+│                                                                              │
+│  STEP 3: USER LOGS IN                                                        │
+│          └── Sees: Milestone Amount = 25,000 LKR (bonus)                    │
+│                                                                              │
+│                              ↓                                               │
+│                                                                              │
+│  STEP 4: USER CLICKS FIRST AD                                                │
+│          ├── milestoneAmount = 0 (BONUS CLEARED!)                           │
+│          └── totalAdsCompleted = 1                                          │
+│                                                                              │
+│                              ↓                                               │
+│                                                                              │
+│  STEP 5: ADMIN SETS VALUES (Non-Promotion)                                   │
+│          ├── milestoneAmount = -5,000 (negative)                            │
+│          │   └── Shows as: Milestone Amount: -5,000 LKR                     │
+│          ├── ongoingMilestone = 10,000 (pending)                            │
+│          │   └── Shows as: Ongoing Milestone: 10,000 LKR                    │
+│          └── milestoneReward = 100 (commission)                             │
+│              └── Shows as: Milestone Reward: 100 LKR                        │
+│                                                                              │
+│                              ↓                                               │
+│                                                                              │
+│  STEP 6: AD CLICKING IS BLOCKED                                              │
+│          ├── 🎯 Ad's Hub: LOCKED ❌                                         │
+│          └── Message: "You must deposit to continue"                        │
+│                                                                              │
+│                              ↓                                               │
+│                                                                              │
+│  STEP 7: USER DEPOSITS                                                       │
+│          ├── Contacts admin                                                 │
+│          ├── Makes payment                                                  │
+│          └── Admin confirms deposit                                         │
+│                                                                              │
+│                              ↓                                               │
+│                                                                              │
+│  STEP 8: AD CLICKING UNLOCKED                                                │
+│          ├── 🎯 Ad's Hub: UNLOCKED ✅                                       │
+│          └── Message: "You can now click ads!"                              │
+│                                                                              │
+│                              ↓                                               │
+│                                                                              │
+│  STEP 9: USER CLICKS ADS                                                     │
+│          ├── Click 1:  -5,000 + 100 = -4,900                                │
+│          ├── Click 2:  -4,900 + 100 = -4,800                                │
+│          ├── Click 3:  -4,800 + 100 = -4,700                                │
+│          ├── ...                                                            │
+│          ├── Click 50: -100 + 100 = 0                                       │
+│          └── Click 51: 0 + 100 = +100 (POSITIVE!)                           │
+│                                                                              │
+│                              ↓                                               │
+│                                                                              │
+│  STEP 10: AFTER 28 ADS                                                       │
+│           └── 💸 Payouts button APPEARS                                     │
+│                                                                              │
+│                              ↓                                               │
+│                                                                              │
+│  STEP 11: USER REQUESTS PAYOUT                                               │
+│           ├── Enters amount                                                 │
+│           ├── Enters bank details                                           │
+│           └── Submits request (status: pending)                             │
+│                                                                              │
+│                              ↓                                               │
+│                                                                              │
+│  STEP 12: ADMIN APPROVES PAYOUT                                              │
+│           ├── milestoneAmount decreases by payout amount                    │
+│           ├── Payout status = "approved"                                    │
+│           └── Admin pays user (bank transfer)                               │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+================================================================================
+                    PART 8: FIELD REFERENCE
+================================================================================
+================================================================================
+
+
+USER BALANCE FIELDS:
+--------------------
+
+┌──────────────────────┬────────────────────┬─────────────────────────────────┐
+│ DATABASE FIELD       │ DISPLAY NAME       │ PURPOSE                         │
+├──────────────────────┼────────────────────┼─────────────────────────────────┤
+│ milestoneAmount      │ Milestone Amount   │ MAIN BALANCE                    │
+│                      │                    │ - Can be NEGATIVE               │
+│                      │                    │ - Admin sets negative amount    │
+│                      │                    │ - Increases with each ad click  │
+│                      │                    │ - Decreases with payout         │
+├──────────────────────┼────────────────────┼─────────────────────────────────┤
+│ ongoingMilestone     │ Ongoing Milestone  │ PENDING/LOCKED AMOUNT           │
+│                      │                    │ - Admin sets pending amount     │
+│                      │                    │ - Display only                  │
+│                      │                    │ - Cannot be withdrawn           │
+├──────────────────────┼────────────────────┼─────────────────────────────────┤
+│ milestoneReward      │ Milestone Reward   │ COMMISSION PER AD               │
+│                      │                    │ - Admin sets commission amount  │
+│                      │                    │ - User earns this per ad click  │
+│                      │                    │ - Resets to 0 at midnight       │
+├──────────────────────┼────────────────────┼─────────────────────────────────┤
+│ destinationAmount    │ Destination Amount │ TARGET AMOUNT                   │
+│                      │                    │ - Goal to reach                 │
+│                      │                    │ - Display only                  │
+├──────────────────────┼────────────────────┼─────────────────────────────────┤
+│ totalAdsCompleted    │ Ads Completed      │ TOTAL ADS CLICKED               │
+│                      │                    │ - Lifetime count                │
+│                      │                    │ - Unlocks payout at 28          │
+├──────────────────────┼────────────────────┼─────────────────────────────────┤
+│ points               │ Points             │ REWARD POINTS                   │
+│                      │                    │ - Bonus points earned           │
+└──────────────────────┴────────────────────┴─────────────────────────────────┘
+
+
+ADMIN → CUSTOMER FIELD MAPPING:
+-------------------------------
+
+┌────────────────────────┬────────────────────────┬──────────────────────────┐
+│ ADMIN SETS             │ DATABASE FIELD         │ CUSTOMER SEES            │
+├────────────────────────┼────────────────────────┼──────────────────────────┤
+│ Negative Amount        │ milestoneAmount        │ Milestone Amount         │
+│ (e.g., -5000)          │                        │ (shows: -5,000 LKR)      │
+├────────────────────────┼────────────────────────┼──────────────────────────┤
+│ Pending Amount         │ ongoingMilestone       │ Ongoing Milestone        │
+│ (e.g., 10000)          │                        │ (shows: 10,000 LKR)      │
+├────────────────────────┼────────────────────────┼──────────────────────────┤
+│ Commission Amount      │ milestoneReward        │ Milestone Reward         │
+│ (e.g., 100)            │                        │ (shows: 100 LKR)         │
+└────────────────────────┴────────────────────────┴──────────────────────────┘
+
+
+================================================================================
+================================================================================
+                    PART 9: NAVIGATION MENU NAMES
+================================================================================
+================================================================================
+
+
+MENU NAME CHANGES:
+------------------
+
+┌────────────────────┬────────────────────────────┐
+│ OLD NAME           │ NEW NAME (Use exactly)     │
+├────────────────────┼────────────────────────────┤
+│ HOME               │ 📊 Dashboard               │
+│ FEATURES           │ 💎 Exclusives              │
+│ ADS                │ 🎯 Ad's Hub                │
+│ WITHDRAW           │ 💸 Payouts                 │
+│ POINT              │ 👑 Status                  │
+│ EVENT SPACE        │ 🎉 Events                  │
+│ CONTACT US         │ 📞 Contact                 │
+│ Logout             │ 🚪 Sign Out                │
+└────────────────────┴────────────────────────────┘
+
+
+USER NAVIGATION (Logged Out):
+-----------------------------
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  [Logo] SiteName     📊 Dashboard | 💎 Exclusives | Login | Register         │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+USER NAVIGATION (Logged In):
+----------------------------
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  [Logo] SiteName                                                             │
+│                                                                              │
+│  📊 Dashboard | 💎 Exclusives | 🎯 Ad's Hub | 💸 Payouts |                   │
+│  👑 Status | 🎉 Events | 📞 Contact | 🚪 Sign Out                            │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+URL MAPPING:
+------------
+
+┌────────────────────────┬────────────────────────┐
+│ MENU ITEM              │ URL                    │
+├────────────────────────┼────────────────────────┤
+│ 📊 Dashboard           │ / or /dashboard        │
+│ 💎 Exclusives          │ /exclusives            │
+│ 🎯 Ad's Hub            │ /ads                   │
+│ 💸 Payouts             │ /payout                │
+│ 👑 Status              │ /status                │
+│ 🎉 Events              │ /events                │
+│ 📞 Contact             │ /contact               │
+│ Register               │ /register              │
+│ Login                  │ /login                 │
+└────────────────────────┴────────────────────────┘
+
+
+================================================================================
+================================================================================
+                    SUMMARY - ALL RULES
+================================================================================
+================================================================================
+
+
+RULE 1: NEW USER BONUS
+----------------------
+- New user registers → milestoneAmount = 25,000 (bonus)
+- First ad click → milestoneAmount = 0 (bonus cleared)
+
+
+RULE 2: ADMIN SETS VALUES (NON-PROMOTION)
+-----------------------------------------
+- Negative Amount → Shows in Milestone Amount (negative)
+- Pending Amount → Shows in Ongoing Milestone (locked)
+- Commission Amount → Shows in Milestone Reward (per ad)
+
+
+RULE 3: DEPOSIT BLOCKING
+------------------------
+- Negative balance + No deposit → ❌ Cannot click ads
+- Negative balance + Has deposit → ✅ Can click ads
+
+
+RULE 4: INSTANT BALANCE UPDATE
+------------------------------
+- Each ad click → Balance updates INSTANTLY
+- No need to refresh or wait
+
+
+RULE 5: PAYOUT UNLOCK
+---------------------
+- Need 28 ads completed to see 💸 Payouts button
+- Need POSITIVE balance to request payout
+
+
+RULE 6: PAYOUT PROCESS
+----------------------
+- User requests → Admin approves → Balance deducted → User paid
+
+
+================================================================================
+================================================================================
+                    CALCULATION FORMULAS
+================================================================================
+================================================================================
+
+
+NEW USER BONUS:
+  milestoneAmount = 25000
+
+FIRST AD CLICK (bonus user):
+  milestoneAmount = 0
+
+NORMAL AD CLICK:
+  milestoneAmount = milestoneAmount + commission
+  (e.g., -5000 + 100 = -4900)
+
+PAYOUT (approved):
+  milestoneAmount = milestoneAmount - payoutAmount
+  (e.g., 5000 - 3000 = 2000)
+
+PAYOUT BUTTON VISIBLE:
+  IF totalAdsCompleted >= 28 → SHOW
+  IF totalAdsCompleted < 28 → HIDE
+
+DEPOSIT BLOCKING:
+  IF milestoneAmount < 0 AND hasDeposit == false → BLOCK
+  IF milestoneAmount < 0 AND hasDeposit == true → ALLOW
+
+
+================================================================================
+================================================================================
+                         END OF DOCUMENT
+================================================================================
+================================================================================

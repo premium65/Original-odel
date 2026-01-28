@@ -1,0 +1,455 @@
+================================================================================
+                    ODELADS - COMPLETE SYSTEM FEATURES
+================================================================================
+
+================================================================================
+PART 1: USER REGISTRATION & BONUS SYSTEM
+================================================================================
+
+NEW USER REGISTRATION:
+----------------------
+1. User fills registration form (username, email, password, mobile, full name)
+2. Status = "pending" (waiting for admin approval)
+3. Admin approves → Status = "active"
+4. User can now login
+
+BONUS SYSTEM:
+-------------
+- New registered user gets: +25000 LKR bonus in milestoneAmount
+- This is DISPLAY ONLY to attract users
+- After user clicks FIRST AD → bonus cleared → milestoneAmount = 0
+
+Example:
+  Register → milestoneAmount = 25000
+  Click 1st ad → milestoneAmount = 0 (bonus gone)
+
+
+================================================================================
+PART 2: USER BALANCE FIELDS
+================================================================================
+
+FIELD NAME              | DISPLAY NAME      | PURPOSE
+------------------------|-------------------|----------------------------------
+milestoneAmount         | Milestone Amount  | Main balance (can be NEGATIVE)
+ongoingMilestone        | Ongoing Milestone | Pending/locked amount
+milestoneReward         | Milestone Reward  | Commission per ad / daily earning
+destinationAmount       | Destination       | Target amount
+totalAdsCompleted       | Ads Completed     | Total ads clicked (unlocks payout)
+points                  | Points            | Reward points
+
+ADMIN SETS FOR NON-PROMOTION USERS:
+-----------------------------------
+- Negative amount → Shows in Milestone Amount (user "owes" this)
+- Pending amount → Shows in Ongoing Milestone (locked money)
+- Commission → Shows in Milestone Reward (earning per ad)
+
+Example:
+  Admin sets:
+    milestoneAmount = -5000 (negative balance)
+    ongoingMilestone = 10000 (pending amount)
+    milestoneReward = 100 (commission per ad)
+
+
+================================================================================
+PART 3: AD CLICK SYSTEM & EARNING CALCULATION
+================================================================================
+
+HOW USER EARNS:
+---------------
+1. User goes to Dashboard
+2. Clicks on available ad
+3. Watches/views ad content
+4. Earns commission (added to balance INSTANTLY)
+5. Balance updates in REAL-TIME after each click
+
+INSTANT UPDATE RULE:
+--------------------
+Every ad click → milestoneAmount updates IMMEDIATELY (not end of day)
+
+CALCULATION:
+------------
+  New Balance = Current Balance + Commission
+
+Example (with negative starting balance):
+  
+  Starting: milestoneAmount = -5000, commission = 100
+  
+  Click Ad 1: -5000 + 100 = -4900 ✅ (instant update)
+  Click Ad 2: -4900 + 100 = -4800 ✅ (instant update)
+  Click Ad 3: -4800 + 100 = -4700 ✅ (instant update)
+  ...
+  Click Ad 50: -500 + 100 = -400 ✅ (instant update)
+  Click Ad 51: -400 + 100 = -300 ✅ (instant update)
+  ...
+  Click Ad 55: 0 + 100 = 100 ✅ (now positive!)
+
+FIRST AD CLICK SPECIAL RULE:
+----------------------------
+- If user has 25000 bonus (new user)
+- First ad click → milestoneAmount = 0 (bonus cleared)
+- After that, normal calculation applies
+
+
+================================================================================
+PART 4: PAYOUT SYSTEM
+================================================================================
+
+PAYOUT BUTTON VISIBILITY:
+-------------------------
+- Payout button is HIDDEN until user completes 28 ads
+- After 28 ads completed → Payout button APPEARS
+
+Rule:
+  IF totalAdsCompleted >= 28 → Show Payout Button
+  IF totalAdsCompleted < 28 → Hide Payout Button
+
+Example:
+  User completed 15 ads → Payout button HIDDEN
+  User completed 28 ads → Payout button VISIBLE ✅
+  User completed 50 ads → Payout button VISIBLE ✅
+
+PAYOUT PROCESS:
+---------------
+1. User clicks Payout button (only visible after 28 ads)
+2. User enters amount to payout
+3. User enters bank details
+4. Submits payout request
+5. Status = "pending"
+6. Admin sees in Admin Panel → Payouts
+7. Admin approves or rejects
+
+ADMIN APPROVES:
+---------------
+- User's milestoneAmount DECREASES by payout amount
+- Payout status = "approved"
+- Admin pays user manually (bank transfer)
+
+ADMIN REJECTS:
+--------------
+- User's milestoneAmount stays same
+- Payout status = "rejected"
+- User sees rejection reason
+
+PAYOUT CALCULATION:
+-------------------
+  New Balance = Current Balance - Payout Amount
+
+Example:
+  Balance = 5000 LKR
+  Payout request = 3000 LKR
+  Admin approves
+  New Balance = 5000 - 3000 = 2000 LKR
+
+
+================================================================================
+PART 5: DEPOSIT SYSTEM & BLOCKING
+================================================================================
+
+DEPOSIT:
+--------
+- Admin can add money to user's milestoneAmount
+- Used for: bonus, correction, refund, etc.
+
+DEPOSIT BLOCKS AD CLICKING:
+---------------------------
+- When user has deposit in account
+- User CANNOT click ads
+- Must wait for admin approval or condition met
+
+Example:
+  User deposits 1000 LKR → Cannot click ads
+  Admin clears/approves → User can click ads again
+
+
+================================================================================
+PART 6: PROMOTION/RESTRICTION SYSTEM
+================================================================================
+
+WHAT IS PROMOTION:
+------------------
+Special earning rules set by admin for specific user
+
+ADMIN SETS:
+-----------
+- Ads Limit: Number of ads user must complete (e.g., 100)
+- Deposit: Display amount (e.g., 5000)
+- Commission: Earning per ad (e.g., 50 LKR)
+
+HOW IT WORKS:
+-------------
+1. Admin sets promotion on user
+2. User must click X number of ads
+3. Each ad = promotion commission (not normal ad price)
+4. After completing all ads → promotion ends
+5. User returns to normal mode
+
+Example:
+  Promotion: 100 ads, 50 LKR commission
+  User clicks 100 ads
+  Total earned = 100 × 50 = 5000 LKR
+  After 100 ads → promotion ends
+
+
+================================================================================
+PART 7: USER STATUS SYSTEM
+================================================================================
+
+STATUS      | CAN LOGIN? | DESCRIPTION
+------------|------------|---------------------------
+pending     | NO         | New user, waiting approval
+active      | YES        | Approved, full access
+frozen      | NO         | Suspended by admin
+
+STATUS FLOW:
+------------
+  Register → pending
+  Admin approves → active
+  Admin freezes → frozen
+  Admin unfreezes → active
+
+
+================================================================================
+PART 8: DAILY RESET SYSTEM
+================================================================================
+
+MIDNIGHT RESET (00:00):
+-----------------------
+- milestoneReward → resets to 0 (daily earnings cleared)
+- milestoneAmount → stays same (total balance unchanged)
+- totalAdsCompleted → stays same
+- All other fields → stay same
+
+
+================================================================================
+PART 9: ADMIN PANEL FEATURES
+================================================================================
+
+USER MANAGEMENT:
+----------------
+- View all users
+- Approve pending users
+- Freeze/unfreeze users
+- Delete users
+- View user details
+
+PREMIUM MANAGE (7 Options):
+---------------------------
+1. RESET      - Set any field to 0
+2. ADD VALUE  - Add amount to any field
+3. DEPOSIT    - Add money to milestoneAmount
+4. EDIT DETAILS - Change username, mobile, password
+5. EDIT BANK  - Change bank account details
+6. SET RESTRICTION - Create promotion for user
+7. REMOVE RESTRICTION - End promotion
+
+PAYOUT MANAGEMENT:
+------------------
+- View all payout requests
+- Approve payouts (deducts from user balance)
+- Reject payouts (with reason)
+
+DEPOSIT MANAGEMENT:
+-------------------
+- Add deposits to users
+- View deposit history
+
+ADS MANAGEMENT:
+---------------
+- Create new ads
+- Edit ad details
+- Set ad price (commission)
+- Delete ads
+- Enable/disable ads
+
+CMS (Content Management):
+-------------------------
+- Branding (site name, logo, tagline)
+- Theme (colors)
+- Site Images (hero backgrounds)
+- Slideshow
+- Contact info
+- Info pages (About, Terms, Privacy)
+- Content (home, dashboard text)
+
+
+================================================================================
+PART 10: COMPLETE USER JOURNEY
+================================================================================
+
+STEP 1: REGISTER
+  └─→ User fills form
+  └─→ Status = pending
+  └─→ milestoneAmount = +25000 (bonus)
+
+STEP 2: ADMIN APPROVES
+  └─→ Status = active
+  └─→ User can login
+
+STEP 3: FIRST AD CLICK
+  └─→ milestoneAmount = 0 (bonus cleared)
+  └─→ totalAdsCompleted = 1
+
+STEP 4: ADMIN SETS VALUES
+  └─→ milestoneAmount = -5000 (negative)
+  └─→ ongoingMilestone = 10000 (pending)
+  └─→ milestoneReward = 100 (commission)
+
+STEP 5: USER CLICKS ADS
+  └─→ Each click: balance + 100 (instant update)
+  └─→ Click 1: -5000 + 100 = -4900
+  └─→ Click 2: -4900 + 100 = -4800
+  └─→ ... continues ...
+
+STEP 6: 28 ADS COMPLETED
+  └─→ PAYOUT BUTTON APPEARS ✅
+  └─→ User can request payout
+
+STEP 7: BALANCE POSITIVE
+  └─→ User requests payout
+  └─→ Admin approves
+  └─→ User gets paid
+
+
+================================================================================
+PART 11: CALCULATION FORMULAS
+================================================================================
+
+NEW USER BONUS:
+  milestoneAmount = 25000
+
+FIRST AD CLICK (bonus user):
+  milestoneAmount = 0
+
+EACH AD CLICK:
+  milestoneAmount = milestoneAmount + commission
+
+PAYOUT:
+  milestoneAmount = milestoneAmount - payout_amount
+
+DEPOSIT:
+  milestoneAmount = milestoneAmount + deposit_amount
+
+RESET FIELD:
+  field = 0
+
+ADD VALUE:
+  field = field + amount
+
+PAYOUT BUTTON VISIBLE:
+  totalAdsCompleted >= 28 → SHOW
+  totalAdsCompleted < 28 → HIDE
+
+
+================================================================================
+PART 12: FIELD DISPLAY MAPPING
+================================================================================
+
+ADMIN SETS          | USER SEES IN
+--------------------|------------------
+Negative amount     | Milestone Amount
+Pending amount      | Ongoing Milestone
+Commission amount   | Milestone Reward
+
+
+================================================================================
+PART 13: PAGES & URLS
+================================================================================
+
+FRONTEND (User):
+----------------
+/               - Home page
+/register       - Registration
+/login          - Login
+/dashboard      - User dashboard
+/payout         - Payout request (visible after 28 ads)
+/wallet         - Balance & history
+/points         - Points page
+/exclusives     - 💎 Exclusives page
+
+NAVIGATION MENU:
+----------------
+Home | 💎 Exclusives | Login | Register  (logged out)
+Home | 💎 Exclusives | Dashboard | Payout  (logged in)
+
+ADMIN PANEL:
+------------
+/admin                  - Dashboard
+/admin/users            - All users
+/admin/pending          - Pending approvals
+/admin/users/:id        - User detail
+/admin/premium-manage   - Premium manage (7 options)
+/admin/admins           - Admin users
+/admin/payouts          - Payout requests
+/admin/deposits         - Deposits
+/admin/transactions     - All transactions
+/admin/ads              - Manage ads
+/admin/slideshow        - Slideshow images
+/admin/images           - Site images
+/admin/branding         - Logo & branding
+/admin/theme-settings   - Theme colors
+/admin/contact/*        - Contact settings
+/admin/info/*           - Info pages
+/admin/content/*        - Content settings
+
+
+================================================================================
+PART 14: API ENDPOINTS
+================================================================================
+
+AUTH:
+  POST /api/auth/register     - Register new user (+25000 bonus)
+  POST /api/auth/login        - Login
+  POST /api/auth/logout       - Logout
+  GET  /api/auth/me           - Current user
+
+ADS:
+  GET  /api/ads               - Get all ads
+  POST /api/ads/click         - Click ad (earn money, instant update)
+
+PAYOUT:
+  POST /api/payouts           - Request payout
+  GET  /api/payouts/my        - My payouts
+
+ADMIN:
+  GET  /api/admin/users       - All users
+  POST /api/admin/users/:id/status    - Update status
+  POST /api/admin/users/:id/deposit   - Add deposit
+  POST /api/admin/users/:id/reset     - Reset field
+  POST /api/admin/users/:id/add-value - Add value to field
+  POST /api/admin/users/:id/restrict  - Set promotion
+  POST /api/admin/users/:id/unrestrict - Remove promotion
+  GET  /api/admin/payouts     - All payouts
+  POST /api/admin/payouts/:id/approve - Approve payout
+  POST /api/admin/payouts/:id/reject  - Reject payout
+
+
+================================================================================
+PART 15: NAMING CONVENTIONS
+================================================================================
+
+OLD NAME          | NEW NAME
+------------------|------------------
+Features          | 💎 Exclusives
+/features         | /exclusives
+Withdrawal        | Payout
+/withdraw         | /payout
+Withdrawals       | Payouts
+/admin/withdrawals| /admin/payouts
+
+
+================================================================================
+SUMMARY
+================================================================================
+
+✅ New user gets 25000 bonus
+✅ 1st ad click clears bonus to 0
+✅ Admin sets negative balance + pending + commission
+✅ Each ad click updates balance INSTANTLY
+✅ Deposit blocks ad clicking
+✅ PAYOUT button shows after 28 ads completed
+✅ 💎 Exclusives page (not Features)
+✅ Admin controls everything from panel
+
+================================================================================
+                         END OF DOCUMENT
+================================================================================
