@@ -1,17 +1,22 @@
 export function isUnauthorizedError(error: Error): boolean {
-  return /^401: .*Unauthorized/.test(error.message);
+  // Covers 401 errors from our local auth APIs
+  return error.message.includes("401") || error.message.includes("Unauthorized");
 }
 
-// Redirect to login with a toast notification
-export function redirectToLogin(toast?: (options: { title: string; description: string; variant: string }) => void) {
+// Redirect to local auth page with a toast
+export function redirectToLogin(
+  toast?: (options: { title: string; description: string; variant: string }) => void
+) {
   if (toast) {
     toast({
-      title: "Unauthorized",
-      description: "You are logged out. Logging in again...",
+      title: "Session expired",
+      description: "Please log in again.",
       variant: "destructive",
     });
   }
+
   setTimeout(() => {
-    window.location.href = "/api/login";
+    // Local auth page (NOT Replit)
+    window.location.href = "/auth";
   }, 500);
 }
