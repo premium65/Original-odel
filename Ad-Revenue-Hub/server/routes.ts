@@ -12,7 +12,6 @@ export async function registerRoutes(
 ): Promise<Server> {
   // Setup Auth
   await setupAuth(app);
-  registerAuthRoutes(app);
 
   // === ADMIN LOGIN (Username/Password) ===
   app.post("/api/admin/login", async (req, res) => {
