@@ -88,6 +88,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Generate password hash endpoint
+  app.get("/api/generate-hash", async (req, res) => {
+    try {
+      const bcrypt = await import('bcrypt');
+      const password = 'admin123';
+      const saltRounds = 10;
+      
+      // Generate hash
+      const hash = await bcrypt.default.hash(password, saltRounds);
+      
+      // Test the hash
+      const isValid = await bcrypt.default.compare(password, hash);
+      
+      res.json({
+        password: password,
+        generatedHash: hash,
+        verification: isValid,
+        message: `Hash generated and verified: ${isValid}`
+      });
+      
+    } catch (error) {
+      console.error("[GENERATE_HASH] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Password test endpoint
   app.get("/api/test-password", async (req, res) => {
     try {
