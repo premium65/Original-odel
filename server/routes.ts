@@ -234,7 +234,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     const { password: _, ...userWithoutPassword } = user;
-    res.json(userWithoutPassword);
+    // Ensure isAdmin field is properly included for frontend validation
+    const userResponse = {
+      ...userWithoutPassword,
+      isAdmin: user.isAdmin || 0
+    };
+    console.log("[AUTH/ME] Returning user:", JSON.stringify(userResponse));
+    res.json(userResponse);
   });
 
   // Rating endpoints
