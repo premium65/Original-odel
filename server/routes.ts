@@ -88,6 +88,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Password test endpoint
+  app.get("/api/test-password", async (req, res) => {
+    try {
+      const bcrypt = await import('bcrypt');
+      const testPassword = 'admin123';
+      
+      // Get the admin user from database
+      const user = await storage.getUserByUsername("admin");
+      
+      if (!user) {
+        return res.json({ error: "Admin user not found" });
+      }
+      
+      console.log("[TEST_PASSWORD] User password hash:", user.password);
+      console.log("[TEST_PASSWORD] Testing password:", testPassword);
+      
+      // Test password verification
+      const isValid = await bcrypt.default.compare(testPassword, user.password);
+      
+      res.json({
+        password: testPassword,
+        hash: user.password,
+        isValid: isValid,
+        message: isValid ? "Password matches!" : "Password does not match"
+      });
+      
+    } catch (error) {
+      console.error("[TEST_PASSWORD] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Database connection test endpoint
   app.get("/api/test-db", async (req, res) => {
     try {
