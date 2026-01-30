@@ -55,7 +55,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       saveUninitialized: false,
       proxy: true, // ⭐ CRITICAL: Trust the reverse proxy for secure cookies
       cookie: {
-        secure: true, // ⭐ FIXED: Always true on Render (HTTPS)
+        secure: process.env.NODE_ENV === "production", // ⭐ FIXED: Only secure in production
         httpOnly: true,
         sameSite: "lax",
         maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
@@ -155,10 +155,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(500).json({ error: "Failed to save session" });
         }
 
-        // Return user info (without password)
+        // Return user info (without password) - ensure isAdmin field is included for admin login
         const { password: _, ...userWithoutPassword } = user;
-        console.log("Login successful, session saved, returning user:", JSON.stringify(userWithoutPassword));
-        res.json(userWithoutPassword);
+        // Ensure isAdmin field is properly included for frontend validation
+        const userResponse = {
+          ...userWithoutPassword,
+          isAdmin: user.isAdmin || 0
+        };
+        console.log("Login successful, session saved, returning user:", JSON.stringify(userResponse));
+        res.json(userResponse);
       });
 
     } catch (error) {
