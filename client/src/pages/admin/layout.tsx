@@ -36,10 +36,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
+  console.log("[ADMIN_LAYOUT] Current user data:", currentUser);
+  console.log("[ADMIN_LAYOUT] isAdmin value:", currentUser?.isAdmin);
+  console.log("[ADMIN_LAYOUT] isAdmin type:", typeof currentUser?.isAdmin);
+  console.log("[ADMIN_LAYOUT] Number(isAdmin):", Number(currentUser?.isAdmin));
+  console.log("[ADMIN_LAYOUT] Number(isAdmin) !== 1:", Number(currentUser?.isAdmin) !== 1);
+
   if (!currentUser || Number(currentUser.isAdmin) !== 1) {
     console.log("[ADMIN_LAYOUT] Access denied - redirecting to login");
     console.log("[ADMIN_LAYOUT] User exists:", !!currentUser);
     console.log("[ADMIN_LAYOUT] isAdmin check:", currentUser?.isAdmin, "!== 1");
+    console.log("[ADMIN_LAYOUT] Final check result:", Number(currentUser?.isAdmin) !== 1);
     setLocation("/login");
     return null;
   }
