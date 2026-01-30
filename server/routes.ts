@@ -240,7 +240,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const isPasswordValid = await verifyPassword(password, user.password);
+      console.log("[LOGIN] Password verification:");
+      console.log("[LOGIN] - Input password:", password);
+      console.log("[LOGIN] - Stored hash:", user.password);
+      console.log("[LOGIN] - Verification result:", isPasswordValid);
+      
       if (!isPasswordValid) {
+        console.log("[LOGIN] Password verification failed - returning 401");
         return res.status(401).json({ error: "Invalid username or password" });
       }
 
