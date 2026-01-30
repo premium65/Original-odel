@@ -15,6 +15,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     queryKey: ["/api/auth/me"],
   });
 
+  console.log("[ADMIN_LAYOUT] Current user data:", currentUser);
+  console.log("[ADMIN_LAYOUT] isAdmin value:", currentUser?.isAdmin);
+  console.log("[ADMIN_LAYOUT] isAdmin type:", typeof currentUser?.isAdmin);
+
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     toast({ title: "Logged out successfully" });
@@ -32,7 +36,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  if (!currentUser || currentUser.isAdmin !== 1) {
+  if (!currentUser || Number(currentUser.isAdmin) !== 1) {
+    console.log("[ADMIN_LAYOUT] Access denied - redirecting to login");
+    console.log("[ADMIN_LAYOUT] User exists:", !!currentUser);
+    console.log("[ADMIN_LAYOUT] isAdmin check:", currentUser?.isAdmin, "!== 1");
     setLocation("/login");
     return null;
   }
