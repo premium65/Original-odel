@@ -247,6 +247,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(userResponse);
   });
 
+  // Alias for /api/auth/me (some frontend code uses this)
+  app.get("/api/auth/user", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    let user: any = null;
+
+    // Try MongoDB first if connected
+    if (isMongoConnected()) {
+      console.log("[AUTH/USER] Using MongoDB, userId:", req.session.userId);
+      user = await mongoStorage.getUser(req.session.userId);
+    } else {
+      console.log("[AUTH/USER] Using PostgreSQL, userId:", req.session.userId);
+      const numericId = getNumericUserId(req.session.userId);
+      if (numericId) {
+        user = await storage.getUser(numericId);
+      }
+    }
+
+    if (!user) {
+      return res.status(404).send("User not found");
+    }
+
+    const { password: _, ...userWithoutPassword } = user;
+    // Ensure isAdmin field is properly included for frontend validation
+    const userResponse = {
+      ...userWithoutPassword,
+      isAdmin: user.isAdmin || 0
+    };
+    console.log("[AUTH/USER] Returning user:", JSON.stringify(userResponse));
+    res.json(userResponse);
+  });
+
   // Rating endpoints
   app.post("/api/ratings", async (req, res) => {
     try {
@@ -437,6 +471,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin endpoints
+  app.get("/api/admin/stats", async (req, res) => {
+    try {
+      const auth = await checkAdminAuth(req);
+      if (auth.error) {
+        return res.status(auth.statusCode!).send(auth.error);
+      }
+
+      let users = [];
+      let withdrawals = [];
+
+      // Try MongoDB first if connected
+      if (isMongoConnected()) {
+        console.log("[ADMIN/STATS] Using MongoDB");
+        users = await mongoStorage.getAllUsers();
+        withdrawals = await mongoStorage.getWithdrawals();
+      } else {
+        // Fall back to PostgreSQL storage
+        console.log("[ADMIN/STATS] Using PostgreSQL");
+        users = await storage.getAllUsers();
+        withdrawals = await storage.getAllWithdrawals();
+      }
+
+      const stats = {
+        totalUsers: users.length,
+        pendingUsers: users.filter(u => u.status === 'pending').length,
+        activeUsers: users.filter(u => u.status === 'active').length,
+        frozenUsers: users.filter(u => u.status === 'frozen').length,
+        totalWithdrawals: withdrawals.reduce((sum, w) => sum + parseFloat(w.amount || '0'), 0),
+        pendingWithdrawals: withdrawals.filter(w => w.status === 'pending').length,
+      };
+
+      res.json(stats);
+    } catch (error) {
+      console.error("Get stats error:", error);
+      res.status(500).send("Failed to get stats");
+    }
+  });
+
   app.get("/api/admin/users", async (req, res) => {
     try {
       const auth = await checkAdminAuth(req);
