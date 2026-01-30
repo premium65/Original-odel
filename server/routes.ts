@@ -79,6 +79,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     })
   );
 
+  // Simple health check endpoint
+  app.get("/api/health", (req, res) => {
+    res.json({ 
+      status: "OK", 
+      message: "Server is running",
+      timestamp: new Date().toISOString()
+    });
+  });
+
   // Database connection test endpoint
   app.get("/api/test-db", async (req, res) => {
     try {
