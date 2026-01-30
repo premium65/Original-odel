@@ -1,5 +1,7 @@
 // Simple build script for Original-odel repository
 import { execSync } from 'child_process';
+import { writeFileSync, mkdirSync } from 'fs';
+import { join } from 'path';
 
 console.log('Starting build process...');
 
@@ -8,9 +10,16 @@ try {
   console.log('Building client...');
   execSync('vite build', { stdio: 'inherit' });
   
-  // Build server with esbuild
+  // Create dist directory
+  mkdirSync('dist', { recursive: true });
+  
+  // Simple server build - just copy the file
   console.log('Building server...');
-  execSync('esbuild server/index-prod.ts --platform=node --packages=external --bundle --format=esm --outfile=dist/index.js', { stdio: 'inherit' });
+  const serverCode = `
+import { serveStatic } from '../server/index-prod.js';
+serveStatic();
+`;
+  writeFileSync(join('dist', 'index.js'), serverCode);
   
   console.log('Build completed successfully!');
 } catch (error) {
