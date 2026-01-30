@@ -26,6 +26,10 @@ export default function AdminLogin() {
       });
 
       const user = await response.json();
+      console.log("[ADMIN_LOGIN] Login response:", user);
+      console.log("[ADMIN_LOGIN] Response status:", response.status);
+      console.log("[ADMIN_LOGIN] isAdmin value:", user.isAdmin);
+      console.log("[ADMIN_LOGIN] isAdmin type:", typeof user.isAdmin);
 
       if (!response.ok) {
         toast({
