@@ -36,6 +36,37 @@ function getNumericUserId(sessionUserId: string | undefined): number | undefined
   return isNaN(num) ? undefined : num;
 }
 
+// Helper function to check admin authorization
+async function checkAdminAuth(req: any): Promise<{ user: any; error?: string; statusCode?: number }> {
+  if (!req.session.userId) {
+    return { user: null, error: "Not authenticated", statusCode: 401 };
+  }
+
+  let currentUser = null;
+
+  // Try MongoDB first if connected
+  if (isMongoConnected()) {
+    console.log("[ADMIN_AUTH] Using MongoDB for admin check");
+    currentUser = await mongoStorage.getUser(req.session.userId);
+  } else {
+    // Fall back to PostgreSQL storage
+    console.log("[ADMIN_AUTH] Using PostgreSQL for admin check");
+    const numericId = getNumericUserId(req.session.userId);
+    if (numericId) {
+      currentUser = await storage.getUser(numericId);
+    }
+  }
+
+  console.log("[ADMIN_AUTH] Current user:", currentUser?.username, "isAdmin:", currentUser?.isAdmin);
+
+  if (!currentUser || currentUser.isAdmin !== 1) {
+    console.log("[ADMIN_AUTH] Access denied - not admin");
+    return { user: null, error: "Admin access required", statusCode: 403 };
+  }
+
+  return { user: currentUser };
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // ⭐ CRITICAL FIX: Trust proxy for secure cookies behind Render's reverse proxy
   app.set('trust proxy', 1);
@@ -398,13 +429,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin endpoints
   app.get("/api/admin/users", async (req, res) => {
     try {
-      if (!req.session.userId) {
-        return res.status(401).send("Not authenticated");
-      }
-
-      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
-      if (!currentUser || currentUser.isAdmin !== 1) {
-        return res.status(403).send("Admin access required");
+      const auth = await checkAdminAuth(req);
+      if (auth.error) {
+        return res.status(auth.statusCode!).send(auth.error);
       }
 
       const users = await storage.getAllUsers();
@@ -425,13 +452,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/admin/users/:userId", async (req, res) => {
     try {
-      if (!req.session.userId) {
-        return res.status(401).send("Not authenticated");
-      }
-
-      const currentUser = await storage.getUser(getNumericUserId(req.session.userId)!);
-      if (!currentUser || currentUser.isAdmin !== 1) {
-        return res.status(403).send("Admin access required");
+      const auth = await checkAdminAuth(req);
+      if (auth.error) {
+        return res.status(auth.statusCode!).send(auth.error);
       }
 
       const userId = parseInt(req.params.userId);
