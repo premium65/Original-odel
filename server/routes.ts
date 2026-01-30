@@ -79,6 +79,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     })
   );
 
+  // Database connection test endpoint
+  app.get("/api/test-db", async (req, res) => {
+    try {
+      console.log("[TEST_DB] Testing database connection...");
+      
+      // Test PostgreSQL connection
+      const testUser = await storage.getUserByUsername("admin");
+      
+      if (testUser) {
+        console.log("[TEST_DB] Admin user found:", testUser.username);
+        res.json({ 
+          success: true, 
+          message: "Database connected successfully",
+          adminUser: {
+            username: testUser.username,
+            isAdmin: testUser.isAdmin,
+            status: testUser.status
+          }
+        });
+      } else {
+        console.log("[TEST_DB] Admin user NOT found");
+        res.json({ 
+          success: false, 
+          message: "Database connected but admin user not found" 
+        });
+      }
+    } catch (error) {
+      console.error("[TEST_DB] Database connection failed:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Database connection failed",
+        error: error.message 
+      });
+    }
+  });
+
   // Session middleware
   app.use(
     session({
