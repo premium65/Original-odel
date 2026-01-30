@@ -138,6 +138,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { username, password } = req.body;
+      console.log("[LOGIN] Login attempt:", { username, password: "***" });
 
       if (!username || !password) {
         return res.status(400).json({ error: "Username and password are required" });
@@ -179,6 +180,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Set session - handle both id (PostgreSQL) and _id (MongoDB), always store as string
       const userId = user.id || user._id?.toString();
       req.session.userId = String(userId);
+      console.log("[LOGIN] Session set with userId:", userId);
 
       // Explicitly save session before responding
       req.session.save((err) => {
@@ -186,6 +188,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.error("Session save error:", err);
           return res.status(500).json({ error: "Failed to save session" });
         }
+
+        console.log("[LOGIN] Session saved successfully");
 
         // Return user info (without password) - ensure isAdmin field is included for admin login
         const { password: _, ...userWithoutPassword } = user;
