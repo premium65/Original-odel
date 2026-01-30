@@ -32,7 +32,6 @@ export default function AdminPremium() {
     refetchOnWindowFocus: true,
   });
 
-  // Filter users based on search query
   const filteredUsers = users.filter(user => {
     const query = searchQuery.toLowerCase();
     return (
@@ -66,20 +65,19 @@ export default function AdminPremium() {
       return data;
     },
     onSuccess: () => {
-      // Force refetch instead of just invalidating
       queryClient.refetchQueries({ queryKey: ["/api/admin/users"] });
       setRestrictDialogOpen(false);
       setSelectedUser(null);
       toast({
         title: "Restriction Applied",
-        description: "User restriction has been set successfully. Milestone Amount has been reduced by the deposit amount.",
+        description: "User restriction has been set successfully.",
       });
     },
     onError: (error: Error) => {
       toast({
         variant: "destructive",
         title: "Restriction Failed",
-        description: error.message || "Failed to apply restriction. Please check the input values.",
+        description: error.message,
       });
     },
   });
@@ -95,19 +93,11 @@ export default function AdminPremium() {
       return response.json();
     },
     onSuccess: () => {
-      // Force refetch instead of just invalidating
       queryClient.refetchQueries({ queryKey: ["/api/admin/users"] });
-      toast({
-        title: "Reset Successful",
-        description: "Field has been reset to 0",
-      });
+      toast({ title: "Reset Successful", description: "Field has been reset to 0" });
     },
     onError: (error: Error) => {
-      toast({
-        variant: "destructive",
-        title: "Reset Failed",
-        description: error.message,
-      });
+      toast({ variant: "destructive", title: "Reset Failed", description: error.message });
     },
   });
 
@@ -122,19 +112,11 @@ export default function AdminPremium() {
       return response.json();
     },
     onSuccess: () => {
-      // Force refetch instead of just invalidating
       queryClient.refetchQueries({ queryKey: ["/api/admin/users"] });
-      toast({
-        title: "Value Added",
-        description: "Amount has been added successfully",
-      });
+      toast({ title: "Value Added", description: "Amount has been added successfully" });
     },
     onError: (error: Error) => {
-      toast({
-        variant: "destructive",
-        title: "Add Failed",
-        description: error.message,
-      });
+      toast({ variant: "destructive", title: "Add Failed", description: error.message });
     },
   });
 
@@ -157,17 +139,10 @@ export default function AdminPremium() {
       queryClient.refetchQueries({ queryKey: ["/api/admin/users"] });
       setEditUserDialogOpen(false);
       setSelectedUser(null);
-      toast({
-        title: "User Updated",
-        description: "User details have been updated successfully.",
-      });
+      toast({ title: "User Updated", description: "User details have been updated successfully." });
     },
     onError: (error: Error) => {
-      toast({
-        variant: "destructive",
-        title: "Update Failed",
-        description: error.message || "Failed to update user details.",
-      });
+      toast({ variant: "destructive", title: "Update Failed", description: error.message });
     },
   });
 
@@ -190,17 +165,10 @@ export default function AdminPremium() {
       queryClient.refetchQueries({ queryKey: ["/api/admin/users"] });
       setEditBankDialogOpen(false);
       setSelectedUser(null);
-      toast({
-        title: "Bank Details Updated",
-        description: "Bank details have been updated successfully.",
-      });
+      toast({ title: "Bank Details Updated", description: "Bank details have been updated successfully." });
     },
     onError: (error: Error) => {
-      toast({
-        variant: "destructive",
-        title: "Update Failed",
-        description: error.message || "Failed to update bank details.",
-      });
+      toast({ variant: "destructive", title: "Update Failed", description: error.message });
     },
   });
 
@@ -210,7 +178,6 @@ export default function AdminPremium() {
 
     setSelectedUser(user);
     
-    // Check if user already has a restriction - if yes, open in EDIT mode
     if ((user as any).restrictionAdsLimit !== null && (user as any).restrictionAdsLimit !== undefined) {
       setDialogMode("edit");
     } else {
@@ -222,10 +189,7 @@ export default function AdminPremium() {
 
   const handleRestrictionSubmit = (data: { adsLimit: number; deposit: string; commission: string; pendingAmount: string }) => {
     if (!selectedUser) return;
-    setRestrictionMutation.mutate({
-      userId: selectedUser.id,
-      ...data,
-    });
+    setRestrictionMutation.mutate({ userId: selectedUser.id, ...data });
   };
 
   const handleReset = (userId: number, field: string) => {
@@ -257,11 +221,7 @@ export default function AdminPremium() {
   const handleAddValueSubmit = (amount: string) => {
     if (!selectedUser || !addValueField) return;
     
-    addValueMutation.mutate({ 
-      userId: selectedUser.id, 
-      field: addValueField, 
-      amount 
-    });
+    addValueMutation.mutate({ userId: selectedUser.id, field: addValueField, amount });
     
     setAddValueDialogOpen(false);
     setSelectedUser(null);
@@ -322,7 +282,7 @@ export default function AdminPremium() {
           </div>
         </div>
         <p className="text-sm text-muted-foreground">
-          Hello, did you check the List of Premium Packages? 📦
+          Hello, did you check the List of Premium Packages?
         </p>
       </div>
 
@@ -372,7 +332,7 @@ export default function AdminPremium() {
                       <td className="px-3 py-3 text-sm">
                         <div className="flex items-center gap-1">
                           <Phone className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-xs">{user.id}1892</span>
+                          <span className="text-xs">{user.mobileNumber || 'N/A'}</span>
                         </div>
                       </td>
                       <td className="px-3 py-3">
@@ -474,7 +434,7 @@ export default function AdminPremium() {
         </CardContent>
       </Card>
 
-      {/* Promotion Dialog (Create/Edit) */}
+      {/* Promotion Dialog */}
       <RestrictUserDialog
         open={restrictDialogOpen}
         onOpenChange={setRestrictDialogOpen}

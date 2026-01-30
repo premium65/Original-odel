@@ -1,153 +1,306 @@
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Calendar, DollarSign, TrendingDown, TrendingUp } from "lucide-react";
+import { Link } from "wouter";
+import { 
+  Users, 
+  Eye, 
+  DollarSign, 
+  Wallet, 
+  PiggyBank, 
+  UserCheck,
+  Clock,
+  TrendingUp,
+  ArrowRight,
+  AlertCircle
+} from "lucide-react";
 import type { User, Withdrawal } from "@shared/schema";
 
-interface DashboardStats {
-  totalUsers: number;
-  totalBookings: number;
-  totalCommission: string;
-  totalWithdraw: string;
-  totalDeposit: string;
-}
+// Format currency in Indian Rupees
+const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    minimumFractionDigits: 2,
+  }).format(amount).replace('₹', '₹');
+};
 
 export default function AdminDashboard() {
-  const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
+  // Fetch all users
+  const { data: users = [] } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
   });
 
-  const { data: withdrawals = [], isLoading: withdrawalsLoading } = useQuery<Withdrawal[]>({
+  // Fetch withdrawals
+  const { data: withdrawals = [] } = useQuery<Withdrawal[]>({
     queryKey: ["/api/admin/withdrawals"],
   });
 
-  const stats: DashboardStats = {
-    totalUsers: users.length,
-    totalBookings: 0,
-    totalCommission: users.reduce((sum, user) => sum + parseFloat(user.milestoneReward), 0).toFixed(2),
-    totalWithdraw: withdrawals
-      .filter(w => w.status === 'approved')
-      .reduce((sum, w) => sum + parseFloat(w.amount), 0)
-      .toFixed(2),
-    totalDeposit: users.reduce((sum, user) => sum + parseFloat(user.milestoneAmount), 0).toFixed(2),
-  };
+  // Calculate statistics
+  const totalUsers = users.length;
+  const activeUsers = users.filter(u => u.status === "active").length;
+  const pendingUsers = users.filter(u => u.status === "pending").length;
+  
+  const totalDeposit = users.reduce((sum, user) => sum + (user.balance || 0), 0);
+  const totalCommission = users.reduce((sum, user) => sum + (user.lifetimeEarnings || 0), 0);
+  const totalAdsViewed = users.reduce((sum, user) => sum + (user.totalAdsWatched || 0), 0);
+  
+  const pendingWithdrawals = withdrawals.filter(w => w.status === "pending");
+  const totalWithdrawn = withdrawals
+    .filter(w => w.status === "approved")
+    .reduce((sum, w) => sum + w.amount, 0);
 
-  const isLoading = usersLoading || withdrawalsLoading;
+  // Get recent users (last 5)
+  const recentUsers = [...users]
+    .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+    .slice(0, 5);
 
-  const statCards = [
-    { title: "TOTAL USERS", value: stats.totalUsers.toString(), icon: Users, color: "from-blue-500 to-blue-600" },
-    { title: "TOTAL BOOKING", value: stats.totalBookings.toString(), icon: Calendar, color: "from-purple-500 to-purple-600" },
-    { title: "TOTAL COMMISSION", value: parseFloat(stats.totalCommission).toLocaleString('en-IN', { minimumFractionDigits: 2 }), icon: DollarSign, color: "from-amber-500 to-orange-600" },
-    { title: "TOTAL WITHDRAW", value: parseFloat(stats.totalWithdraw).toLocaleString('en-IN', { minimumFractionDigits: 2 }), icon: TrendingDown, color: "from-red-500 to-red-600" },
-    { title: "TOTAL DEPOSIT", value: parseFloat(stats.totalDeposit).toLocaleString('en-IN', { minimumFractionDigits: 2 }), icon: TrendingUp, color: "from-green-500 to-green-600" },
-  ];
-
-  const pendingUsers = users.filter(u => u.status === 'pending').slice(0, 4);
-  const pendingWithdrawals = withdrawals.filter(w => w.status === 'pending').slice(0, 4);
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <p className="text-muted-foreground">Loading dashboard...</p>
-      </div>
-    );
-  }
+  // Get current date
+  const currentDate = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold" style={{ color: '#B8936B' }}>Dashboard</h1>
-        <p className="text-muted-foreground">Hello, welcome to HolidayInn!</p>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-        {statCards.map((stat, index) => (
-          <Card key={index} className="bg-card border">
-            <CardContent className="p-6">
-              <div className="flex flex-col items-center text-center space-y-2">
-                <div className={`p-3 rounded-full bg-gradient-to-br ${stat.color}`}>
-                  <stat.icon className="h-6 w-6 text-white" />
-                </div>
-                <div className="text-3xl font-bold" style={{ color: '#B8936B' }}>{stat.value}</div>
-                <p className="text-sm text-muted-foreground uppercase tracking-wide">{stat.title}</p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <div>
-        <h2 className="text-xl font-semibold mb-4" style={{ color: '#B8936B' }}>High Priority Assignments</h2>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {pendingUsers.map((user) => (
-            <Card key={`user-${user.id}`} className="bg-amber-50 dark:bg-amber-950/20">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardDescription className="text-xs">{new Date(user.registeredAt).toLocaleDateString()}</CardDescription>
-                  <Users className="h-4 w-4 text-amber-600" />
-                </div>
-                <CardTitle className="text-base">User Approval Required</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground line-clamp-3">
-                  New user <strong>{user.fullName}</strong> (@{user.username}) is waiting for account approval.
-                </p>
-              </CardContent>
-            </Card>
-          ))}
-          {pendingUsers.length === 0 && pendingWithdrawals.length === 0 && (
-            <Card className="bg-green-50 dark:bg-green-950/20">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">All Clear!</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">No pending approvals required.</p>
-              </CardContent>
-            </Card>
-          )}
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-white">Dashboard</h1>
+          <p className="text-[#9ca3af] mt-1">Welcome back! Here's what's happening today.</p>
+        </div>
+        <div className="text-right">
+          <p className="text-[#6b7280] text-sm">Last updated</p>
+          <p className="text-white font-medium">{currentDate}</p>
         </div>
       </div>
 
-      <div>
-        <h2 className="text-xl font-semibold mb-4" style={{ color: '#B8936B' }}>Recent Users</h2>
-        <Card>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-muted/50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">User</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Email</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Status</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Registered</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Commission</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {users.slice(0, 5).map((user) => (
-                    <tr key={user.id} className="hover:bg-muted/50">
-                      <td className="px-4 py-3">
-                        <div>
-                          <p className="font-medium">{user.fullName}</p>
-                          <p className="text-sm text-muted-foreground">@{user.username}</p>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-sm">{user.email}</td>
-                      <td className="px-4 py-3">
-                        <span className={`px-2 py-1 rounded-full text-xs ${
-                          user.status === 'active' ? 'bg-green-100 text-green-700' :
-                          user.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                          'bg-red-100 text-red-700'
-                        }`}>{user.status}</span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{new Date(user.registeredAt).toLocaleDateString()}</td>
-                      <td className="px-4 py-3 text-sm font-medium">₹ {parseFloat(user.milestoneReward).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+      {/* Stats Cards - Row 1 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* Total Users */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0ea5e9] to-[#0284c7] p-6">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-white/80 text-sm font-medium uppercase tracking-wider">Total Users</p>
+              <h3 className="text-4xl font-bold text-white mt-2">{totalUsers}</h3>
+              <p className="text-white/70 text-sm mt-2">
+                {activeUsers} active, {pendingUsers} pending
+              </p>
+              <p className="text-white/60 text-xs mt-1 flex items-center gap-1">
+                <TrendingUp className="w-3 h-3" /> 12% from last week
+              </p>
             </div>
-          </CardContent>
-        </Card>
+            <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+              <Users className="w-6 h-6 text-white" />
+            </div>
+          </div>
+          <div className="absolute -bottom-4 -right-4 w-24 h-24 rounded-full bg-white/10"></div>
+        </div>
+
+        {/* Total Ads Viewed */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#8b5cf6] to-[#7c3aed] p-6">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-white/80 text-sm font-medium uppercase tracking-wider">Total Ads Viewed</p>
+              <h3 className="text-4xl font-bold text-white mt-2">{totalAdsViewed.toLocaleString()}</h3>
+              <p className="text-white/70 text-sm mt-2">All time clicks</p>
+              <p className="text-white/60 text-xs mt-1 flex items-center gap-1">
+                <TrendingUp className="w-3 h-3" /> 8% from last week
+              </p>
+            </div>
+            <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+              <Eye className="w-6 h-6 text-white" />
+            </div>
+          </div>
+          <div className="absolute -bottom-4 -right-4 w-24 h-24 rounded-full bg-white/10"></div>
+        </div>
+
+        {/* Total Commission */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#10b981] to-[#059669] p-6">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-white/80 text-sm font-medium uppercase tracking-wider">Total Commission</p>
+              <h3 className="text-4xl font-bold text-white mt-2">{formatCurrency(totalCommission)}</h3>
+              <p className="text-white/70 text-sm mt-2">Earnings distributed</p>
+              <p className="text-white/60 text-xs mt-1 flex items-center gap-1">
+                <TrendingUp className="w-3 h-3" /> 23% from last week
+              </p>
+            </div>
+            <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+              <DollarSign className="w-6 h-6 text-white" />
+            </div>
+          </div>
+          <div className="absolute -bottom-4 -right-4 w-24 h-24 rounded-full bg-white/10"></div>
+        </div>
+      </div>
+
+      {/* Stats Cards - Row 2 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* Total Withdraw */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#f59e0b] to-[#d97706] p-6">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-white/80 text-sm font-medium uppercase tracking-wider">Total Withdraw</p>
+              <h3 className="text-4xl font-bold text-white mt-2">{formatCurrency(totalWithdrawn)}</h3>
+              <p className="text-white/70 text-sm mt-2">
+                {formatCurrency(pendingWithdrawals.reduce((s, w) => s + w.amount, 0))} pending
+              </p>
+            </div>
+            <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+              <Wallet className="w-6 h-6 text-white" />
+            </div>
+          </div>
+          <div className="absolute -bottom-4 -right-4 w-24 h-24 rounded-full bg-white/10"></div>
+        </div>
+
+        {/* Total Deposit */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#06b6d4] to-[#0891b2] p-6">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-white/80 text-sm font-medium uppercase tracking-wider">Total Deposit</p>
+              <h3 className="text-4xl font-bold text-white mt-2">{formatCurrency(totalDeposit)}</h3>
+              <p className="text-white/70 text-sm mt-2">User balances</p>
+            </div>
+            <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+              <PiggyBank className="w-6 h-6 text-white" />
+            </div>
+          </div>
+          <div className="absolute -bottom-4 -right-4 w-24 h-24 rounded-full bg-white/10"></div>
+        </div>
+
+        {/* Active Users */}
+        <div className="relative overflow-hidden rounded-2xl bg-[#1e293b] border border-[#334155] p-6">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-[#9ca3af] text-sm font-medium uppercase tracking-wider">Active Users</p>
+              <h3 className="text-4xl font-bold text-white mt-2">{activeUsers}</h3>
+              <p className="text-[#6b7280] text-sm mt-2">
+                {totalUsers > 0 ? Math.round((activeUsers / totalUsers) * 100) : 0}% of total
+              </p>
+            </div>
+            <div className="w-12 h-12 rounded-xl bg-[#0f172a] flex items-center justify-center">
+              <UserCheck className="w-6 h-6 text-[#10b981]" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* High Priority Actions */}
+        <div className="bg-[#1a2332] rounded-2xl border border-[#2a3a4d] overflow-hidden">
+          <div className="flex items-center justify-between p-5 border-b border-[#2a3a4d]">
+            <div className="flex items-center gap-3">
+              <Clock className="w-5 h-5 text-[#f59e0b]" />
+              <h2 className="text-lg font-semibold text-white">High Priority Actions</h2>
+            </div>
+            <span className="px-3 py-1 text-xs font-semibold bg-[#f59e0b]/20 text-[#f59e0b] rounded-full">
+              {pendingUsers + pendingWithdrawals.length} pending
+            </span>
+          </div>
+          <div className="p-4 space-y-3">
+            {pendingUsers > 0 && (
+              <Link href="/admin/pending">
+                <div className="flex items-center justify-between p-4 bg-[#0f1419] rounded-xl hover:bg-[#0f1419]/80 transition-colors cursor-pointer group">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-[#8b5cf6]/20 flex items-center justify-center">
+                      <Users className="w-5 h-5 text-[#8b5cf6]" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-white">{pendingUsers} Pending Users</p>
+                      <p className="text-sm text-[#6b7280]">Awaiting approval</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-[#10b981] group-hover:translate-x-1 transition-transform">
+                    <span className="text-sm font-medium">Review</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </div>
+                </div>
+              </Link>
+            )}
+            
+            {pendingWithdrawals.length > 0 && (
+              <Link href="/admin/withdrawals">
+                <div className="flex items-center justify-between p-4 bg-[#0f1419] rounded-xl hover:bg-[#0f1419]/80 transition-colors cursor-pointer group">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-[#f59e0b]/20 flex items-center justify-center">
+                      <Wallet className="w-5 h-5 text-[#f59e0b]" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-white">{pendingWithdrawals.length} Withdrawal Requests</p>
+                      <p className="text-sm text-[#6b7280]">Needs processing</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-[#10b981] group-hover:translate-x-1 transition-transform">
+                    <span className="text-sm font-medium">Review</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </div>
+                </div>
+              </Link>
+            )}
+
+            {pendingUsers === 0 && pendingWithdrawals.length === 0 && (
+              <div className="flex items-center justify-center p-8 text-center">
+                <div>
+                  <div className="w-12 h-12 rounded-full bg-[#10b981]/20 flex items-center justify-center mx-auto mb-3">
+                    <UserCheck className="w-6 h-6 text-[#10b981]" />
+                  </div>
+                  <p className="font-medium text-white">All Clear!</p>
+                  <p className="text-sm text-[#6b7280]">No pending approvals required.</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Recent Users */}
+        <div className="bg-[#1a2332] rounded-2xl border border-[#2a3a4d] overflow-hidden">
+          <div className="flex items-center justify-between p-5 border-b border-[#2a3a4d]">
+            <div className="flex items-center gap-3">
+              <Users className="w-5 h-5 text-[#8b5cf6]" />
+              <h2 className="text-lg font-semibold text-white">Recent Users</h2>
+            </div>
+            <Link href="/admin/users">
+              <span className="text-sm text-[#10b981] hover:underline cursor-pointer">View all</span>
+            </Link>
+          </div>
+          <div className="p-4 space-y-3">
+            {recentUsers.length > 0 ? (
+              recentUsers.map(user => (
+                <div key={user.id} className="flex items-center justify-between p-3 bg-[#0f1419] rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#8b5cf6] to-[#6366f1] flex items-center justify-center text-white font-bold">
+                      {user.fullName?.charAt(0).toUpperCase() || user.username.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="font-medium text-white">{user.fullName || user.username}</p>
+                      <p className="text-sm text-[#6b7280]">@{user.username}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${
+                      user.status === 'active' 
+                        ? 'bg-[#10b981]/20 text-[#10b981]' 
+                        : user.status === 'pending'
+                        ? 'bg-[#f59e0b]/20 text-[#f59e0b]'
+                        : 'bg-[#ef4444]/20 text-[#ef4444]'
+                    }`}>
+                      {user.status}
+                    </span>
+                    <p className="text-sm text-[#10b981] mt-1">{formatCurrency(user.balance || 0)}</p>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="flex items-center justify-center p-8 text-center">
+                <div>
+                  <AlertCircle className="w-8 h-8 text-[#6b7280] mx-auto mb-2" />
+                  <p className="text-[#6b7280]">No users yet</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

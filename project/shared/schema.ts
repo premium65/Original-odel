@@ -80,6 +80,31 @@ export const withdrawals = pgTable("withdrawals", {
   bankBranch: varchar("bank_branch", { length: 100 }),
 });
 
+// =============================================
+// CMS TABLES - Site Settings & Slideshow
+// =============================================
+
+// Site Settings Table
+export const siteSettings = pgTable("site_settings", {
+  id: serial("id").primaryKey(),
+  category: varchar("category", { length: 50 }).notNull(),
+  settingKey: varchar("setting_key", { length: 100 }).notNull(),
+  settingValue: text("setting_value"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Slideshow Images Table
+export const slideshowImages = pgTable("slideshow_images", {
+  id: serial("id").primaryKey(),
+  title: varchar("title", { length: 200 }),
+  imageUrl: text("image_url").notNull(),
+  linkUrl: text("link_url"),
+  displayOrder: integer("display_order").default(0),
+  isActive: integer("is_active").default(1),
+  page: varchar("page", { length: 50 }).default("home"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   ratings: many(ratings),
@@ -161,3 +186,5 @@ export type InsertAd = z.infer<typeof insertAdSchema>;
 export type InsertAdClick = z.infer<typeof insertAdClickSchema>;
 export type Withdrawal = typeof withdrawals.$inferSelect;
 export type InsertWithdrawal = z.infer<typeof insertWithdrawalSchema>;
+export type SiteSetting = typeof siteSettings.$inferSelect;
+export type SlideshowImage = typeof slideshowImages.$inferSelect;
