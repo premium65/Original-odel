@@ -88,43 +88,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  // Missing endpoints for new frontend
-  app.get("/api/ads", async (req, res) => {
-    try {
-      // Return empty ads array for now
-      res.json([]);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch ads" });
-    }
-  });
-
-  app.get("/api/withdrawals", async (req, res) => {
-    try {
-      // Return empty withdrawals array for now
-      res.json([]);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch withdrawals" });
-    }
-  });
-
-  app.get("/api/ratings/my", async (req, res) => {
-    try {
-      // Return empty ratings array for now
-      res.json([]);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch ratings" });
-    }
-  });
-
-  app.get("/api/deposits", async (req, res) => {
-    try {
-      // Return empty deposits array for now
-      res.json([]);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch deposits" });
-    }
-  });
-
   // Simple session test endpoint
   app.get("/api/test-session", (req, res) => {
     console.log("[TEST-SESSION] Session:", req.session);
@@ -251,27 +214,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[ADMIN/SESSION] Error:", error);
       return res.json({ isLoggedIn: false });
-    }
-  });
-
-  // Registration endpoint
-  app.post("/api/auth/register", async (req, res) => {
-    try {
-      const { username, email, password, firstName, lastName } = req.body;
-      
-      if (!username || !email || !password) {
-        return res.status(400).json({ error: "Username, email, and password are required" });
-      }
-
-      // For now, just return a success response
-      // In production, you'd create the user in the database
-      res.json({
-        message: "Registration successful! Your account is pending admin approval.",
-        status: "pending"
-      });
-    } catch (error) {
-      console.error("[REGISTER] Error:", error);
-      res.status(500).json({ error: "Registration failed" });
     }
   });
 
