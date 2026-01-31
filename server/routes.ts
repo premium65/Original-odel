@@ -595,40 +595,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(userResponse);
   });
 
-  // Alias for /api/auth/me (some frontend code uses this)
-  app.get("/api/auth/user", async (req, res) => {
-    if (!req.session.userId) {
-      return res.status(401).send("Not authenticated");
-    }
-
-    let user: any = null;
-
-    // Try MongoDB first if connected
-    if (isMongoConnected()) {
-      console.log("[AUTH/USER] Using MongoDB, userId:", req.session.userId);
-      user = await mongoStorage.getUser(req.session.userId);
-    } else {
-      console.log("[AUTH/USER] Using PostgreSQL, userId:", req.session.userId);
-      const numericId = getNumericUserId(req.session.userId);
-      if (numericId) {
-        user = await storage.getUser(numericId);
-      }
-    }
-
-    if (!user) {
-      return res.status(404).send("User not found");
-    }
-
-    const { password: _, ...userWithoutPassword } = user;
-    // Ensure isAdmin field is properly included for frontend validation
-    const userResponse = {
-      ...userWithoutPassword,
-      isAdmin: user.isAdmin || 0
-    };
-    console.log("[AUTH/USER] Returning user:", JSON.stringify(userResponse));
-    res.json(userResponse);
-  });
-
   // Rating endpoints
   app.post("/api/ratings", async (req, res) => {
     try {
