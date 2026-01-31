@@ -125,6 +125,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Simple session test endpoint
+  app.get("/api/test-session", (req, res) => {
+    console.log("[TEST-SESSION] Session:", req.session);
+    console.log("[TEST-SESSION] Session ID:", req.sessionID);
+    console.log("[TEST-SESSION] Session userId:", req.session?.userId);
+    res.json({
+      sessionId: req.sessionID,
+      userId: req.session?.userId,
+      session: req.session
+    });
+  });
+
   // Additional missing endpoints for new frontend
   app.get("/api/auth/user", (req, res) => {
     try {
@@ -382,7 +394,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       saveUninitialized: false,
       proxy: true, // ⭐ CRITICAL: Trust the reverse proxy for secure cookies
       cookie: {
-        secure: process.env.NODE_ENV === "production", // ⭐ FIXED: Only secure in production
+        secure: false, // ⭐ FIXED: Set to false for now to test
         httpOnly: true,
         sameSite: "lax",
         maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
