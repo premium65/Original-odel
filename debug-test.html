@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Test</title>
+</head>
+<body>
+    <h1>API Debug Test</h1>
+    
+    <h2>Test Admin Login</h2>
+    <button onclick="testLogin()">Test Login API</button>
+    <div id="loginResult"></div>
+    
+    <h2>Test Admin Session</h2>
+    <button onclick="testSession()">Test Session API</button>
+    <div id="sessionResult"></div>
+    
+    <h2>Test Registration</h2>
+    <button onclick="testRegister()">Test Register API</button>
+    <div id="registerResult"></div>
+
+    <script>
+        async function testLogin() {
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ username: 'admin', password: 'admin123' })
+                });
+                const data = await response.json();
+                document.getElementById('loginResult').innerHTML = `
+                    <h4>Response Status: ${response.status}</h4>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                document.getElementById('loginResult').innerHTML = `
+                    <h4>Error:</h4>
+                    <pre>${error.message}</pre>
+                `;
+            }
+        }
+        
+        async function testSession() {
+            try {
+                const response = await fetch('/api/admin/session', {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                document.getElementById('sessionResult').innerHTML = `
+                    <h4>Response Status: ${response.status}</h4>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                document.getElementById('sessionResult').innerHTML = `
+                    <h4>Error:</h4>
+                    <pre>${error.message}</pre>
+                `;
+            }
+        }
+        
+        async function testRegister() {
+            try {
+                const response = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: 'testuser', email: 'test@example.com', password: 'test123' })
+                });
+                const data = await response.json();
+                document.getElementById('registerResult').innerHTML = `
+                    <h4>Response Status: ${response.status}</h4>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                document.getElementById('registerResult').innerHTML = `
+                    <h4>Error:</h4>
+                    <pre>${error.message}</pre>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>
