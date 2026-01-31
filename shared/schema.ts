@@ -1,163 +1,143 @@
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, serial, numeric } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { pgTable, text, serial, integer, boolean, timestamp, decimal, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { users } from "./models/auth";
 
-// Users table with approval status
-export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  username: varchar("username", { length: 50 }).notNull().unique(),
-  email: varchar("email", { length: 255 }).notNull().unique(),
-  password: text("password").notNull(),
-  fullName: varchar("full_name", { length: 100 }).notNull(),
-  mobileNumber: varchar("mobile_number", { length: 20 }),
-  status: varchar("status", { length: 20 }).notNull().default("pending"), // pending, active, frozen
-  registeredAt: timestamp("registered_at").notNull().defaultNow(),
-  isAdmin: integer("is_admin").notNull().default(0), // 0 = regular user, 1 = admin
-  // Bank details
-  bankName: varchar("bank_name", { length: 100 }),
-  accountNumber: varchar("account_number", { length: 50 }),
-  accountHolderName: varchar("account_holder_name", { length: 100 }),
-  branchName: varchar("branch_name", { length: 100 }),
-  // Financial tracking
-  destinationAmount: numeric("destination_amount", { precision: 10, scale: 2 }).notNull().default("25000.00"), // Registration bonus (becomes 0 after first ad)
-  milestoneAmount: numeric("milestone_amount", { precision: 10, scale: 2 }).notNull().default("0.00"), // Current withdrawable balance
-  milestoneReward: numeric("milestone_reward", { precision: 10, scale: 2 }).notNull().default("0.00"), // Total ad earnings
-  totalAdsCompleted: integer("total_ads_completed").notNull().default(0), // Total number of ads completed
-  // Restriction fields
-  restrictionAdsLimit: integer("restriction_ads_limit"), // Max ads allowed (e.g., 12)
-  restrictionDeposit: numeric("restriction_deposit", { precision: 10, scale: 2 }), // Deposit amount (e.g., 5000)
-  restrictionCommission: numeric("restriction_commission", { precision: 10, scale: 2 }), // Commission during restriction
-  ongoingMilestone: numeric("ongoing_milestone", { precision: 10, scale: 2 }).notNull().default("0.00"), // Pending amount during restriction
-  restrictedAdsCompleted: integer("restricted_ads_completed").notNull().default(0), // Count of ads completed under current restriction
-  points: integer("points").notNull().default(100), // User points (modifiable by admin)
-});
+export * from "./models/auth";
 
-// Ratings table
-export const ratings = pgTable("ratings", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id),
-  targetUsername: varchar("target_username", { length: 50 }).notNull(),
-  rating: integer("rating").notNull(), // 1-5 stars
-  comment: text("comment"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
-
-// Ads table
+// === ADS TABLE ===
 export const ads = pgTable("ads", {
   id: serial("id").primaryKey(),
-  adCode: varchar("ad_code", { length: 20 }).notNull().unique(), // AD-0001, AD-0002, etc
-  duration: integer("duration").notNull().default(10), // seconds
-  price: numeric("price", { precision: 10, scale: 2 }).notNull().default("101.75"), // reward per click in LKR
-  link: text("link").notNull(),
-  imageUrl: text("image_url"), // path to product image
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  imageUrl: text("image_url").notNull(),
+  targetUrl: text("target_url").notNull(),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Ad Clicks tracking
-export const adClicks = pgTable("ad_clicks", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id),
-  adId: integer("ad_id").notNull().references(() => ads.id),
-  clickedAt: timestamp("clicked_at").notNull().defaultNow(),
-});
-
-// Withdrawals table
+// === WITHDRAWALS TABLE ===
 export const withdrawals = pgTable("withdrawals", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id),
-  amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
-  status: varchar("status", { length: 20 }).notNull().default("pending"), // pending, approved, rejected
-  requestedAt: timestamp("requested_at").notNull().defaultNow(),
-  processedAt: timestamp("processed_at"),
-  processedBy: integer("processed_by").references(() => users.id), // admin who processed
-  notes: text("notes"), // admin notes
-  // Bank details for withdrawal
-  bankFullName: varchar("bank_full_name", { length: 100 }),
-  bankAccountNumber: varchar("bank_account_number", { length: 50 }),
-  bankName: varchar("bank_name", { length: 100 }),
-  bankBranch: varchar("bank_branch", { length: 100 }),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  method: text("method").notNull(), // Bank Transfer, etc.
+  accountDetails: text("account_details").notNull(),
+  status: text("status").default("pending"), // pending, approved, rejected
+  reason: text("reason"), // rejection reason
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Relations
-export const usersRelations = relations(users, ({ many }) => ({
-  ratings: many(ratings),
-  adClicks: many(adClicks),
-  withdrawals: many(withdrawals),
-}));
-
-export const ratingsRelations = relations(ratings, ({ one }) => ({
-  user: one(users, {
-    fields: [ratings.userId],
-    references: [users.id],
-  }),
-}));
-
-export const adClicksRelations = relations(adClicks, ({ one }) => ({
-  user: one(users, {
-    fields: [adClicks.userId],
-    references: [users.id],
-  }),
-  ad: one(ads, {
-    fields: [adClicks.adId],
-    references: [ads.id],
-  }),
-}));
-
-export const withdrawalsRelations = relations(withdrawals, ({ one }) => ({
-  user: one(users, {
-    fields: [withdrawals.userId],
-    references: [users.id],
-  }),
-  processedByUser: one(users, {
-    fields: [withdrawals.processedBy],
-    references: [users.id],
-  }),
-}));
-
-// Insert schemas
-export const insertUserSchema = createInsertSchema(users).omit({
-  id: true,
-  registeredAt: true,
-  status: true,
-  isAdmin: true,
+// === DEPOSITS/TRANSACTIONS TABLE (Optional but good for history) ===
+// Guide focuses on updating user balance, but tracking deposits is standard.
+export const deposits = pgTable("deposits", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  type: text("type").notNull(), // "deposit", "manual_add", "admin_bonus"
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertRatingSchema = createInsertSchema(ratings).omit({
-  id: true,
-  createdAt: true,
-  userId: true,
+// === SITE SETTINGS TABLE (CMS) ===
+export const siteSettings = pgTable("site_settings", {
+  id: serial("id").primaryKey(),
+  key: text("key").notNull().unique(),
+  value: text("value"),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertAdSchema = createInsertSchema(ads).omit({
-  id: true,
-  createdAt: true,
+// === SLIDES TABLE (Home Page Slideshow) ===
+export const slides = pgTable("slides", {
+  id: serial("id").primaryKey(),
+  title: text("title"),
+  subtitle: text("subtitle"),
+  imageUrl: text("image_url").notNull(),
+  buttonText: text("button_text"),
+  buttonLink: text("button_link"),
+  displayOrder: integer("display_order").default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertAdClickSchema = createInsertSchema(adClicks).omit({
-  id: true,
-  clickedAt: true,
-  userId: true,
+// === CONTACT INFO TABLE ===
+export const contactInfo = pgTable("contact_info", {
+  id: serial("id").primaryKey(),
+  type: text("type").notNull().unique(), // phone, email, whatsapp, telegram
+  value: text("value"),
+  isActive: boolean("is_active").default(true),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertWithdrawalSchema = createInsertSchema(withdrawals).omit({
-  id: true,
-  requestedAt: true,
-  processedAt: true,
-  processedBy: true,
-  status: true,
-  userId: true,
+// === INFO PAGES TABLE (About, Terms, Privacy) ===
+export const infoPages = pgTable("info_pages", {
+  id: serial("id").primaryKey(),
+  slug: text("slug").notNull().unique(), // about, terms, privacy
+  title: text("title").notNull(),
+  content: text("content"),
+  isActive: boolean("is_active").default(true),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Types
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
-export type InsertRating = z.infer<typeof insertRatingSchema>;
-export type Rating = typeof ratings.$inferSelect;
+// === COMMISSIONS TABLE ===
+export const commissions = pgTable("commissions", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  referralId: varchar("referral_id").references(() => users.id),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  type: text("type").notNull(), // referral, bonus, etc
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// === AD CLICKS TABLE (Transaction tracking) ===
+export const adClicks = pgTable("ad_clicks", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  adId: integer("ad_id").notNull().references(() => ads.id),
+  earnedAmount: decimal("earned_amount", { precision: 10, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// === ADMIN CREDENTIALS TABLE ===
+export const adminCredentials = pgTable("admin_credentials", {
+  id: serial("id").primaryKey(),
+  username: text("username").notNull().unique(),
+  password: text("password").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// === SCHEMAS ===
+export const insertAdSchema = createInsertSchema(ads).omit({ id: true, createdAt: true });
+export const insertWithdrawalSchema = createInsertSchema(withdrawals).omit({ id: true, userId: true, status: true, reason: true, createdAt: true });
+export const insertDepositSchema = createInsertSchema(deposits).omit({ id: true, createdAt: true });
+export const insertSlideSchema = createInsertSchema(slides).omit({ id: true, createdAt: true });
+export const insertSiteSettingSchema = createInsertSchema(siteSettings).omit({ id: true, updatedAt: true });
+export const insertContactInfoSchema = createInsertSchema(contactInfo).omit({ id: true, updatedAt: true });
+export const insertInfoPageSchema = createInsertSchema(infoPages).omit({ id: true, updatedAt: true });
+export const insertCommissionSchema = createInsertSchema(commissions).omit({ id: true, createdAt: true });
+export const insertAdClickSchema = createInsertSchema(adClicks).omit({ id: true, createdAt: true });
+export const insertAdminCredentialsSchema = createInsertSchema(adminCredentials).omit({ id: true, createdAt: true });
+
+// === TYPES ===
 export type Ad = typeof ads.$inferSelect;
-export type AdClick = typeof adClicks.$inferSelect;
 export type InsertAd = z.infer<typeof insertAdSchema>;
-export type InsertAdClick = z.infer<typeof insertAdClickSchema>;
 export type Withdrawal = typeof withdrawals.$inferSelect;
 export type InsertWithdrawal = z.infer<typeof insertWithdrawalSchema>;
+export type Deposit = typeof deposits.$inferSelect;
+export type InsertDeposit = z.infer<typeof insertDepositSchema>;
+export type Slide = typeof slides.$inferSelect;
+export type InsertSlide = z.infer<typeof insertSlideSchema>;
+export type SiteSetting = typeof siteSettings.$inferSelect;
+export type InsertSiteSetting = z.infer<typeof insertSiteSettingSchema>;
+export type ContactInfo = typeof contactInfo.$inferSelect;
+export type InsertContactInfo = z.infer<typeof insertContactInfoSchema>;
+export type InfoPage = typeof infoPages.$inferSelect;
+export type InsertInfoPage = z.infer<typeof insertInfoPageSchema>;
+export type Commission = typeof commissions.$inferSelect;
+export type InsertCommission = z.infer<typeof insertCommissionSchema>;
+export type AdClick = typeof adClicks.$inferSelect;
+export type InsertAdClick = z.infer<typeof insertAdClickSchema>;
+export type AdminCredentials = typeof adminCredentials.$inferSelect;
+export type InsertAdminCredentials = z.infer<typeof insertAdminCredentialsSchema>;
