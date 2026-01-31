@@ -126,38 +126,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Additional missing endpoints for new frontend
-  app.get("/api/auth/user", async (req, res) => {
-    console.log("[AUTH/USER] Session check:", req.session);
-    console.log("[AUTH/USER] Session userId:", req.session?.userId);
-    
-    if (!req.session || !req.session.userId) {
-      console.log("[AUTH/USER] No session found");
-      return res.status(401).json({ error: "Not authenticated" });
-    }
-    
-    // Return admin user if session exists
-    if (req.session.userId === "admin") {
-      console.log("[AUTH/USER] Returning admin user data");
-      res.json({
-        id: "admin",
-        username: "admin",
-        email: "admin@gameSitePro.com",
-        fullName: "System Administrator",
-        firstName: "System",
-        lastName: "Administrator",
-        mobileNumber: "0000000000",
-        status: "active",
-        isAdmin: 1,
-        registeredAt: new Date().toISOString(),
-        destinationAmount: "0.00",
-        milestoneAmount: "0.00",
-        milestoneReward: "0.00",
-        totalAdsCompleted: 0,
-        points: 100
-      });
-    } else {
-      console.log("[AUTH/USER] Invalid userId in session:", req.session.userId);
-      res.status(401).json({ error: "Not authenticated" });
+  app.get("/api/auth/user", (req, res) => {
+    try {
+      console.log("[AUTH/USER] Session check:", req.session);
+      console.log("[AUTH/USER] Session userId:", req.session?.userId);
+      
+      if (!req.session || !req.session.userId) {
+        console.log("[AUTH/USER] No session found");
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      
+      // Return admin user if session exists
+      if (req.session.userId === "admin") {
+        console.log("[AUTH/USER] Returning admin user data");
+        return res.json({
+          id: "admin",
+          username: "admin",
+          email: "admin@gameSitePro.com",
+          fullName: "System Administrator",
+          firstName: "System",
+          lastName: "Administrator",
+          mobileNumber: "0000000000",
+          status: "active",
+          isAdmin: 1,
+          registeredAt: new Date().toISOString(),
+          destinationAmount: "0.00",
+          milestoneAmount: "0.00",
+          milestoneReward: "0.00",
+          totalAdsCompleted: 0,
+          points: 100
+        });
+      } else {
+        console.log("[AUTH/USER] Invalid userId in session:", req.session.userId);
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+    } catch (error) {
+      console.error("[AUTH/USER] Error:", error);
+      return res.status(500).json({ error: "Internal server error" });
     }
   });
 
