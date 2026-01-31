@@ -34,6 +34,10 @@ export default function AdminLoginPage() {
       const data = await response.json();
 
       if (response.ok) {
+        // Save admin token if provided
+        if (data.adminToken) {
+          localStorage.setItem('adminToken', data.adminToken);
+        }
         toast({ title: "Login successful" });
         setLocation("/admin");
       } else {

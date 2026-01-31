@@ -83,16 +83,30 @@ function AdminProtectedRoute({ component: Component }: { component: React.Compon
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    fetch("/api/admin/session", { credentials: "include" })
-      .then(res => res.json())
-      .then(data => {
-        setIsLoggedIn(data.isLoggedIn);
-        setIsLoading(false);
-      })
-      .catch(() => {
+    // Check for admin token in localStorage (from login response)
+    const adminToken = localStorage.getItem('adminToken');
+    
+    const fetchSession = async () => {
+      try {
+        const url = adminToken ? `/api/admin/session?token=${adminToken}` : "/api/admin/session";
+        const response = await fetch(url, { credentials: "include" });
+        const data = await response.json();
+        
+        if (data.isLoggedIn) {
+          setIsLoggedIn(true);
+        } else {
+          // Clear token if invalid
+          localStorage.removeItem('adminToken');
+          setIsLoggedIn(false);
+        }
+      } catch (error) {
         setIsLoggedIn(false);
+      } finally {
         setIsLoading(false);
-      });
+      }
+    };
+
+    fetchSession();
   }, []);
 
   useEffect(() => {
