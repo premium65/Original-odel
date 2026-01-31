@@ -127,11 +127,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Additional missing endpoints for new frontend
   app.get("/api/auth/user", async (req, res) => {
-    if (!req.session.userId) {
+    console.log("[AUTH/USER] Session check:", req.session);
+    console.log("[AUTH/USER] Session userId:", req.session?.userId);
+    
+    if (!req.session || !req.session.userId) {
+      console.log("[AUTH/USER] No session found");
       return res.status(401).json({ error: "Not authenticated" });
     }
+    
     // Return admin user if session exists
     if (req.session.userId === "admin") {
+      console.log("[AUTH/USER] Returning admin user data");
       res.json({
         id: "admin",
         username: "admin",
@@ -150,6 +156,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         points: 100
       });
     } else {
+      console.log("[AUTH/USER] Invalid userId in session:", req.session.userId);
       res.status(401).json({ error: "Not authenticated" });
     }
   });
@@ -369,6 +376,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return res.status(500).json({ error: "Failed to save session" });
           }
 
+          console.log("[LOGIN] Admin session saved successfully, userId:", req.session.userId);
+          console.log("[LOGIN] Session object:", req.session);
+
           // Return admin user data
           const adminUser = {
             id: "admin",
@@ -388,7 +398,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             points: 100
           };
 
-          console.log("[LOGIN] Admin login successful");
+          console.log("[LOGIN] Admin login successful, returning user");
           res.json(adminUser);
         });
         return;
