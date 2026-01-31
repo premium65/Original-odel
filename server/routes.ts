@@ -234,12 +234,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("[ADMIN/SESSION] Session check:", req.session);
       console.log("[ADMIN/SESSION] Session userId:", req.session?.userId);
       
-      if (!req.session || !req.session.userId) {
-        console.log("[ADMIN/SESSION] No session found");
-        return res.json({ isLoggedIn: false });
-      }
-      
-      if (req.session.userId === "admin") {
+      // Simple check - if session has admin userId, consider logged in
+      if (req.session && req.session.userId === "admin") {
         console.log("[ADMIN/SESSION] Admin session valid");
         return res.json({ 
           isLoggedIn: true,
@@ -249,10 +245,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             isAdmin: 1
           }
         });
-      } else {
-        console.log("[ADMIN/SESSION] Non-admin session");
-        return res.json({ isLoggedIn: false });
       }
+      
+      console.log("[ADMIN/SESSION] No admin session found");
+      return res.json({ isLoggedIn: false });
     } catch (error) {
       console.error("[ADMIN/SESSION] Error:", error);
       return res.json({ isLoggedIn: false });
@@ -513,8 +509,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return res.status(500).json({ error: "Failed to save session" });
           }
 
-          console.log("[LOGIN] Admin session saved successfully, userId:", req.session.userId);
-          console.log("[LOGIN] Session object:", req.session);
+          console.log("[LOGIN] Admin session saved successfully");
+          console.log("[LOGIN] Session ID:", req.sessionID);
 
           // Return admin user data
           const adminUser = {
