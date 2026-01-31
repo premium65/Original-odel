@@ -25,7 +25,7 @@ export default function AdminPendingUsers() {
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ userId, status }: { userId: string; status: string }) => {
-      return apiRequest("PATCH", `/api/users/${userId}/status`, { status });
+      return apiRequest("PATCH", `/api/admin/users/${userId}/status`, { status });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
