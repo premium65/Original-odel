@@ -5,6 +5,16 @@ import { users } from "./models/auth";
 
 export * from "./models/auth";
 
+// === RATINGS TABLE ===
+export const ratings = pgTable("ratings", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  targetUsername: varchar("target_username", { length: 255 }),
+  rating: integer("rating").notNull(),
+  comment: text("comment"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // === ADS TABLE ===
 export const ads = pgTable("ads", {
   id: serial("id").primaryKey(),
@@ -109,6 +119,8 @@ export const adminCredentials = pgTable("admin_credentials", {
 });
 
 // === SCHEMAS ===
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertRatingSchema = createInsertSchema(ratings).omit({ id: true, createdAt: true });
 export const insertAdSchema = createInsertSchema(ads).omit({ id: true, createdAt: true });
 export const insertWithdrawalSchema = createInsertSchema(withdrawals).omit({ id: true, userId: true, status: true, reason: true, createdAt: true });
 export const insertDepositSchema = createInsertSchema(deposits).omit({ id: true, createdAt: true });
@@ -121,6 +133,10 @@ export const insertAdClickSchema = createInsertSchema(adClicks).omit({ id: true,
 export const insertAdminCredentialsSchema = createInsertSchema(adminCredentials).omit({ id: true, createdAt: true });
 
 // === TYPES ===
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type Rating = typeof ratings.$inferSelect;
+export type InsertRating = z.infer<typeof insertRatingSchema>;
 export type Ad = typeof ads.$inferSelect;
 export type InsertAd = z.infer<typeof insertAdSchema>;
 export type Withdrawal = typeof withdrawals.$inferSelect;
