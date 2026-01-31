@@ -211,7 +211,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin session endpoint for admin protected routes
+  // Admin session endpoint for admin protected routes - FIXED
   app.get("/api/admin/session", (req, res) => {
     try {
       console.log("[ADMIN/SESSION] Session check:", req.session);
