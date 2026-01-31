@@ -514,11 +514,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/login", async (req, res) => {
     try {
-      const { username, password } = req.body;
-      console.log("[LOGIN] Login attempt:", { username, password: "***" });
+      const { username, email, password } = req.body;
+      // Support both username and email for login
+      const loginIdentifier = username || email;
+      console.log("[LOGIN] Login attempt:", { loginIdentifier, password: "***" });
 
-      if (!username || !password) {
-        return res.status(400).json({ error: "Username and password are required" });
+      if (!loginIdentifier || !password) {
+        return res.status(400).json({ error: "Username/email and password are required" });
       }
 
       // Simple admin check for immediate fix
@@ -569,13 +571,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let user: any = null;
 
-      // Try MongoDB first if connected
-      if (isMongoConnected()) {
-        console.log("[LOGIN] Using MongoDB for authentication");
-        user = await mongoStorage.getUserByUsername(username);
+      // Check in-memory users first
+      const memoryUser = inMemoryUsers.find(u => u.username === loginIdentifier || u.email === loginIdentifier);
+      if (memoryUser) {
+        console.log("[LOGIN] Found user in in-memory storage");
+        user = memoryUser;
       } else {
-        console.log("[LOGIN] Using PostgreSQL for authentication");
-        user = await storage.getUserByUsername(username);
+        // Try database users
+        if (isMongoConnected()) {
+          console.log("[LOGIN] Using MongoDB for authentication");
+          user = await mongoStorage.getUserByUsername(loginIdentifier);
+        } else {
+          console.log("[LOGIN] Using PostgreSQL for authentication");
+          user = await storage.getUserByUsername(loginIdentifier);
+        }
       }
       
       console.log("[LOGIN] User found:", !!user);
