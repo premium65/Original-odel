@@ -102,6 +102,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     })
   );
 
+  // Test endpoint to show registered users (no auth required for testing)
+  app.get("/api/test-users", (req, res) => {
+    try {
+      console.log("[TEST-USERS] In-memory users count:", inMemoryUsers.length);
+      
+      // Remove passwords from response
+      const usersWithoutPasswords = inMemoryUsers.map(({ password, ...user }) => user);
+      
+      res.json({
+        message: "Registered users (for testing)",
+        count: inMemoryUsers.length,
+        users: usersWithoutPasswords
+      });
+    } catch (error) {
+      console.error("Test users error:", error);
+      res.status(500).json({ error: "Failed to fetch test users" });
+    }
+  });
+
   // Simple health check endpoint
   app.get("/api/health", (req, res) => {
     res.json({ 
