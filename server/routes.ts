@@ -81,7 +81,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       cookie: {
         secure: false, // Set to false for development/testing
         httpOnly: true,
-        sameSite: "lax",
+        sameSite: "none", // Changed to none for cross-origin
         maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
         path: "/", // Ensure cookie is available for all paths
       },
@@ -97,6 +97,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     cors({
       origin: true, // Allow same-origin requests
       credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
     })
   );
 
