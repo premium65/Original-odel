@@ -45,6 +45,7 @@ export const users = pgTable("users", {
   // User Details
   mobileNumber: text("mobile_number"),
   username: text("username"),
+  password: text("password"), // Added for compatibility with existing database
   
   // Preferences
   notificationsEnabled: boolean("notifications_enabled").default(true),

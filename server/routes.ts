@@ -339,11 +339,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Return user info (without password) - ensure isAdmin field is included for admin login
         const { password: _, ...userWithoutPassword } = user;
-        // Ensure isAdmin field is properly included for frontend validation
+        
+        // Map fields for new frontend compatibility
         const userResponse = {
           ...userWithoutPassword,
-          isAdmin: user.isAdmin || 0
+          isAdmin: user.isAdmin || 0,
+          // Add firstName/lastName from fullName if they don't exist
+          firstName: user.firstName || user.fullName?.split(' ')[0] || '',
+          lastName: user.lastName || user.fullName?.split(' ').slice(1).join(' ') || '',
+          // Ensure all required fields are present
+          email: user.email || `${user.username}@example.com`,
+          mobileNumber: user.mobileNumber || '',
+          username: user.username
         };
+        
         console.log("Login successful, session saved, returning user:", JSON.stringify(userResponse));
         res.json(userResponse);
       });
