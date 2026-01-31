@@ -83,7 +83,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/health", (req, res) => {
     res.json({ 
       status: "OK", 
-      message: "Server is running",
+      message: "Server is running - DEPLOYED: " + new Date().toISOString(),
       timestamp: new Date().toISOString()
     });
   });
