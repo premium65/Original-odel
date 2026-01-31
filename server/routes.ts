@@ -88,6 +88,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Missing endpoints for new frontend
+  app.get("/api/ads", async (req, res) => {
+    try {
+      // Return empty ads array for now
+      res.json([]);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch ads" });
+    }
+  });
+
+  app.get("/api/withdrawals", async (req, res) => {
+    try {
+      // Return empty withdrawals array for now
+      res.json([]);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch withdrawals" });
+    }
+  });
+
+  app.get("/api/ratings/my", async (req, res) => {
+    try {
+      // Return empty ratings array for now
+      res.json([]);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch ratings" });
+    }
+  });
+
+  app.get("/api/deposits", async (req, res) => {
+    try {
+      // Return empty deposits array for now
+      res.json([]);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch deposits" });
+    }
+  });
+
   // Generate password hash endpoint
   app.get("/api/generate-hash", async (req, res) => {
     try {
