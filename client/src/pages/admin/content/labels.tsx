@@ -1,5 +1,5 @@
 import { AdminLayout } from "@/components/admin-layout";
-import { useAuth } from "@/hooks/use-auth";
+import { useAdminAuth } from "@/hooks/use-admin-auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Type, Save, ArrowLeft } from "lucide-react";
 
 export default function AdminLabels() {
-  const { user } = useAuth();
+  const { user, logout } = useAdminAuth();
   const { toast } = useToast();
 
   const { data: settings } = useQuery<Record<string, string>>({
@@ -172,3 +172,4 @@ export default function AdminLabels() {
     </AdminLayout>
   );
 }
+

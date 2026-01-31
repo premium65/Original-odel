@@ -1,5 +1,5 @@
 import { AdminLayout } from "@/components/admin-layout";
-import { useAuth } from "@/hooks/use-auth";
+import { useAdminAuth } from "@/hooks/use-admin-auth";
 import { useWithdrawals, useApproveWithdrawal, useRejectWithdrawal } from "@/hooks/use-withdrawals";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -25,7 +25,7 @@ import { useState } from "react";
 import { Label } from "@/components/ui/label";
 
 export default function AdminWithdrawals() {
-  const { user } = useAuth();
+  const { user, logout } = useAdminAuth();
   const { data: withdrawals, isLoading } = useWithdrawals();
   const { mutate: approve, isPending: approving } = useApproveWithdrawal();
   const { mutate: reject, isPending: rejecting } = useRejectWithdrawal();
@@ -200,3 +200,4 @@ export default function AdminWithdrawals() {
     </AdminLayout>
   );
 }
+

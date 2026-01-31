@@ -1,5 +1,5 @@
 import { AdminLayout } from "@/components/admin-layout";
-import { useAuth } from "@/hooks/use-auth";
+import { useAdminAuth } from "@/hooks/use-admin-auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -31,7 +31,7 @@ interface Slide {
 }
 
 export default function AdminSlides() {
-  const { user } = useAuth();
+  const { user, logout } = useAdminAuth();
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [editingSlide, setEditingSlide] = useState<Slide | null>(null);
@@ -309,3 +309,4 @@ export default function AdminSlides() {
     </AdminLayout>
   );
 }
+

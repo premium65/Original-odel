@@ -1,5 +1,5 @@
 import { AdminLayout } from "@/components/admin-layout";
-import { useAuth } from "@/hooks/use-auth";
+import { useAdminAuth } from "@/hooks/use-admin-auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -23,7 +23,7 @@ interface AdClick {
 }
 
 export default function AdminTransactionDetails() {
-  const { user } = useAuth();
+  const { user, logout } = useAdminAuth();
 
   const { data: transactions, isLoading } = useQuery<AdClick[]>({
     queryKey: ["/api/admin/transactions"]
@@ -103,3 +103,4 @@ export default function AdminTransactionDetails() {
     </AdminLayout>
   );
 }
+

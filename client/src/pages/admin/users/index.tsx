@@ -1,5 +1,5 @@
 import { AdminLayout } from "@/components/admin-layout";
-import { useAuth } from "@/hooks/use-auth";
+import { useAdminAuth } from "@/hooks/use-admin-auth";
 import { useUsersList } from "@/hooks/use-users";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,7 @@ import { MoreHorizontal, Search, UserCheck, UserX, Shield, Eye, ArrowLeft } from
 import { Link } from "wouter";
 
 export default function AdminAllUsers() {
-  const { user } = useAuth();
+  const { user, logout } = useAdminAuth();
   const { data: users, isLoading } = useUsersList();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
@@ -189,3 +189,4 @@ export default function AdminAllUsers() {
     </AdminLayout>
   );
 }
+

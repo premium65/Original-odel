@@ -1,5 +1,5 @@
 import { AdminLayout } from "@/components/admin-layout";
-import { useAuth } from "@/hooks/use-auth";
+import { useAdminAuth } from "@/hooks/use-admin-auth";
 import { useUsersList } from "@/hooks/use-users";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +19,7 @@ import { Users, Search, Eye, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
 
 export default function AdminTransactionUsers() {
-  const { user } = useAuth();
+  const { user, logout } = useAdminAuth();
   const { data: users, isLoading } = useUsersList();
   const [search, setSearch] = useState("");
 
@@ -145,3 +145,4 @@ export default function AdminTransactionUsers() {
     </AdminLayout>
   );
 }
+

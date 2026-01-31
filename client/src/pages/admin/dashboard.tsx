@@ -1,4 +1,5 @@
 import { AdminLayout } from "@/components/admin-layout";
+import { useAdminAuth } from "@/hooks/use-admin-auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,13 +21,8 @@ interface AdminStats {
 }
 
 export default function AdminDashboard() {
-  // IMMEDIATE BYPASS: Skip useAuth to prevent authentication issues
-  const user = {
-    id: "admin",
-    username: "admin",
-    fullName: "System Administrator",
-    isAdmin: 1
-  };
+  // IMMEDIATE BYPASS: Use admin auth hook to prevent authentication issues
+  const { user } = useAdminAuth();
   const [showHero, setShowHero] = useState(true);
 
   const { data: stats } = useQuery<AdminStats>({
@@ -303,3 +299,4 @@ export default function AdminDashboard() {
     </AdminLayout>
   );
 }
+

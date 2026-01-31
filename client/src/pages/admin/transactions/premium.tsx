@@ -1,5 +1,5 @@
 import { AdminLayout } from "@/components/admin-layout";
-import { useAuth } from "@/hooks/use-auth";
+import { useAdminAuth } from "@/hooks/use-admin-auth";
 import { useUsersList } from "@/hooks/use-users";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,7 +27,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Star, Search, Phone, RotateCcw, Pencil, Plus, X, ArrowLeft } from "lucide-react";
 export default function AdminPremiumManage() {
-  const { user } = useAuth();
+  const { user, logout } = useAdminAuth();
   const { data: users } = useUsersList();
   const { toast } = useToast();
   
@@ -873,3 +873,4 @@ export default function AdminPremiumManage() {
     </AdminLayout>
   );
 }
+

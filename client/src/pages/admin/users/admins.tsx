@@ -1,5 +1,5 @@
 import { AdminLayout } from "@/components/admin-layout";
-import { useAuth } from "@/hooks/use-auth";
+import { useAdminAuth } from "@/hooks/use-admin-auth";
 import { useUsersList } from "@/hooks/use-users";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +16,7 @@ import { Shield, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function AdminAdmins() {
-  const { user } = useAuth();
+  const { user, logout } = useAdminAuth();
   const { data: users, isLoading } = useUsersList();
 
   if (!(user as any)?.isAdmin) {
@@ -107,3 +107,4 @@ export default function AdminAdmins() {
     </AdminLayout>
   );
 }
+

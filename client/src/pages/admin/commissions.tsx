@@ -1,5 +1,5 @@
 import { AdminLayout } from "@/components/admin-layout";
-import { useAuth } from "@/hooks/use-auth";
+import { useAdminAuth } from "@/hooks/use-admin-auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -25,7 +25,7 @@ interface Commission {
 }
 
 export default function AdminCommissions() {
-  const { user } = useAuth();
+  const { user, logout } = useAdminAuth();
 
   const { data: commissions, isLoading } = useQuery<Commission[]>({
     queryKey: ["/api/admin/commissions"]
@@ -111,3 +111,4 @@ export default function AdminCommissions() {
     </AdminLayout>
   );
 }
+

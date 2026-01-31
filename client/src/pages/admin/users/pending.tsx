@@ -1,5 +1,5 @@
 import { AdminLayout } from "@/components/admin-layout";
-import { useAuth } from "@/hooks/use-auth";
+import { useAdminAuth } from "@/hooks/use-admin-auth";
 import { useUsersList } from "@/hooks/use-users";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { UserCheck, UserX, Clock, ArrowLeft } from "lucide-react";
 
 export default function AdminPendingUsers() {
-  const { user } = useAuth();
+  const { user, logout } = useAdminAuth();
   const { data: users, isLoading } = useUsersList();
   const { toast } = useToast();
 
@@ -137,3 +137,4 @@ export default function AdminPendingUsers() {
     </AdminLayout>
   );
 }
+

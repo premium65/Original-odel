@@ -1,5 +1,5 @@
 import { AdminLayout } from "@/components/admin-layout";
-import { useAuth } from "@/hooks/use-auth";
+import { useAdminAuth } from "@/hooks/use-admin-auth";
 import { useAds } from "@/hooks/use-ads";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,7 +30,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Megaphone, Plus, Pencil, Trash2, ExternalLink, ArrowLeft } from "lucide-react";
 
 export default function AdminAds() {
-  const { user } = useAuth();
+  const { user, logout } = useAdminAuth();
   const { data: ads, isLoading } = useAds();
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
@@ -311,3 +311,4 @@ export default function AdminAds() {
     </AdminLayout>
   );
 }
+

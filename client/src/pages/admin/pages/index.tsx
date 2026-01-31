@@ -1,5 +1,5 @@
 import { AdminLayout } from "@/components/admin-layout";
-import { useAuth } from "@/hooks/use-auth";
+import { useAdminAuth } from "@/hooks/use-admin-auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +22,7 @@ interface InfoPage {
 }
 
 export default function AdminInfoPages() {
-  const { user } = useAuth();
+  const { user, logout } = useAdminAuth();
   const { toast } = useToast();
   const [location] = useLocation();
   
@@ -153,3 +153,4 @@ export default function AdminInfoPages() {
     </AdminLayout>
   );
 }
+

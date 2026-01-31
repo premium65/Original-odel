@@ -1,5 +1,5 @@
 import { LayoutShell } from "@/components/layout-shell";
-import { useAuth } from "@/hooks/use-auth";
+import { useAdminAuth } from "@/hooks/use-admin-auth";
 import { useUsersList, useUpdateUserStatus, useAdminDeposit } from "@/hooks/use-users";
 import {
   Table,
@@ -25,7 +25,7 @@ import {
 import { Label } from "@/components/ui/label";
 
 export default function AdminUsers() {
-  const { user } = useAuth();
+  const { user, logout } = useAdminAuth();
   const { data: users, isLoading } = useUsersList();
   const { mutate: updateStatus } = useUpdateUserStatus();
   const { mutate: deposit } = useAdminDeposit();
@@ -187,3 +187,4 @@ export default function AdminUsers() {
     </LayoutShell>
   );
 }
+
