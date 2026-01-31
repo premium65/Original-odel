@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { useState } from "react";
 import { SiGoogle, SiFacebook } from "react-icons/si";
 import { useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 
 interface AuthPageProps {
   defaultMode?: "login" | "register";
@@ -16,9 +17,64 @@ export default function AuthPage({ defaultMode = "login" }: AuthPageProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  
+  // Form state
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    password: ""
+  });
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleAuth = () => {
-    setLocation("/admin-login");
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleAuth = async () => {
+    if (isLogin) {
+      // For login, redirect to admin login
+      setLocation("/admin-login");
+      return;
+    }
+
+    // Registration logic
+    if (!formData.firstName || !formData.lastName || !formData.email || !formData.password) {
+      toast({ title: "Please fill all fields", variant: "destructive" });
+      return;
+    }
+
+    if (!agreedToTerms) {
+      toast({ title: "Please agree to terms and conditions", variant: "destructive" });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData)
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast({ 
+          title: "Registration Successful!", 
+          description: "Your account is pending admin approval." 
+        });
+        // Redirect to login after successful registration
+        setIsLogin(true);
+      } else {
+        toast({ title: data.error || "Registration failed", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Registration failed", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleBack = () => {
@@ -100,6 +156,8 @@ export default function AuthPage({ defaultMode = "login" }: AuthPageProps) {
                     <label className="text-xs font-medium text-gray-700 mb-1 block">First Name</label>
                     <Input
                       placeholder="John"
+                      value={formData.firstName}
+                      onChange={(e) => handleInputChange("firstName", e.target.value)}
                       className="h-11 border-gray-300 focus:border-gray-900 text-sm"
                       data-testid="input-first-name"
                     />
@@ -108,6 +166,8 @@ export default function AuthPage({ defaultMode = "login" }: AuthPageProps) {
                     <label className="text-xs font-medium text-gray-700 mb-1 block">Last Name</label>
                     <Input
                       placeholder="Last Name"
+                      value={formData.lastName}
+                      onChange={(e) => handleInputChange("lastName", e.target.value)}
                       className="h-11 border-gray-300 focus:border-gray-900 text-sm"
                       data-testid="input-last-name"
                     />
@@ -120,6 +180,8 @@ export default function AuthPage({ defaultMode = "login" }: AuthPageProps) {
                 <Input
                   type="email"
                   placeholder="Email Address"
+                  value={formData.email}
+                  onChange={(e) => handleInputChange("email", e.target.value)}
                   className="h-11 border-gray-300 focus:border-gray-900 text-sm"
                   data-testid="input-email"
                 />
@@ -131,14 +193,15 @@ export default function AuthPage({ defaultMode = "login" }: AuthPageProps) {
                   <Input
                     type={showPassword ? "text" : "password"}
                     placeholder="Password"
-                    className="h-11 border-gray-300 focus:border-gray-900 pr-11 text-sm"
+                    value={formData.password}
+                    onChange={(e) => handleInputChange("password", e.target.value)}
+                    className="h-11 border-gray-300 focus:border-gray-900 text-sm pr-10"
                     data-testid="input-password"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    data-testid="button-toggle-password"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -153,10 +216,18 @@ export default function AuthPage({ defaultMode = "login" }: AuthPageProps) {
               {/* Submit Button */}
               <Button
                 onClick={handleAuth}
+                disabled={isLoading}
                 className="w-full h-11 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-full mt-2"
                 data-testid="button-submit-auth"
               >
-                {isLogin ? "Log in" : "Create Account"}
+                {isLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                    {isLogin ? "Logging in..." : "Creating Account..."}
+                  </>
+                ) : (
+                  isLogin ? "Log in" : "Create Account"
+                )}
               </Button>
 
               {/* Terms Checkbox */}
