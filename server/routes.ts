@@ -263,6 +263,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Logout endpoint
+  app.post("/api/logout", (req, res) => {
+    try {
+      req.session.destroy((err) => {
+        if (err) {
+          console.error("[LOGOUT] Session destroy error:", err);
+          return res.status(500).json({ error: "Logout failed" });
+        }
+        res.clearCookie("connect.sid");
+        res.json({ message: "Logged out successfully" });
+      });
+    } catch (error) {
+      console.error("[LOGOUT] Error:", error);
+      res.status(500).json({ error: "Logout failed" });
+    }
+  });
+
   // Generate password hash endpoint
   app.get("/api/generate-hash", async (req, res) => {
     try {
