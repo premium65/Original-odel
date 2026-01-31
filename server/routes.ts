@@ -15,6 +15,9 @@ import cors from "cors";
 
 const SALT_ROUNDS = 10;
 
+// In-memory user storage for when database is down
+const inMemoryUsers: any[] = [];
+
 async function hashPassword(password: string): Promise<string> {
   return await bcrypt.hash(password, SALT_ROUNDS);
 }
@@ -410,14 +413,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ error: "Account already exists" });
         }
         
-        // If database is down or has issues, provide a graceful fallback
-        console.log("Database unavailable, using fallback registration");
+        // If database is down or has issues, save to in-memory storage
+        console.log("Database unavailable, saving to in-memory storage");
+        const hashedPassword = await hashPassword(password);
+        const inMemoryUser = {
+          id: "mem_" + Date.now(),
+          username,
+          email,
+          password: hashedPassword,
+          firstName: firstName || '',
+          lastName: lastName || '',
+          status: 'pending',
+          isAdmin: false,
+          createdAt: new Date().toISOString(),
+          registeredAt: new Date().toISOString(),
+          milestoneAmount: "0",
+          milestoneReward: "0", 
+          destinationAmount: "0",
+          ongoingMilestone: "0",
+          totalAdsCompleted: 0,
+          points: 0,
+          pendingAmount: "0",
+          hasDeposit: false,
+          restrictedAdsCompleted: 0,
+          notificationsEnabled: true,
+          language: "en",
+          theme: "dark",
+        };
+        
+        inMemoryUsers.push(inMemoryUser);
+        console.log("User saved to in-memory storage:", inMemoryUser.id, inMemoryUser.username);
+        
         return res.json({ 
           success: true, 
-          userId: "pending_" + Date.now(),
+          userId: inMemoryUser.id,
           message: "Registration successful! Your account is pending admin approval.",
           status: "pending",
-          note: "Account created successfully (processing in background)"
+          note: "Account created successfully (awaiting admin activation)"
         });
       }
       
@@ -840,7 +872,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(auth.statusCode!).send(auth.error);
       }
 
-      const users = await storage.getAllUsers();
+      let allUsers = [];
+      
+      // Try to get database users
+      try {
+        const dbUsers = await storage.getAllUsers();
+        allUsers = allUsers.concat(dbUsers);
+        console.log(`Found ${dbUsers.length} database users`);
+      } catch (dbError) {
+        console.log("Database users fetch failed:", dbError.message);
+      }
+      
+      // Add in-memory users
+      if (inMemoryUsers.length > 0) {
+        allUsers = allUsers.concat(inMemoryUsers);
+        console.log(`Added ${inMemoryUsers.length} in-memory users`);
+      }
       
       // Disable caching to ensure fresh data after mutations
       res.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
@@ -848,7 +895,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.set("Expires", "0");
       
       // Remove passwords from response
-      const usersWithoutPasswords = users.map(({ password, ...user }) => user);
+      const usersWithoutPasswords = allUsers.map(({ password, ...user }) => user);
       res.json(usersWithoutPasswords);
     } catch (error) {
       console.error("Fetch users error:", error);
