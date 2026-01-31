@@ -35,8 +35,38 @@ export default function AuthPage({ defaultMode = "login" }: AuthPageProps) {
 
   const handleAuth = async () => {
     if (isLogin) {
-      // For login, redirect to admin login
-      setLocation("/admin-login");
+      // Handle regular user login
+      if (!formData.email || !formData.password) {
+        toast({ title: "Please fill email and password", variant: "destructive" });
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        const response = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: formData.email,
+            password: formData.password
+          }),
+          credentials: "include"
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          toast({ title: "Login successful!" });
+          // Redirect to dashboard for regular users
+          setLocation("/dashboard");
+        } else {
+          toast({ title: data.error || "Login failed", variant: "destructive" });
+        }
+      } catch (error) {
+        toast({ title: "Login failed", variant: "destructive" });
+      } finally {
+        setIsLoading(false);
+      }
       return;
     }
 
