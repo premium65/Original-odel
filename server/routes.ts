@@ -174,8 +174,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           points: 100
         });
       } else {
-        console.log("[AUTH/USER] Invalid userId in session:", req.session.userId);
-        return res.status(401).json({ error: "Not authenticated" });
+        // Handle regular users - check in-memory storage first
+        const memoryUser = inMemoryUsers.find(u => u.id === req.session.userId);
+        if (memoryUser) {
+          console.log("[AUTH/USER] Found user in in-memory storage:", memoryUser.username);
+          const { password, ...userWithoutPassword } = memoryUser;
+          return res.json(userWithoutPassword);
+        }
+        
+        console.log("[AUTH/USER] User not found for userId:", req.session.userId);
+        return res.status(401).json({ error: "User not found" });
       }
     } catch (error) {
       console.error("[AUTH/USER] Error:", error);
