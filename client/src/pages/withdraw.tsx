@@ -1,328 +1,312 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/use-auth";
+import { useCreateWithdrawal, useWithdrawals } from "@/hooks/use-withdrawals";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { insertWithdrawalSchema } from "@shared/schema";
+import { z } from "zod";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
+import { 
+  ArrowLeft, Wallet, Clock, CheckCircle, XCircle, Lock, CreditCard, History
+} from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { motion } from "framer-motion";
 import { useLocation } from "wouter";
-import type { User } from "@shared/schema";
-import { ArrowLeft, DollarSign, Building2, CheckCircle2 } from "lucide-react";
+
+const withdrawalFormSchema = insertWithdrawalSchema.extend({
+  amount: z.coerce.number().min(1000, "Minimum withdrawal is 1000 LKR"),
+});
 
 export default function WithdrawPage() {
-  const { toast } = useToast();
+  const { user, isLoading: isUserLoading } = useAuth();
+  const { mutate: createWithdrawal, isPending } = useCreateWithdrawal();
+  const { data: withdrawals, isLoading: isWithdrawalsLoading } = useWithdrawals();
   const [, setLocation] = useLocation();
-  const [step, setStep] = useState<1 | 2>(1);
-  
-  // Bank details
-  const [fullName, setFullName] = useState("");
-  const [accountNumber, setAccountNumber] = useState("");
-  const [bankName, setBankName] = useState("");
-  const [branch, setBranch] = useState("");
-  
-  // Withdrawal amount
-  const [amount, setAmount] = useState("");
 
-  const { data: user } = useQuery<User>({
-    queryKey: ["/api/auth/me"],
-  });
-
-  const withdrawalMutation = useMutation({
-    mutationFn: async (data: {
-      amount: string;
-      bankDetails: {
-        fullName: string;
-        accountNumber: string;
-        bankName: string;
-        branch: string;
-      };
-    }) => {
-      const response = await fetch("/api/withdrawals", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error || "Failed to submit withdrawal");
-      }
-      
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/withdrawals/my"] });
-      
-      toast({
-        title: "Withdrawal Submitted",
-        description: "Your withdrawal request has been submitted for admin approval.",
-      });
-      
-      // Reset form
-      setStep(1);
-      setFullName("");
-      setAccountNumber("");
-      setBankName("");
-      setBranch("");
-      setAmount("");
-      
-      // Redirect to features page
-      setTimeout(() => setLocation('/features'), 1500);
-    },
-    onError: (error: Error) => {
-      toast({
-        variant: "destructive",
-        title: "Withdrawal Failed",
-        description: error.message || "Failed to submit withdrawal request",
-      });
+  const form = useForm<z.infer<typeof withdrawalFormSchema>>({
+    resolver: zodResolver(withdrawalFormSchema),
+    defaultValues: {
+      amount: 0,
+      method: "Bank Transfer",
+      accountDetails: "",
     },
   });
 
-  const handleBankDetailsNext = () => {
-    if (!fullName.trim() || !accountNumber.trim() || !bankName.trim() || !branch.trim()) {
-      toast({
-        variant: "destructive",
-        title: "Missing Information",
-        description: "Please fill in all bank details",
-      });
-      return;
-    }
-    
-    setStep(2);
-  };
-
-  const handleSubmitWithdrawal = () => {
-    const withdrawAmount = parseFloat(amount);
-    const availableBalance = parseFloat(user?.milestoneAmount || '0');
-    
-    if (isNaN(withdrawAmount) || withdrawAmount <= 0) {
-      toast({
-        variant: "destructive",
-        title: "Invalid Amount",
-        description: "Please enter a valid withdrawal amount",
-      });
-      return;
-    }
-    
-    if (withdrawAmount > availableBalance) {
-      toast({
-        variant: "destructive",
-        title: "Insufficient Balance",
-        description: `You can only withdraw up to LKR ${availableBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-      });
-      return;
-    }
-    
-    withdrawalMutation.mutate({
-      amount,
-      bankDetails: {
-        fullName,
-        accountNumber,
-        bankName,
-        branch,
-      },
+  const onSubmit = (data: z.infer<typeof withdrawalFormSchema>) => {
+    createWithdrawal({
+      ...data,
+      amount: String(data.amount),
     });
+    form.reset();
   };
 
-  if (!user) {
+  if (isUserLoading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <p className="text-muted-foreground">Loading...</p>
+      <div className="min-h-screen bg-zinc-100 dark:bg-zinc-950 p-6">
+        <Skeleton className="h-8 w-48 bg-zinc-200 dark:bg-zinc-800 mb-6" />
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-32 bg-zinc-200 dark:bg-zinc-800 rounded-xl" />
+          ))}
+        </div>
       </div>
     );
   }
 
-  const milestoneAmount = parseFloat(user.milestoneAmount || '0');
+  const userData = user as any || {};
+  const balance = Number(userData.milestoneAmount || 0);
+  const totalAds = userData.totalAdsCompleted || 0;
+  const PAYOUT_UNLOCK_ADS = 28;
+  const canWithdraw = totalAds >= PAYOUT_UNLOCK_ADS;
+  const adsUntilPayout = Math.max(0, PAYOUT_UNLOCK_ADS - totalAds);
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "approved": return <CheckCircle className="w-4 h-4 text-green-500" />;
+      case "rejected": return <XCircle className="w-4 h-4 text-red-500" />;
+      default: return <Clock className="w-4 h-4 text-yellow-500" />;
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "approved": return "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400";
+      case "rejected": return "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400";
+      default: return "bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400";
+    }
+  };
 
   return (
-    <div className="container mx-auto p-6 max-w-2xl space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4 bg-card border rounded-lg p-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => step === 1 ? setLocation('/features') : setStep(1)}
-          data-testid="button-back"
+    <div className="min-h-screen bg-zinc-100 dark:bg-zinc-950">
+      <div className="max-w-4xl mx-auto p-4 md:p-6">
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white dark:bg-zinc-900 rounded-xl p-4 mb-6 flex items-center gap-3 shadow-sm"
         >
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <h1 className="text-2xl font-bold" style={{ color: '#f7931e' }}>
-          Withdraw Funds
-        </h1>
-      </div>
-
-      {/* Progress Steps */}
-      <div className="flex items-center justify-center gap-4">
-        <div className="flex items-center gap-2">
-          <div 
-            className="flex items-center justify-center h-10 w-10 rounded-full text-white font-semibold"
-            style={{ backgroundColor: step === 1 ? '#f7931e' : '#22c55e' }}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setLocation("/dashboard")}
+            className="text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
+            data-testid="button-back"
           >
-            {step === 1 ? '1' : <CheckCircle2 className="h-5 w-5" />}
-          </div>
-          <span className="text-sm font-medium">Bank Details</span>
-        </div>
-        
-        <div 
-          className="h-1 w-16 rounded"
-          style={{ backgroundColor: step === 2 ? '#f7931e' : '#666' }}
-        />
-        
-        <div className="flex items-center gap-2">
-          <div 
-            className="flex items-center justify-center h-10 w-10 rounded-full text-white font-semibold"
-            style={{ backgroundColor: step === 2 ? '#f7931e' : '#666' }}
-          >
-            2
-          </div>
-          <span className="text-sm font-medium">Withdrawal Amount</span>
-        </div>
-      </div>
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <h1 className="text-xl font-bold text-orange-500">Payouts</h1>
+        </motion.div>
 
-      {/* Step 1: Bank Details */}
-      {step === 1 && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <Building2 className="h-6 w-6" style={{ color: '#f7931e' }} />
-              <CardTitle>Enter Bank Details</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="fullName">Full Name</Label>
-              <Input
-                id="fullName"
-                placeholder="Enter account holder's full name"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                data-testid="input-full-name"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="accountNumber">Account Number</Label>
-              <Input
-                id="accountNumber"
-                placeholder="Enter bank account number"
-                value={accountNumber}
-                onChange={(e) => setAccountNumber(e.target.value)}
-                data-testid="input-account-number"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="bankName">Bank Name</Label>
-              <Input
-                id="bankName"
-                placeholder="Enter bank name"
-                value={bankName}
-                onChange={(e) => setBankName(e.target.value)}
-                data-testid="input-bank-name"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="branch">Branch</Label>
-              <Input
-                id="branch"
-                placeholder="Enter branch name"
-                value={branch}
-                onChange={(e) => setBranch(e.target.value)}
-                data-testid="input-branch"
-              />
-            </div>
-
-            <Button
-              className="w-full mt-4"
-              style={{ backgroundColor: '#f7931e', color: 'white' }}
-              onClick={handleBankDetailsNext}
-              data-testid="button-next-step"
+        <div className="grid md:grid-cols-2 gap-6">
+          <div className="space-y-4">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
             >
-              Next: Enter Amount
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+              <Card className="border-2 border-green-400 bg-white dark:bg-zinc-900">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-semibold text-zinc-700 dark:text-zinc-300">Available Balance</h3>
+                    <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-500/20 flex items-center justify-center">
+                      <Wallet className="w-5 h-5 text-green-500" />
+                    </div>
+                  </div>
+                  <p className="text-3xl font-bold text-green-500">LKR {balance.toFixed(2)}</p>
+                  <p className="text-xs text-zinc-500 mt-1">Minimum withdrawal: LKR 1,000.00</p>
+                </CardContent>
+              </Card>
+            </motion.div>
 
-      {/* Step 2: Withdrawal Amount */}
-      {step === 2 && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <DollarSign className="h-6 w-6" style={{ color: '#f7931e' }} />
-              <CardTitle>Enter Withdrawal Amount</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Bank Details Summary */}
-            <div className="bg-muted rounded-lg p-4 space-y-2">
-              <p className="text-sm font-semibold mb-2">Bank Details:</p>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <span className="text-muted-foreground">Name:</span>
-                <span className="font-medium">{fullName}</span>
-                
-                <span className="text-muted-foreground">Account:</span>
-                <span className="font-medium">{accountNumber}</span>
-                
-                <span className="text-muted-foreground">Bank:</span>
-                <span className="font-medium">{bankName}</span>
-                
-                <span className="text-muted-foreground">Branch:</span>
-                <span className="font-medium">{branch}</span>
-              </div>
-            </div>
-
-            {/* Available Balance */}
-            <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Available Balance:</span>
-                <span className="text-2xl font-bold" style={{ color: '#f7931e' }}>
-                  LKR {milestoneAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                </span>
-              </div>
-            </div>
-
-            {/* Amount Input */}
-            <div className="space-y-2">
-              <Label htmlFor="amount">Withdrawal Amount (LKR)</Label>
-              <Input
-                id="amount"
-                type="number"
-                placeholder="Enter amount to withdraw"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                data-testid="input-withdrawal-amount"
-              />
-              <p className="text-xs text-muted-foreground">
-                Maximum: LKR {milestoneAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-              </p>
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => setStep(1)}
-                data-testid="button-back-to-details"
+            {!canWithdraw && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15 }}
               >
-                Back
-              </Button>
-              <Button
-                className="flex-1"
-                style={{ backgroundColor: '#f7931e', color: 'white' }}
-                onClick={handleSubmitWithdrawal}
-                disabled={withdrawalMutation.isPending}
-                data-testid="button-submit-withdrawal"
+                <Card className="border-2 border-yellow-400 bg-white dark:bg-zinc-900">
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-3 mb-3">
+                      <Lock className="w-5 h-5 text-yellow-500" />
+                      <h3 className="font-semibold text-zinc-700 dark:text-zinc-300">Withdrawal Locked</h3>
+                    </div>
+                    <p className="text-sm text-zinc-500 mb-3">Complete {adsUntilPayout} more ads to unlock withdrawals</p>
+                    <div className="h-2 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-yellow-400 to-yellow-600 transition-all"
+                        style={{ width: `${(totalAds / PAYOUT_UNLOCK_ADS) * 100}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-zinc-500 mt-2">{totalAds} / {PAYOUT_UNLOCK_ADS} ads completed</p>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
+
+            {canWithdraw && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
               >
-                {withdrawalMutation.isPending ? "Submitting..." : "Submit Withdrawal"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                <Card className="bg-white dark:bg-zinc-900">
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                      <CreditCard className="w-5 h-5 text-orange-500" />
+                      <h3 className="font-semibold text-zinc-700 dark:text-zinc-300">Request Withdrawal</h3>
+                    </div>
+                    
+                    <Form {...form}>
+                      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                        <FormField
+                          control={form.control}
+                          name="amount"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Amount (LKR)</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="number" 
+                                  placeholder="1000.00" 
+                                  className="bg-zinc-50 dark:bg-zinc-800"
+                                  {...field} 
+                                  data-testid="input-amount"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="method"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Payment Method</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                  <SelectTrigger className="bg-zinc-50 dark:bg-zinc-800" data-testid="select-method">
+                                    <SelectValue placeholder="Select method" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                                  <SelectItem value="EzCash">EzCash</SelectItem>
+                                  <SelectItem value="KoKo">KoKo</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="accountDetails"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Account Details</FormLabel>
+                              <FormControl>
+                                <Textarea 
+                                  placeholder="Bank Name, Account Number, Branch, Holder Name" 
+                                  className="min-h-[80px] bg-zinc-50 dark:bg-zinc-800" 
+                                  {...field}
+                                  data-testid="input-account-details"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <Button 
+                          type="submit" 
+                          className="w-full bg-orange-500 hover:bg-orange-600" 
+                          disabled={isPending || balance < 1000}
+                          data-testid="button-submit-withdrawal"
+                        >
+                          {isPending ? "Submitting..." : "Submit Request"}
+                        </Button>
+                      </form>
+                    </Form>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
+          </div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+          >
+            <Card className="bg-white dark:bg-zinc-900 h-full">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <History className="w-5 h-5 text-purple-500" />
+                  <h3 className="font-semibold text-zinc-700 dark:text-zinc-300 text-lg">Withdrawal History</h3>
+                </div>
+
+                {isWithdrawalsLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} className="h-16 bg-zinc-100 dark:bg-zinc-800 rounded-lg" />
+                    ))}
+                  </div>
+                ) : withdrawals && withdrawals.length > 0 ? (
+                  <div className="space-y-3">
+                    {withdrawals.map((w, i) => (
+                      <motion.div
+                        key={w.id}
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.1 * i }}
+                        className="bg-zinc-50 dark:bg-zinc-800 rounded-lg p-4"
+                        data-testid={`withdrawal-item-${w.id}`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-bold text-zinc-800 dark:text-white">
+                            LKR {Number(w.amount).toFixed(2)}
+                          </span>
+                          <Badge className={`${getStatusColor(w.status || "pending")} flex items-center gap-1`}>
+                            {getStatusIcon(w.status || "pending")}
+                            <span className="capitalize">{w.status || "pending"}</span>
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-zinc-500">
+                          <span>{w.method}</span>
+                          <span>{w.createdAt ? format(new Date(w.createdAt), "MMM d, yyyy") : "-"}</span>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <div className="w-16 h-16 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mx-auto mb-4">
+                      <History className="w-8 h-8 text-zinc-400" />
+                    </div>
+                    <p className="text-zinc-500">No withdrawal history yet</p>
+                    <p className="text-xs text-zinc-400 mt-1">Your requests will appear here</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+      </div>
     </div>
   );
 }

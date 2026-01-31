@@ -1,307 +1,300 @@
+import { AdminLayout } from "@/components/admin-layout";
+import { useAuth } from "@/hooks/use-auth";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useQuery } from "@tanstack/react-query";
+import { Users, MousePointer, Wallet, DollarSign, Clock, ArrowRight, TrendingUp, ChevronRight, Shield, Rocket } from "lucide-react";
 import { Link } from "wouter";
-import { 
-  Users, 
-  Eye, 
-  DollarSign, 
-  Wallet, 
-  PiggyBank, 
-  UserCheck,
-  Clock,
-  TrendingUp,
-  ArrowRight,
-  AlertCircle
-} from "lucide-react";
-import type { User, Withdrawal } from "@shared/schema";
+import { useState } from "react";
 
-// Format currency in Indian Rupees
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    minimumFractionDigits: 2,
-  }).format(amount).replace('₹', '₹');
-};
+interface AdminStats {
+  totalUsers: number;
+  activeUsers: number;
+  pendingUsers: number;
+  totalWithdrawals: string;
+  pendingWithdrawals: string;
+  totalDeposits: string;
+  totalAdClicks: number;
+  totalEarnings: string;
+}
 
 export default function AdminDashboard() {
-  // Fetch all users
-  const { data: users = [] } = useQuery<User[]>({
-    queryKey: ["/api/admin/users"],
+  const { user } = useAuth();
+  const [showHero, setShowHero] = useState(true);
+
+  const { data: stats } = useQuery<AdminStats>({
+    queryKey: ["/api/admin/stats"]
   });
 
-  // Fetch withdrawals
-  const { data: withdrawals = [] } = useQuery<Withdrawal[]>({
-    queryKey: ["/api/admin/withdrawals"],
+  const { data: users } = useQuery<any[]>({
+    queryKey: ["/api/users"]
   });
 
-  // Calculate statistics
-  const totalUsers = users.length;
-  const activeUsers = users.filter(u => u.status === "active").length;
-  const pendingUsers = users.filter(u => u.status === "pending").length;
-  
-  const totalDeposit = users.reduce((sum, user) => sum + (user.balance || 0), 0);
-  const totalCommission = users.reduce((sum, user) => sum + (user.lifetimeEarnings || 0), 0);
-  const totalAdsViewed = users.reduce((sum, user) => sum + (user.totalAdsWatched || 0), 0);
-  
-  const pendingWithdrawals = withdrawals.filter(w => w.status === "pending");
-  const totalWithdrawn = withdrawals
-    .filter(w => w.status === "approved")
-    .reduce((sum, w) => sum + w.amount, 0);
-
-  // Get recent users (last 5)
-  const recentUsers = [...users]
-    .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
-    .slice(0, 5);
-
-  // Get current date
-  const currentDate = new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
+  const { data: withdrawals } = useQuery<any[]>({
+    queryKey: ["/api/withdrawals"]
   });
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-white">Dashboard</h1>
-          <p className="text-[#9ca3af] mt-1">Welcome back! Here's what's happening today.</p>
-        </div>
-        <div className="text-right">
-          <p className="text-[#6b7280] text-sm">Last updated</p>
-          <p className="text-white font-medium">{currentDate}</p>
-        </div>
-      </div>
+  if (!(user as any)?.isAdmin) {
+    return <div className="p-8 text-center text-red-500">Access Denied</div>;
+  }
 
-      {/* Stats Cards - Row 1 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {/* Total Users */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0ea5e9] to-[#0284c7] p-6">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-white/80 text-sm font-medium uppercase tracking-wider">Total Users</p>
-              <h3 className="text-4xl font-bold text-white mt-2">{totalUsers}</h3>
-              <p className="text-white/70 text-sm mt-2">
-                {activeUsers} active, {pendingUsers} pending
-              </p>
-              <p className="text-white/60 text-xs mt-1 flex items-center gap-1">
-                <TrendingUp className="w-3 h-3" /> 12% from last week
-              </p>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
-              <Users className="w-6 h-6 text-white" />
-            </div>
+  const pendingWithdrawalsList = withdrawals?.filter(w => w.status === "pending") || [];
+  const recentUsers = users?.slice(0, 5) || [];
+
+  if (showHero) {
+    return (
+      <div className="relative h-screen w-full overflow-hidden bg-black flex flex-col items-center justify-center text-white font-sans selection:bg-primary/30">
+        <div className="absolute inset-0 z-0">
+          <img 
+            src="https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=1600&auto=format&fit=crop" 
+            alt="Sentinel Defense Background" 
+            className="w-full h-full object-cover opacity-50 scale-105"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
+        </div>
+
+        <nav className="absolute top-0 w-full p-8 flex items-center justify-between z-10 max-w-7xl mx-auto">
+          <div className="flex items-center gap-2">
+            <span className="text-3xl font-light tracking-[0.3em] text-white">ODEL</span>
           </div>
-          <div className="absolute -bottom-4 -right-4 w-24 h-24 rounded-full bg-white/10"></div>
-        </div>
-
-        {/* Total Ads Viewed */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#8b5cf6] to-[#7c3aed] p-6">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-white/80 text-sm font-medium uppercase tracking-wider">Total Ads Viewed</p>
-              <h3 className="text-4xl font-bold text-white mt-2">{totalAdsViewed.toLocaleString()}</h3>
-              <p className="text-white/70 text-sm mt-2">All time clicks</p>
-              <p className="text-white/60 text-xs mt-1 flex items-center gap-1">
-                <TrendingUp className="w-3 h-3" /> 8% from last week
-              </p>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
-              <Eye className="w-6 h-6 text-white" />
-            </div>
-          </div>
-          <div className="absolute -bottom-4 -right-4 w-24 h-24 rounded-full bg-white/10"></div>
-        </div>
-
-        {/* Total Commission */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#10b981] to-[#059669] p-6">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-white/80 text-sm font-medium uppercase tracking-wider">Total Commission</p>
-              <h3 className="text-4xl font-bold text-white mt-2">{formatCurrency(totalCommission)}</h3>
-              <p className="text-white/70 text-sm mt-2">Earnings distributed</p>
-              <p className="text-white/60 text-xs mt-1 flex items-center gap-1">
-                <TrendingUp className="w-3 h-3" /> 23% from last week
-              </p>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
-              <DollarSign className="w-6 h-6 text-white" />
-            </div>
-          </div>
-          <div className="absolute -bottom-4 -right-4 w-24 h-24 rounded-full bg-white/10"></div>
-        </div>
-      </div>
-
-      {/* Stats Cards - Row 2 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {/* Total Withdraw */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#f59e0b] to-[#d97706] p-6">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-white/80 text-sm font-medium uppercase tracking-wider">Total Withdraw</p>
-              <h3 className="text-4xl font-bold text-white mt-2">{formatCurrency(totalWithdrawn)}</h3>
-              <p className="text-white/70 text-sm mt-2">
-                {formatCurrency(pendingWithdrawals.reduce((s, w) => s + w.amount, 0))} pending
-              </p>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
-              <Wallet className="w-6 h-6 text-white" />
-            </div>
-          </div>
-          <div className="absolute -bottom-4 -right-4 w-24 h-24 rounded-full bg-white/10"></div>
-        </div>
-
-        {/* Total Deposit */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#06b6d4] to-[#0891b2] p-6">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-white/80 text-sm font-medium uppercase tracking-wider">Total Deposit</p>
-              <h3 className="text-4xl font-bold text-white mt-2">{formatCurrency(totalDeposit)}</h3>
-              <p className="text-white/70 text-sm mt-2">User balances</p>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
-              <PiggyBank className="w-6 h-6 text-white" />
-            </div>
-          </div>
-          <div className="absolute -bottom-4 -right-4 w-24 h-24 rounded-full bg-white/10"></div>
-        </div>
-
-        {/* Active Users */}
-        <div className="relative overflow-hidden rounded-2xl bg-[#1e293b] border border-[#334155] p-6">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-[#9ca3af] text-sm font-medium uppercase tracking-wider">Active Users</p>
-              <h3 className="text-4xl font-bold text-white mt-2">{activeUsers}</h3>
-              <p className="text-[#6b7280] text-sm mt-2">
-                {totalUsers > 0 ? Math.round((activeUsers / totalUsers) * 100) : 0}% of total
-              </p>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-[#0f172a] flex items-center justify-center">
-              <UserCheck className="w-6 h-6 text-[#10b981]" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Bottom Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* High Priority Actions */}
-        <div className="bg-[#1a2332] rounded-2xl border border-[#2a3a4d] overflow-hidden">
-          <div className="flex items-center justify-between p-5 border-b border-[#2a3a4d]">
-            <div className="flex items-center gap-3">
-              <Clock className="w-5 h-5 text-[#f59e0b]" />
-              <h2 className="text-lg font-semibold text-white">High Priority Actions</h2>
-            </div>
-            <span className="px-3 py-1 text-xs font-semibold bg-[#f59e0b]/20 text-[#f59e0b] rounded-full">
-              {pendingUsers + pendingWithdrawals.length} pending
-            </span>
-          </div>
-          <div className="p-4 space-y-3">
-            {pendingUsers > 0 && (
-              <Link href="/admin/pending">
-                <div className="flex items-center justify-between p-4 bg-[#0f1419] rounded-xl hover:bg-[#0f1419]/80 transition-colors cursor-pointer group">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-[#8b5cf6]/20 flex items-center justify-center">
-                      <Users className="w-5 h-5 text-[#8b5cf6]" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-white">{pendingUsers} Pending Users</p>
-                      <p className="text-sm text-[#6b7280]">Awaiting approval</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 text-[#10b981] group-hover:translate-x-1 transition-transform">
-                    <span className="text-sm font-medium">Review</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </div>
-                </div>
-              </Link>
-            )}
-            
-            {pendingWithdrawals.length > 0 && (
-              <Link href="/admin/withdrawals">
-                <div className="flex items-center justify-between p-4 bg-[#0f1419] rounded-xl hover:bg-[#0f1419]/80 transition-colors cursor-pointer group">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-[#f59e0b]/20 flex items-center justify-center">
-                      <Wallet className="w-5 h-5 text-[#f59e0b]" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-white">{pendingWithdrawals.length} Withdrawal Requests</p>
-                      <p className="text-sm text-[#6b7280]">Needs processing</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 text-[#10b981] group-hover:translate-x-1 transition-transform">
-                    <span className="text-sm font-medium">Review</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </div>
-                </div>
-              </Link>
-            )}
-
-            {pendingUsers === 0 && pendingWithdrawals.length === 0 && (
-              <div className="flex items-center justify-center p-8 text-center">
-                <div>
-                  <div className="w-12 h-12 rounded-full bg-[#10b981]/20 flex items-center justify-center mx-auto mb-3">
-                    <UserCheck className="w-6 h-6 text-[#10b981]" />
-                  </div>
-                  <p className="font-medium text-white">All Clear!</p>
-                  <p className="text-sm text-[#6b7280]">No pending approvals required.</p>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Recent Users */}
-        <div className="bg-[#1a2332] rounded-2xl border border-[#2a3a4d] overflow-hidden">
-          <div className="flex items-center justify-between p-5 border-b border-[#2a3a4d]">
-            <div className="flex items-center gap-3">
-              <Users className="w-5 h-5 text-[#8b5cf6]" />
-              <h2 className="text-lg font-semibold text-white">Recent Users</h2>
-            </div>
+          <div className="hidden md:flex items-center gap-8 text-sm font-medium text-white/70">
+            <button 
+              className="hover:text-white transition-colors"
+              onClick={() => setShowHero(false)}
+            >
+              Dashboard
+            </button>
             <Link href="/admin/users">
-              <span className="text-sm text-[#10b981] hover:underline cursor-pointer">View all</span>
+              <button className="hover:text-white transition-colors">Users</button>
+            </Link>
+            <Link href="/admin/transactions/users">
+              <button className="hover:text-white transition-colors">Transactions</button>
+            </Link>
+            <Link href="/admin/cms/dashboard">
+              <button className="hover:text-white transition-colors">Settings</button>
             </Link>
           </div>
-          <div className="p-4 space-y-3">
-            {recentUsers.length > 0 ? (
-              recentUsers.map(user => (
-                <div key={user.id} className="flex items-center justify-between p-3 bg-[#0f1419] rounded-xl">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#8b5cf6] to-[#6366f1] flex items-center justify-center text-white font-bold">
-                      {user.fullName?.charAt(0).toUpperCase() || user.username.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <p className="font-medium text-white">{user.fullName || user.username}</p>
-                      <p className="text-sm text-[#6b7280]">@{user.username}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${
-                      user.status === 'active' 
-                        ? 'bg-[#10b981]/20 text-[#10b981]' 
-                        : user.status === 'pending'
-                        ? 'bg-[#f59e0b]/20 text-[#f59e0b]'
-                        : 'bg-[#ef4444]/20 text-[#ef4444]'
-                    }`}>
-                      {user.status}
-                    </span>
-                    <p className="text-sm text-[#10b981] mt-1">{formatCurrency(user.balance || 0)}</p>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="flex items-center justify-center p-8 text-center">
-                <div>
-                  <AlertCircle className="w-8 h-8 text-[#6b7280] mx-auto mb-2" />
-                  <p className="text-[#6b7280]">No users yet</p>
-                </div>
-              </div>
-            )}
+          <button 
+            className="text-sm font-bold tracking-tight hover:text-orange-500 transition-colors"
+            onClick={() => setShowHero(false)}
+          >
+            Enter Admin Panel
+          </button>
+        </nav>
+
+        <div className="relative z-10 max-w-4xl text-center px-4 space-y-10 animate-in fade-in slide-in-from-bottom-8 duration-1000">
+          <h1 className="text-6xl md:text-8xl font-bold tracking-tighter leading-[0.9] text-white">
+            ODEL Admin<br />Control Center
+          </h1>
+          <p className="text-lg md:text-xl text-white/60 max-w-2xl mx-auto leading-relaxed font-medium">
+            Manage users, transactions, and platform settings.<br className="hidden md:block" />
+            Full control over <span className="text-white">your advertising platform.</span>
+          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-6">
+            <Button 
+              size="lg" 
+              className="h-14 px-10 text-base font-bold bg-orange-500 text-white hover:bg-orange-600 rounded-none w-full sm:w-auto transition-transform active:scale-95"
+              onClick={() => setShowHero(false)}
+            >
+              Open Dashboard
+            </Button>
+            <Button 
+              size="lg" 
+              variant="outline"
+              className="h-14 px-10 text-base font-bold border-white/20 text-white hover:bg-white/10 rounded-none w-full sm:w-auto backdrop-blur-md transition-transform active:scale-95"
+            >
+              View Documentation
+            </Button>
           </div>
         </div>
       </div>
-    </div>
+    );
+  }
+
+  return (
+    <AdminLayout>
+      <div className="flex flex-col gap-1 mb-6">
+        <h1 className="text-2xl font-bold tracking-tight">Dashboard Overview</h1>
+        <p className="text-sm text-muted-foreground">Monitor your platform's performance and key metrics.</p>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card className="shadow-sm border-border/40">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total Users</p>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-2xl font-bold">{stats?.totalUsers || 0}</p>
+                  <span className="text-xs font-medium text-green-500">+12%</span>
+                </div>
+              </div>
+              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <Users className="h-5 w-5 text-primary" />
+              </div>
+            </div>
+            <div className="mt-4 h-1 w-full bg-muted overflow-hidden rounded-full">
+              <div className="h-full bg-primary" style={{ width: '70%' }} />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm border-border/40">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Ad Clicks</p>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-2xl font-bold">{(stats?.totalAdClicks || 0).toLocaleString()}</p>
+                  <span className="text-xs font-medium text-green-500">+8%</span>
+                </div>
+              </div>
+              <div className="h-10 w-10 rounded-full bg-blue-500/10 flex items-center justify-center">
+                <MousePointer className="h-5 w-5 text-blue-500" />
+              </div>
+            </div>
+            <div className="mt-4 h-1 w-full bg-muted overflow-hidden rounded-full">
+              <div className="h-full bg-blue-500" style={{ width: '45%' }} />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm border-border/40">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total Distributed</p>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-2xl font-bold">LKR {Math.round(parseFloat(stats?.totalEarnings || "0")).toLocaleString()}</p>
+                  <span className="text-xs font-medium text-green-500">+23%</span>
+                </div>
+              </div>
+              <div className="h-10 w-10 rounded-full bg-purple-500/10 flex items-center justify-center">
+                <TrendingUp className="h-5 w-5 text-purple-500" />
+              </div>
+            </div>
+            <div className="mt-4 h-1 w-full bg-muted overflow-hidden rounded-full">
+              <div className="h-full bg-purple-500" style={{ width: '85%' }} />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm border-border/40">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Active Sessions</p>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-2xl font-bold">{stats?.activeUsers || 0}</p>
+                  <span className="text-xs font-medium text-blue-500">Live</span>
+                </div>
+              </div>
+              <div className="h-10 w-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                <Users className="h-5 w-5 text-emerald-500" />
+              </div>
+            </div>
+            <div className="mt-4 h-1 w-full bg-muted overflow-hidden rounded-full">
+              <div className="h-full bg-emerald-500" style={{ width: '60%' }} />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2 mt-6">
+        <Card className="shadow-sm border-border/40">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 border-b pb-4">
+            <div className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-primary" />
+              <CardTitle className="text-base font-semibold">Priority Pending</CardTitle>
+            </div>
+            <Badge variant="secondary" className="rounded-full px-2.5 py-0.5 bg-primary/10 text-primary border-none">
+              {(stats?.pendingUsers || 0) + pendingWithdrawalsList.length} total
+            </Badge>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y divide-border/40">
+              <div className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                    <Users className="h-4.5 w-4.5 text-amber-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">{stats?.pendingUsers || 0} Pending Users</p>
+                    <p className="text-xs text-muted-foreground">Identity verification required</p>
+                  </div>
+                </div>
+                <Link href="/admin/users/pending">
+                  <Button variant="outline" size="sm" className="h-8 rounded-md" data-testid="link-review-users">
+                    Manage
+                  </Button>
+                </Link>
+              </div>
+
+              <div className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                    <Wallet className="h-4.5 w-4.5 text-blue-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">{pendingWithdrawalsList.length} Payout Requests</p>
+                    <p className="text-xs text-muted-foreground">Bank transfers to process</p>
+                  </div>
+                </div>
+                <Link href="/admin/withdrawals">
+                  <Button variant="outline" size="sm" className="h-8 rounded-md" data-testid="link-review-withdrawals">
+                    Manage
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm border-border/40">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 border-b pb-4">
+            <div className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
+              <CardTitle className="text-base font-semibold">Recent Registrations</CardTitle>
+            </div>
+            <Link href="/admin/users">
+              <Button variant="ghost" size="sm" className="text-xs text-muted-foreground h-8" data-testid="link-view-all-users">
+                View All
+              </Button>
+            </Link>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y divide-border/40">
+              {recentUsers.length > 0 ? recentUsers.map((u: any) => (
+                <div key={u.id} className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors" data-testid={`user-row-${u.id}`}>
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-9 w-9">
+                      <AvatarImage src={u.profileImageUrl} />
+                      <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+                        {u.firstName?.[0] || "U"}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold truncate">{u.firstName} {u.lastName}</p>
+                      <p className="text-[10px] text-muted-foreground truncate uppercase tracking-wider font-medium">{u.email?.split("@")[0]}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <p className="text-xs font-semibold">LKR {Math.round(parseFloat(u.milestoneAmount || "0")).toLocaleString()}</p>
+                      <p className="text-[10px] text-muted-foreground uppercase font-medium">{u.status}</p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground/40" />
+                  </div>
+                </div>
+              )) : (
+                <div className="p-8 text-center text-sm text-muted-foreground">No recent users found.</div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </AdminLayout>
   );
 }

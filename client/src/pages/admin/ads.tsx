@@ -1,510 +1,313 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { AdminLayout } from "@/components/admin-layout";
+import { useAuth } from "@/hooks/use-auth";
+import { useAds } from "@/hooks/use-ads";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
-import { useState } from "react";
-import type { Ad } from "@shared/schema";
-import { Plus, Edit, Trash2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { Megaphone, Plus, Pencil, Trash2, ExternalLink, ArrowLeft } from "lucide-react";
 
 export default function AdminAds() {
+  const { user } = useAuth();
+  const { data: ads, isLoading } = useAds();
   const { toast } = useToast();
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [selectedAd, setSelectedAd] = useState<Ad | null>(null);
-  
-  // Form state
-  const [adCode, setAdCode] = useState("");
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState("");
-  const [name, setName] = useState("");
-  const [price, setPrice] = useState("101.75");
-  const [details, setDetails] = useState("");
-  const [link, setLink] = useState("");
-
-  const { data: ads = [], isLoading } = useQuery<Ad[]>({
-    queryKey: ["/api/ads"],
+  const [isOpen, setIsOpen] = useState(false);
+  const [editingAd, setEditingAd] = useState<any>(null);
+  const [formData, setFormData] = useState({
+    title: "",
+    description: "",
+    imageUrl: "",
+    targetUrl: "",
+    price: "",
+    isActive: true
   });
 
-  const createAdMutation = useMutation({
-    mutationFn: async (formData: FormData) => {
-      const response = await fetch("/api/admin/ads", {
-        method: "POST",
-        body: formData,
-      });
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error);
-      }
-      return response.json();
+  const resetForm = () => {
+    setFormData({
+      title: "",
+      description: "",
+      imageUrl: "",
+      targetUrl: "",
+      price: "",
+      isActive: true
+    });
+    setEditingAd(null);
+  };
+
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", "/api/ads", formData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/ads"] });
-      toast({
-        title: "Ad Created",
-        description: "The ad has been created successfully",
-      });
+      toast({ title: "Ad created successfully" });
+      setIsOpen(false);
       resetForm();
-      setIsAddDialogOpen(false);
-    },
-    onError: (error: Error) => {
-      toast({
-        variant: "destructive",
-        title: "Creation Failed",
-        description: error.message,
-      });
-    },
-  });
-
-  const updateAdMutation = useMutation({
-    mutationFn: async ({ id, formData }: { id: number; formData: FormData }) => {
-      const response = await fetch(`/api/admin/ads/${id}`, {
-        method: "PUT",
-        body: formData,
-      });
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error);
-      }
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/ads"] });
-      toast({
-        title: "Ad Updated",
-        description: "The ad has been updated successfully",
-      });
-      resetForm();
-      setIsEditDialogOpen(false);
-      setSelectedAd(null);
-    },
-    onError: (error: Error) => {
-      toast({
-        variant: "destructive",
-        title: "Update Failed",
-        description: error.message,
-      });
-    },
-  });
-
-  const deleteAdMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const response = await fetch(`/api/admin/ads/${id}`, {
-        method: "DELETE",
-      });
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error);
-      }
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/ads"] });
-      toast({
-        title: "Ad Deleted",
-        description: "The ad has been deleted successfully",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        variant: "destructive",
-        title: "Deletion Failed",
-        description: error.message,
-      });
-    },
-  });
-
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setImageFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
     }
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("PUT", `/api/ads/${editingAd.id}`, formData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/ads"] });
+      toast({ title: "Ad updated successfully" });
+      setIsOpen(false);
+      resetForm();
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest("DELETE", `/api/ads/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/ads"] });
+      toast({ title: "Ad deleted successfully" });
+    }
+  });
+
+  const handleEdit = (ad: any) => {
+    setEditingAd(ad);
+    setFormData({
+      title: ad.title,
+      description: ad.description,
+      imageUrl: ad.imageUrl,
+      targetUrl: ad.targetUrl,
+      price: ad.price,
+      isActive: ad.isActive
+    });
+    setIsOpen(true);
   };
 
   const handleSubmit = () => {
-    if (!imageFile || !name || !price || !details || !link || !adCode) {
-      toast({
-        variant: "destructive",
-        title: "Missing Information",
-        description: "Please fill in all fields including image",
-      });
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append("image", imageFile);
-    formData.append("adCode", adCode);
-    formData.append("name", name);
-    formData.append("price", price);
-    formData.append("details", details);
-    formData.append("link", link);
-
-    createAdMutation.mutate(formData);
-  };
-
-  const handleEdit = (ad: Ad) => {
-    setSelectedAd(ad);
-    setAdCode(ad.adCode);
-    setName(ad.adCode);
-    setPrice(ad.price);
-    setLink(ad.link);
-    setDetails("");
-    setImagePreview(ad.imageUrl || "");
-    setIsEditDialogOpen(true);
-  };
-
-  const handleUpdate = () => {
-    if (!selectedAd) return;
-
-    if (!name || !price || !link || !adCode) {
-      toast({
-        variant: "destructive",
-        title: "Missing Information",
-        description: "Please fill in all required fields",
-      });
-      return;
-    }
-
-    const formData = new FormData();
-    if (imageFile) {
-      formData.append("image", imageFile);
-    }
-    formData.append("adCode", adCode);
-    formData.append("name", name);
-    formData.append("price", price);
-    formData.append("details", details);
-    formData.append("link", link);
-
-    updateAdMutation.mutate({ id: selectedAd.id, formData });
-  };
-
-  const handleDelete = (id: number) => {
-    if (confirm("Are you sure you want to delete this ad? This action cannot be undone.")) {
-      deleteAdMutation.mutate(id);
+    if (editingAd) {
+      updateMutation.mutate();
+    } else {
+      createMutation.mutate();
     }
   };
 
-  const resetForm = () => {
-    setAdCode("");
-    setImageFile(null);
-    setImagePreview("");
-    setName("");
-    setPrice("101.75");
-    setDetails("");
-    setLink("");
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <p className="text-muted-foreground">Loading ads...</p>
-      </div>
-    );
+  if (!(user as any)?.isAdmin) {
+    return <div className="p-8 text-center text-red-500">Access Denied</div>;
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between bg-card border rounded-lg p-4">
-        <h1 className="text-xl font-bold" style={{ color: '#B8936B' }}>
-          Ads List
-        </h1>
-        <div className="flex items-center gap-4">
-          <p className="text-sm text-muted-foreground">Hello, welcome to HolidayInn!</p>
-          <Button
-            onClick={() => setIsAddDialogOpen(true)}
-            className="bg-amber-600 hover:bg-amber-700"
-            data-testid="button-add-ad"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            ADD AD
-          </Button>
+    <AdminLayout>
+      <Button 
+        variant="ghost" 
+        onClick={() => window.history.back()}
+        className="text-zinc-400 hover:text-white mb-4"
+        data-testid="button-back"
+      >
+        <ArrowLeft className="w-4 h-4 mr-2" />
+        Back
+      </Button>
+      <div className="flex items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-lg bg-primary/20 flex items-center justify-center">
+            <Megaphone className="h-6 w-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold">Manage Ads</h1>
+            <p className="text-muted-foreground">{ads?.length || 0} total ads</p>
+          </div>
         </div>
+        <Dialog open={isOpen} onOpenChange={(open) => { setIsOpen(open); if (!open) resetForm(); }}>
+          <DialogTrigger asChild>
+            <Button data-testid="button-create-ad">
+              <Plus className="mr-2 h-4 w-4" />
+              Create Ad
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>{editingAd ? "Edit Ad" : "Create New Ad"}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 mt-4">
+              <div>
+                <Label>Title</Label>
+                <Input
+                  value={formData.title}
+                  onChange={(e) => setFormData({...formData, title: e.target.value})}
+                  placeholder="Ad title"
+                  data-testid="input-ad-title"
+                />
+              </div>
+              <div>
+                <Label>Description</Label>
+                <Textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({...formData, description: e.target.value})}
+                  placeholder="Short description"
+                  data-testid="input-ad-description"
+                />
+              </div>
+              <div>
+                <Label>Image URL</Label>
+                <Input
+                  value={formData.imageUrl}
+                  onChange={(e) => setFormData({...formData, imageUrl: e.target.value})}
+                  placeholder="https://example.com/image.jpg"
+                  data-testid="input-ad-image"
+                />
+              </div>
+              <div>
+                <Label>Target URL</Label>
+                <Input
+                  value={formData.targetUrl}
+                  onChange={(e) => setFormData({...formData, targetUrl: e.target.value})}
+                  placeholder="https://example.com"
+                  data-testid="input-ad-target"
+                />
+              </div>
+              <div>
+                <Label>Price per Click (LKR)</Label>
+                <Input
+                  type="number"
+                  value={formData.price}
+                  onChange={(e) => setFormData({...formData, price: e.target.value})}
+                  placeholder="0.50"
+                  data-testid="input-ad-price"
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label>Active</Label>
+                <Switch
+                  checked={formData.isActive}
+                  onCheckedChange={(checked) => setFormData({...formData, isActive: checked})}
+                  data-testid="switch-ad-active"
+                />
+              </div>
+              <Button
+                className="w-full"
+                onClick={handleSubmit}
+                disabled={createMutation.isPending || updateMutation.isPending}
+                data-testid="button-submit-ad"
+              >
+                {editingAd ? "Update Ad" : "Create Ad"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
-      {/* Ads List */}
-      <div className="space-y-4">
-        {ads.length === 0 ? (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <p className="text-muted-foreground">No ads created yet. Click "ADD AD" to create your first ad.</p>
-            </CardContent>
-          </Card>
-        ) : (
-          ads.map((ad) => (
-            <Card key={ad.id} className="bg-card">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-4">
-                  {/* Image */}
-                  <div className="w-24 h-24 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-                    {ad.imageUrl ? (
-                      <img
-                        src={ad.imageUrl}
-                        alt={ad.adCode}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                        No Image
+      <Card>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Ad</TableHead>
+                <TableHead>Price</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-8">Loading...</TableCell>
+                </TableRow>
+              ) : !ads?.length ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    No ads yet. Create your first ad!
+                  </TableCell>
+                </TableRow>
+              ) : (
+                ads.map((ad) => (
+                  <TableRow key={ad.id} data-testid={`row-ad-${ad.id}`}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={ad.imageUrl}
+                          alt={ad.title}
+                          className="w-16 h-12 object-cover rounded"
+                        />
+                        <div>
+                          <p className="font-medium">{ad.title}</p>
+                          <p className="text-xs text-muted-foreground line-clamp-1">
+                            {ad.description}
+                          </p>
+                        </div>
                       </div>
-                    )}
-                  </div>
-
-                  {/* Ad Info */}
-                  <div className="flex-1 grid grid-cols-4 gap-4">
-                    <div>
-                      <p className="font-semibold text-sm mb-1">{ad.adCode}</p>
-                      <p className="text-xs text-muted-foreground flex items-center gap-1">
-                        <span className="inline-block w-2 h-2 rounded-full bg-green-500"></span>
-                        {ad.price}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">{ad.link}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground flex items-center gap-1">
-                        <span className="inline-block w-2 h-2 rounded-full bg-gray-400"></span>
-                        {ad.price}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground line-clamp-2">
-                        {ad.link}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex gap-2">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950"
-                      onClick={() => handleEdit(ad)}
-                      data-testid={`button-edit-${ad.id}`}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
-                      onClick={() => handleDelete(ad.id)}
-                      data-testid={`button-delete-${ad.id}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
-
-      {/* Add Ad Dialog */}
-      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Completely fill the form below!</DialogTitle>
-            <DialogDescription>Add a new ad to the platform</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="image">Choose Image (Main)</Label>
-              <Input
-                id="image"
-                type="file"
-                accept="image/*"
-                onChange={handleImageChange}
-                data-testid="input-ad-image"
-              />
-              {imagePreview && (
-                <div className="mt-2 w-full h-32 rounded-lg overflow-hidden bg-muted">
-                  <img
-                    src={imagePreview}
-                    alt="Preview"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className="bg-primary/20 text-primary">
+                        LKR {parseFloat(ad.price).toFixed(2)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={ad.isActive ? "default" : "secondary"}
+                        className={ad.isActive ? "bg-green-500/20 text-green-500" : ""}
+                      >
+                        {ad.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {ad.createdAt ? new Date(ad.createdAt).toLocaleDateString() : "-"}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => window.open(ad.targetUrl, "_blank")}
+                          data-testid={`button-view-ad-${ad.id}`}
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleEdit(ad)}
+                          data-testid={`button-edit-ad-${ad.id}`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="text-destructive"
+                          onClick={() => deleteMutation.mutate(ad.id)}
+                          data-testid={`button-delete-ad-${ad.id}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
               )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="adCode">Ad Code</Label>
-              <Input
-                id="adCode"
-                placeholder="e.g. AD-0001"
-                value={adCode}
-                onChange={(e) => setAdCode(e.target.value)}
-                data-testid="input-ad-code"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                placeholder="e.g. Fashion Product Ad"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                data-testid="input-ad-name"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="price">Price (LKR)</Label>
-              <Input
-                id="price"
-                type="number"
-                step="0.01"
-                placeholder="e.g. 101.75"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                data-testid="input-ad-price"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="link">Link (URL)</Label>
-              <Input
-                id="link"
-                placeholder="e.g. https://example.com/product"
-                value={link}
-                onChange={(e) => setLink(e.target.value)}
-                data-testid="input-ad-link"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="details">Details</Label>
-              <Textarea
-                id="details"
-                placeholder="Ad Details"
-                value={details}
-                onChange={(e) => setDetails(e.target.value)}
-                rows={3}
-                data-testid="input-ad-details"
-              />
-            </div>
-            <Button
-              onClick={handleSubmit}
-              disabled={createAdMutation.isPending}
-              className="w-full bg-amber-600 hover:bg-amber-700 text-white"
-              data-testid="button-submit-ad"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              {createAdMutation.isPending ? "Adding..." : "ADD AD"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Ad Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit Ad</DialogTitle>
-            <DialogDescription>Update the ad information</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-image">Choose Image (Main)</Label>
-              <Input
-                id="edit-image"
-                type="file"
-                accept="image/*"
-                onChange={handleImageChange}
-                data-testid="input-edit-ad-image"
-              />
-              {imagePreview && (
-                <div className="mt-2 w-full h-32 rounded-lg overflow-hidden bg-muted">
-                  <img
-                    src={imagePreview}
-                    alt="Preview"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              )}
-              <p className="text-xs text-muted-foreground">Leave empty to keep current image</p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-adCode">Ad Code</Label>
-              <Input
-                id="edit-adCode"
-                placeholder="e.g. AD-0001"
-                value={adCode}
-                onChange={(e) => setAdCode(e.target.value)}
-                data-testid="input-edit-ad-code"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-name">Name</Label>
-              <Input
-                id="edit-name"
-                placeholder="e.g. Fashion Product Ad"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                data-testid="input-edit-ad-name"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-price">Price (LKR)</Label>
-              <Input
-                id="edit-price"
-                type="number"
-                step="0.01"
-                placeholder="e.g. 101.75"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                data-testid="input-edit-ad-price"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-link">Link (URL)</Label>
-              <Input
-                id="edit-link"
-                placeholder="e.g. https://example.com/product"
-                value={link}
-                onChange={(e) => setLink(e.target.value)}
-                data-testid="input-edit-ad-link"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-details">Details</Label>
-              <Textarea
-                id="edit-details"
-                placeholder="Ad Details"
-                value={details}
-                onChange={(e) => setDetails(e.target.value)}
-                rows={3}
-                data-testid="input-edit-ad-details"
-              />
-            </div>
-            <Button
-              onClick={handleUpdate}
-              disabled={updateAdMutation.isPending}
-              className="w-full bg-amber-600 hover:bg-amber-700 text-white"
-              data-testid="button-update-ad"
-            >
-              <Edit className="h-4 w-4 mr-2" />
-              {updateAdMutation.isPending ? "Updating..." : "UPDATE AD"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </AdminLayout>
   );
 }

@@ -1,211 +1,293 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import NotFound from "@/pages/not-found";
-import Home from "@/pages/home";
-import Register from "@/pages/register";
-import Login from "@/pages/login";
+import { useAuth } from "@/hooks/use-auth";
+import { Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+
+import SplashPage from "@/pages/splash";
+import LandingPage from "@/pages/landing";
+import AuthPage from "@/pages/auth";
 import Dashboard from "@/pages/dashboard";
-import RatingPage from "@/pages/rating";
-import AdminLayout from "@/pages/admin/layout";
-import AdminDashboard from "@/pages/admin/dashboard";
-import AdminUsers from "@/pages/admin/users";
-import AdminPending from "@/pages/admin/pending";
-import AdminUserDetail from "@/pages/admin/user-detail";
-import AdminRatings from "@/pages/admin/ratings";
-import AdminWithdrawals from "@/pages/admin/withdrawals";
-import AdminAds from "@/pages/admin/ads";
-import AdminTransactions from "@/pages/admin/transactions";
-import AdminPremium from "@/pages/admin/premium";
-import AdminPremiumManage from "@/pages/admin/premium-manage";
-import AdminDeposits from "@/pages/admin/deposits";
-import AdminCommission from "@/pages/admin/commission";
-import AdminAdmins from "@/pages/admin/admins";
-import AdminSlideshow from "@/pages/admin/admin-slideshow";
-import AdminThemeSettings from "@/pages/admin/admin-theme-settings";
-// NEW PAGES
-import AdminTransactionUsers from "@/pages/admin/transaction-users";
-import AdminContactPhone from "@/pages/admin/contact-phone";
-import AdminContactEmail from "@/pages/admin/contact-email";
-import AdminContactWhatsapp from "@/pages/admin/contact-whatsapp";
-import AdminContactTelegram from "@/pages/admin/contact-telegram";
-import AdminInfoAbout from "@/pages/admin/info-about";
-import AdminInfoTerms from "@/pages/admin/info-terms";
-import AdminInfoPrivacy from "@/pages/admin/info-privacy";
-import AdminContentHome from "@/pages/admin/content-home";
-import AdminContentDashboard from "@/pages/admin/content-dashboard";
-import AdminContentText from "@/pages/admin/content-text";
-import AdminBranding from "@/pages/admin/branding";
-import Features from "@/pages/features";
-import PointsPage from "@/pages/points";
 import WithdrawPage from "@/pages/withdraw";
-import WalletPage from "@/pages/wallet";
+import ExclusivesPage from "@/pages/exclusives";
+import StatusPage from "@/pages/status";
+import AdsHubPage from "@/pages/ads-hub";
+import ContactPage from "@/pages/contact";
+import EventsPage from "@/pages/events";
+import SettingsPage from "@/pages/settings";
+import NotFound from "@/pages/not-found";
+import PendingAccountPage from "@/pages/pending-account";
+import AdminLoginPage from "@/pages/admin-login";
+
+import AdminDashboard from "@/pages/admin/dashboard";
+import AdminAllUsers from "@/pages/admin/users/index";
+import AdminPendingUsers from "@/pages/admin/users/pending";
+import AdminAdmins from "@/pages/admin/users/admins";
+import AdminTransactionUsers from "@/pages/admin/transactions/users";
+import AdminPremiumManage from "@/pages/admin/transactions/premium";
+import AdminPremiumPlans from "@/pages/admin/transactions/premium-plans";
+import AdminPremiumUsers from "@/pages/admin/transactions/premium-users";
+import AdminPremiumHistory from "@/pages/admin/transactions/premium-history";
+import AdminTransactionDetails from "@/pages/admin/transactions/details";
+import AdminWithdrawals from "@/pages/admin/withdrawals";
+import AdminDeposits from "@/pages/admin/deposits";
+import AdminCommissions from "@/pages/admin/commissions";
+import AdminAds from "@/pages/admin/ads";
+import AdminSlides from "@/pages/admin/slides";
+import AdminContact from "@/pages/admin/contact/index";
+import AdminInfoPages from "@/pages/admin/pages/index";
+import AdminHomeContent from "@/pages/admin/content/home";
+import AdminLabels from "@/pages/admin/content/labels";
+import AdminTheme from "@/pages/admin/appearance/theme";
+import AdminBranding from "@/pages/admin/appearance/branding";
+import AdminDashboardSettings from "@/pages/admin/cms/dashboard-settings";
+
+function ProtectedRoute({ component: Component, adminOnly = false }: { component: React.ComponentType, adminOnly?: boolean }) {
+  const { user, isLoading } = useAuth();
+  const [, setLocation] = useLocation();
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    if (adminOnly) {
+      setLocation("/admin/login");
+      return null;
+    }
+    return <LandingPage />;
+  }
+
+  // Check if user account is pending activation (not for admins)
+  if ((user as any).status === "pending" && !(user as any).isAdmin) {
+    return <PendingAccountPage />;
+  }
+
+  if (adminOnly && !(user as any).isAdmin) {
+    return <NotFound />;
+  }
+
+  return <Component />;
+}
+
+function AdminProtectedRoute({ component: Component }: { component: React.ComponentType }) {
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    fetch("/api/admin/session", { credentials: "include" })
+      .then(res => res.json())
+      .then(data => {
+        setIsLoggedIn(data.isLoggedIn);
+        setIsLoading(false);
+      })
+      .catch(() => {
+        setIsLoggedIn(false);
+        setIsLoading(false);
+      });
+  }, []);
+
+  useEffect(() => {
+    if (!isLoading && !isLoggedIn) {
+      setLocation("/admin/login");
+    }
+  }, [isLoading, isLoggedIn, setLocation]);
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isLoggedIn) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  return <Component />;
+}
+
+function HomePage() {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (user) {
+    // Check if user account is pending activation (not for admins)
+    if ((user as any).status === "pending" && !(user as any).isAdmin) {
+      return <PendingAccountPage />;
+    }
+    return <Dashboard />;
+  }
+
+  return <SplashPage />;
+}
+
+function WelcomePage() {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (user) {
+    // Check if user account is pending activation (not for admins)
+    if ((user as any).status === "pending" && !(user as any).isAdmin) {
+      return <PendingAccountPage />;
+    }
+    return <Dashboard />;
+  }
+
+  return <LandingPage />;
+}
 
 function Router() {
   return (
     <Switch>
-      {/* Public Routes */}
-      <Route path="/" component={Home} />
-      <Route path="/register" component={Register} />
-      <Route path="/login" component={Login} />
-      <Route path="/dashboard" component={Dashboard} />
-      <Route path="/rating" component={RatingPage} />
-      <Route path="/features" component={Features} />
-      <Route path="/withdraw" component={WithdrawPage} />
-      <Route path="/wallet" component={WalletPage} />
-      <Route path="/points" component={PointsPage} />
+      <Route path="/" component={HomePage} />
+      <Route path="/welcome" component={WelcomePage} />
+      <Route path="/auth/login">
+        {() => <AuthPage defaultMode="login" />}
+      </Route>
+      <Route path="/auth/register">
+        {() => <AuthPage defaultMode="register" />}
+      </Route>
+      
+      <Route path="/dashboard">
+        {() => <ProtectedRoute component={Dashboard} />}
+      </Route>
+      <Route path="/withdraw">
+        {() => <ProtectedRoute component={WithdrawPage} />}
+      </Route>
+      <Route path="/exclusives">
+        {() => <ProtectedRoute component={ExclusivesPage} />}
+      </Route>
+      <Route path="/status">
+        {() => <ProtectedRoute component={StatusPage} />}
+      </Route>
+      <Route path="/withdrawals">
+        {() => <ProtectedRoute component={WithdrawPage} />}
+      </Route>
+      <Route path="/ads-hub">
+        {() => <ProtectedRoute component={AdsHubPage} />}
+      </Route>
+      <Route path="/contact">
+        {() => <ProtectedRoute component={ContactPage} />}
+      </Route>
+      <Route path="/events">
+        {() => <ProtectedRoute component={EventsPage} />}
+      </Route>
+      <Route path="/settings">
+        {() => <ProtectedRoute component={SettingsPage} />}
+      </Route>
 
-      {/* Admin Dashboard */}
+      <Route path="/admin/login" component={AdminLoginPage} />
       <Route path="/admin">
-        <AdminLayout>
-          <AdminDashboard />
-        </AdminLayout>
+        {() => <AdminProtectedRoute component={AdminDashboard} />}
       </Route>
-
-      {/* USER MANAGEMENT */}
       <Route path="/admin/users">
-        <AdminLayout>
-          <AdminUsers />
-        </AdminLayout>
+        {() => <AdminProtectedRoute component={AdminAllUsers} />}
       </Route>
-      <Route path="/admin/pending">
-        <AdminLayout>
-          <AdminPending />
-        </AdminLayout>
+      <Route path="/admin/users/pending">
+        {() => <AdminProtectedRoute component={AdminPendingUsers} />}
       </Route>
-      <Route path="/admin/admins">
-        <AdminLayout>
-          <AdminAdmins />
-        </AdminLayout>
+      <Route path="/admin/users/admins">
+        {() => <AdminProtectedRoute component={AdminAdmins} />}
       </Route>
-      <Route path="/admin/users/:id">
-        <AdminLayout>
-          <AdminUserDetail />
-        </AdminLayout>
+      <Route path="/admin/transactions/users">
+        {() => <AdminProtectedRoute component={AdminTransactionUsers} />}
       </Route>
-
-      {/* TRANSACTION */}
-      <Route path="/admin/transaction-users">
-        <AdminLayout>
-          <AdminTransactionUsers />
-        </AdminLayout>
+      <Route path="/admin/transactions/premium">
+        {() => <AdminProtectedRoute component={AdminPremiumManage} />}
       </Route>
-      <Route path="/admin/premium-manage">
-        <AdminLayout>
-          <AdminPremiumManage />
-        </AdminLayout>
+      <Route path="/admin/transactions/premium-plans">
+        {() => <AdminProtectedRoute component={AdminPremiumPlans} />}
       </Route>
-      <Route path="/admin/premium">
-        <AdminLayout>
-          <AdminPremium />
-        </AdminLayout>
+      <Route path="/admin/transactions/premium-users">
+        {() => <AdminProtectedRoute component={AdminPremiumUsers} />}
       </Route>
-      <Route path="/admin/transactions">
-        <AdminLayout>
-          <AdminTransactions />
-        </AdminLayout>
+      <Route path="/admin/transactions/premium-history">
+        {() => <AdminProtectedRoute component={AdminPremiumHistory} />}
+      </Route>
+      <Route path="/admin/transactions/details">
+        {() => <AdminProtectedRoute component={AdminTransactionDetails} />}
       </Route>
       <Route path="/admin/withdrawals">
-        <AdminLayout>
-          <AdminWithdrawals />
-        </AdminLayout>
+        {() => <AdminProtectedRoute component={AdminWithdrawals} />}
       </Route>
       <Route path="/admin/deposits">
-        <AdminLayout>
-          <AdminDeposits />
-        </AdminLayout>
+        {() => <AdminProtectedRoute component={AdminDeposits} />}
       </Route>
-      <Route path="/admin/commission">
-        <AdminLayout>
-          <AdminCommission />
-        </AdminLayout>
+      <Route path="/admin/commissions">
+        {() => <AdminProtectedRoute component={AdminCommissions} />}
       </Route>
-
-      {/* ADS MANAGEMENT */}
       <Route path="/admin/ads">
-        <AdminLayout>
-          <AdminAds />
-        </AdminLayout>
+        {() => <AdminProtectedRoute component={AdminAds} />}
       </Route>
-      <Route path="/admin/ratings">
-        <AdminLayout>
-          <AdminRatings />
-        </AdminLayout>
+      <Route path="/admin/slides">
+        {() => <AdminProtectedRoute component={AdminSlides} />}
       </Route>
-
-      {/* SOCIAL MEDIA - Contact Us */}
       <Route path="/admin/contact/phone">
-        <AdminLayout>
-          <AdminContactPhone />
-        </AdminLayout>
+        {() => <AdminProtectedRoute component={AdminContact} />}
       </Route>
       <Route path="/admin/contact/email">
-        <AdminLayout>
-          <AdminContactEmail />
-        </AdminLayout>
+        {() => <AdminProtectedRoute component={AdminContact} />}
       </Route>
       <Route path="/admin/contact/whatsapp">
-        <AdminLayout>
-          <AdminContactWhatsapp />
-        </AdminLayout>
+        {() => <AdminProtectedRoute component={AdminContact} />}
       </Route>
       <Route path="/admin/contact/telegram">
-        <AdminLayout>
-          <AdminContactTelegram />
-        </AdminLayout>
+        {() => <AdminProtectedRoute component={AdminContact} />}
       </Route>
-
-      {/* SOCIAL MEDIA - Info */}
-      <Route path="/admin/info/about">
-        <AdminLayout>
-          <AdminInfoAbout />
-        </AdminLayout>
+      <Route path="/admin/pages/about">
+        {() => <AdminProtectedRoute component={AdminInfoPages} />}
       </Route>
-      <Route path="/admin/info/terms">
-        <AdminLayout>
-          <AdminInfoTerms />
-        </AdminLayout>
+      <Route path="/admin/pages/terms">
+        {() => <AdminProtectedRoute component={AdminInfoPages} />}
       </Route>
-      <Route path="/admin/info/privacy">
-        <AdminLayout>
-          <AdminInfoPrivacy />
-        </AdminLayout>
+      <Route path="/admin/pages/privacy">
+        {() => <AdminProtectedRoute component={AdminInfoPages} />}
       </Route>
-
-      {/* SITE CONTENT */}
       <Route path="/admin/content/home">
-        <AdminLayout>
-          <AdminContentHome />
-        </AdminLayout>
+        {() => <AdminProtectedRoute component={AdminHomeContent} />}
       </Route>
       <Route path="/admin/content/dashboard">
-        <AdminLayout>
-          <AdminContentDashboard />
-        </AdminLayout>
+        {() => <AdminProtectedRoute component={AdminLabels} />}
       </Route>
-      <Route path="/admin/slideshow">
-        <AdminLayout>
-          <AdminSlideshow />
-        </AdminLayout>
+      <Route path="/admin/content/labels">
+        {() => <AdminProtectedRoute component={AdminLabels} />}
       </Route>
-      <Route path="/admin/content/text">
-        <AdminLayout>
-          <AdminContentText />
-        </AdminLayout>
+      <Route path="/admin/appearance/theme">
+        {() => <AdminProtectedRoute component={AdminTheme} />}
       </Route>
-
-      {/* APPEARANCE */}
-      <Route path="/admin/theme-settings">
-        <AdminLayout>
-          <AdminThemeSettings />
-        </AdminLayout>
+      <Route path="/admin/appearance/branding">
+        {() => <AdminProtectedRoute component={AdminBranding} />}
       </Route>
-      <Route path="/admin/branding">
-        <AdminLayout>
-          <AdminBranding />
-        </AdminLayout>
+      <Route path="/admin/cms/dashboard">
+        {() => <AdminProtectedRoute component={AdminDashboardSettings} />}
       </Route>
 
       <Route component={NotFound} />
@@ -214,6 +296,10 @@ function Router() {
 }
 
 function App() {
+  useEffect(() => {
+    document.documentElement.classList.add("dark");
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>

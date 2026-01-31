@@ -1,9 +1,6 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
+import { LayoutShell } from "@/components/layout-shell";
+import { useAuth } from "@/hooks/use-auth";
+import { useUsersList, useUpdateUserStatus, useAdminDeposit } from "@/hooks/use-users";
 import {
   Table,
   TableBody,
@@ -12,212 +9,181 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { CheckCircle2, XCircle, Clock, Ban, Check, Eye, Unlock } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Link } from "wouter";
-import type { User } from "@shared/schema";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Search, Ban, CheckCircle, Wallet, Edit, ArrowLeft } from "lucide-react";
+import { useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 export default function AdminUsers() {
-  const { toast } = useToast();
+  const { user } = useAuth();
+  const { data: users, isLoading } = useUsersList();
+  const { mutate: updateStatus } = useUpdateUserStatus();
+  const { mutate: deposit } = useAdminDeposit();
+  
   const [searchTerm, setSearchTerm] = useState("");
-  const { data: users, isLoading } = useQuery<User[]>({
-    queryKey: ["/api/admin/users"],
-    refetchInterval: 3000, // Refresh every 3 seconds to show new registrations
-  });
+  const [depositUserId, setDepositUserId] = useState<string | null>(null);
+  const [depositAmount, setDepositAmount] = useState("");
 
-  const filteredUsers = users?.filter(
-    (user) =>
-      user.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  if (!(user as any)?.isAdmin) return null;
 
-  const updateStatusMutation = useMutation({
-    mutationFn: async ({ userId, status }: { userId: number; status: string }) => {
-      return apiRequest("POST", `/api/admin/users/${userId}/status`, { status });
-    },
-    onSuccess: () => {
-      toast({
-        title: "Status Updated",
-        description: "User status has been updated successfully.",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Update Failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
+  const filteredUsers = users?.filter(u => 
+    u.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    u.email?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "active":
-        return <CheckCircle2 className="h-4 w-4" />;
-      case "pending":
-        return <Clock className="h-4 w-4" />;
-      case "frozen":
-        return <XCircle className="h-4 w-4" />;
-      default:
-        return null;
-    }
-  };
-
-  const getStatusVariant = (status: string): "default" | "secondary" | "destructive" => {
-    switch (status) {
-      case "active":
-        return "default";
-      case "pending":
-        return "secondary";
-      case "frozen":
-        return "destructive";
-      default:
-        return "secondary";
+  const handleDeposit = () => {
+    if (depositUserId && depositAmount) {
+      deposit({ id: depositUserId, amount: depositAmount });
+      setDepositUserId(null);
+      setDepositAmount("");
     }
   };
 
   return (
-    <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold">All Users</h1>
-        <p className="text-muted-foreground">Manage all registered users</p>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>User Management</CardTitle>
-          <CardDescription>
-            View and manage all user accounts and their status
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Input
-            placeholder="Search by name, username, or email..."
+    <LayoutShell>
+      <Button 
+        variant="ghost" 
+        onClick={() => window.history.back()}
+        className="text-zinc-400 hover:text-white mb-4"
+        data-testid="button-back"
+      >
+        <ArrowLeft className="w-4 h-4 mr-2" />
+        Back
+      </Button>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-display font-bold">User Management</h1>
+          <p className="text-muted-foreground">Manage user accounts, approvals and balances</p>
+        </div>
+        
+        <div className="relative w-full md:w-64">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input 
+            placeholder="Search users..." 
+            className="pl-9"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            data-testid="input-search-users"
-            className="max-w-md"
           />
-          {isLoading ? (
-            <p className="text-sm text-muted-foreground">Loading users...</p>
-          ) : !filteredUsers || filteredUsers.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              {searchTerm ? "No users match your search." : "No users found."}
-            </p>
-          ) : (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Username</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Registered</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredUsers.map((user) => (
-                    <TableRow key={user.id} data-testid={`user-row-${user.id}`}>
-                      <TableCell className="font-medium" data-testid={`text-fullname-${user.id}`}>
-                        {user.fullName}
-                      </TableCell>
-                      <TableCell data-testid={`text-username-${user.id}`}>
-                        @{user.username}
-                      </TableCell>
-                      <TableCell data-testid={`text-email-${user.id}`}>
-                        {user.email}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={getStatusVariant(user.status)}
-                          className="gap-1"
-                          data-testid={`badge-status-${user.id}`}
+        </div>
+      </div>
+
+      <div className="border rounded-xl bg-card overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>User</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Balance</TableHead>
+              <TableHead className="text-right">Completed Ads</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center py-8">Loading users...</TableCell>
+              </TableRow>
+            ) : filteredUsers?.map((u) => (
+              <TableRow key={u.id}>
+                <TableCell>
+                  <div className="flex flex-col">
+                    <span className="font-medium">{u.firstName} {u.lastName}</span>
+                    <span className="text-xs text-muted-foreground">{u.email}</span>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <Badge variant={
+                    u.status === 'active' ? 'default' : 
+                    u.status === 'frozen' ? 'destructive' : 'secondary'
+                  }>
+                    {u.status}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-right font-mono font-medium">
+                  {Number(u.milestoneAmount).toFixed(2)}
+                </TableCell>
+                <TableCell className="text-right">{u.totalAdsCompleted}</TableCell>
+                <TableCell className="text-right">
+                  <div className="flex justify-end gap-2">
+                    {/* Status Actions */}
+                    {u.status === 'pending' && (
+                      <Button 
+                        size="sm" 
+                        onClick={() => updateStatus({ id: u.id, status: 'active' })}
+                        className="bg-emerald-600 hover:bg-emerald-700"
+                      >
+                        <CheckCircle className="h-4 w-4 mr-1" /> Approve
+                      </Button>
+                    )}
+                    
+                    {u.status === 'active' && (
+                      <Button 
+                        size="sm" 
+                        variant="destructive"
+                        onClick={() => updateStatus({ id: u.id, status: 'frozen' })}
+                      >
+                        <Ban className="h-4 w-4" />
+                      </Button>
+                    )}
+
+                    {u.status === 'frozen' && (
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => updateStatus({ id: u.id, status: 'active' })}
+                      >
+                        Unfreeze
+                      </Button>
+                    )}
+
+                    {/* Deposit Dialog */}
+                    <Dialog open={depositUserId === u.id} onOpenChange={(open) => !open && setDepositUserId(null)}>
+                      <DialogTrigger asChild>
+                        <Button 
+                          size="sm" 
+                          variant="secondary"
+                          onClick={() => setDepositUserId(u.id)}
                         >
-                          {getStatusIcon(user.status)}
-                          {user.status.charAt(0).toUpperCase() + user.status.slice(1)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {new Date(user.registeredAt).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Link href={`/admin/users/${user.id}`}>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              data-testid={`button-view-${user.id}`}
-                            >
-                              <Eye className="h-4 w-4 mr-1" />
-                              View
-                            </Button>
-                          </Link>
-                          {user.status !== "active" && (
-                            <Button
-                              size="sm"
-                              variant="default"
-                              onClick={() =>
-                                updateStatusMutation.mutate({
-                                  userId: user.id,
-                                  status: "active",
-                                })
-                              }
-                              disabled={updateStatusMutation.isPending}
-                              data-testid={`button-approve-${user.id}`}
-                            >
-                              <Check className="h-4 w-4 mr-1" />
-                              Approve
-                            </Button>
-                          )}
-                          {user.status !== "frozen" && (
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() =>
-                                updateStatusMutation.mutate({
-                                  userId: user.id,
-                                  status: "frozen",
-                                })
-                              }
-                              disabled={updateStatusMutation.isPending}
-                              data-testid={`button-freeze-${user.id}`}
-                            >
-                              <Ban className="h-4 w-4 mr-1" />
-                              Freeze
-                            </Button>
-                          )}
-                          {user.status === "frozen" && (
-                            <Button
-                              size="sm"
-                              variant="default"
-                              onClick={() =>
-                                updateStatusMutation.mutate({
-                                  userId: user.id,
-                                  status: "active",
-                                })
-                              }
-                              disabled={updateStatusMutation.isPending}
-                              data-testid={`button-unfreeze-${user.id}`}
-                            >
-                              <Unlock className="h-4 w-4 mr-1" />
-                              Unfreeze
-                            </Button>
-                          )}
+                          <Wallet className="h-4 w-4" />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Manual Deposit</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                          <div className="space-y-2">
+                            <Label>Amount (LKR)</Label>
+                            <Input 
+                              type="number" 
+                              placeholder="0.00" 
+                              value={depositAmount}
+                              onChange={(e) => setDepositAmount(e.target.value)}
+                            />
+                          </div>
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+                        <DialogFooter>
+                          <Button onClick={handleDeposit}>Deposit Funds</Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </LayoutShell>
   );
 }
