@@ -18,7 +18,7 @@ export default function AuthPage({ defaultMode = "login" }: AuthPageProps) {
   const [, setLocation] = useLocation();
 
   const handleAuth = () => {
-    window.location.href = "/api/login";
+    setLocation("/admin-login");
   };
 
   const handleBack = () => {
