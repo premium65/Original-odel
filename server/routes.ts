@@ -211,6 +211,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin session endpoint for admin protected routes
+  app.get("/api/admin/session", (req, res) => {
+    try {
+      console.log("[ADMIN/SESSION] Session check:", req.session);
+      console.log("[ADMIN/SESSION] Session userId:", req.session?.userId);
+      
+      if (!req.session || !req.session.userId) {
+        console.log("[ADMIN/SESSION] No session found");
+        return res.json({ isLoggedIn: false });
+      }
+      
+      if (req.session.userId === "admin") {
+        console.log("[ADMIN/SESSION] Admin session valid");
+        return res.json({ 
+          isLoggedIn: true,
+          user: {
+            id: "admin",
+            username: "admin",
+            isAdmin: 1
+          }
+        });
+      } else {
+        console.log("[ADMIN/SESSION] Non-admin session");
+        return res.json({ isLoggedIn: false });
+      }
+    } catch (error) {
+      console.error("[ADMIN/SESSION] Error:", error);
+      return res.json({ isLoggedIn: false });
+    }
+  });
+
+  // Registration endpoint
+  app.post("/api/auth/register", async (req, res) => {
+    try {
+      const { username, email, password, firstName, lastName } = req.body;
+      
+      if (!username || !email || !password) {
+        return res.status(400).json({ error: "Username, email, and password are required" });
+      }
+
+      // For now, just return a success response
+      // In production, you'd create the user in the database
+      res.json({
+        message: "Registration successful! Your account is pending admin approval.",
+        status: "pending"
+      });
+    } catch (error) {
+      console.error("[REGISTER] Error:", error);
+      res.status(500).json({ error: "Registration failed" });
+    }
+  });
+
   // Generate password hash endpoint
   app.get("/api/generate-hash", async (req, res) => {
     try {
