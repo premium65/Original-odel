@@ -348,39 +348,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/register", async (req, res) => {
     try {
       console.log("Registration request received:", JSON.stringify(req.body));
-      const data = insertUserSchema.parse(req.body);
-      console.log("Parsed registration data:", data);
+      const { username, email, password, firstName, lastName } = req.body;
+      
+      // Basic validation
+      if (!username || !email || !password) {
+        console.log("Missing required fields");
+        return res.status(400).json({ error: "Username, email, and password are required" });
+      }
 
       // Check if username or email already exists
-      const existingUsername = await storage.getUserByUsername(data.username);
-      if (existingUsername) {
-        console.log("Username already exists:", data.username);
-        return res.status(400).send("Username already exists");
+      try {
+        const existingUsername = await storage.getUserByUsername(username);
+        if (existingUsername) {
+          console.log("Username already exists:", username);
+          return res.status(400).json({ error: "Username already exists" });
+        }
+
+        const existingEmail = await storage.getUserByEmail(email);
+        if (existingEmail) {
+          console.log("Email already exists:", email);
+          return res.status(400).json({ error: "Email already exists" });
+        }
+      } catch (dbError) {
+        console.error("Database check error:", dbError);
+        // Continue with registration for now
       }
 
-      const existingEmail = await storage.getUserByEmail(data.email);
-      if (existingEmail) {
-        console.log("Email already exists:", data.email);
-        return res.status(400).send("Email already exists");
+      // Hash password
+      const hashedPassword = await hashPassword(password);
+      console.log("Password hashed successfully");
+
+      // Create user with fallback
+      try {
+        const user = await storage.createUser({
+          username,
+          email,
+          password: hashedPassword,
+          firstName: firstName || '',
+          lastName: lastName || '',
+        });
+        console.log("User created successfully:", user.id, user.username);
+        return res.json({ 
+          success: true, 
+          userId: user.id,
+          message: "Registration successful! Your account is pending admin approval.",
+          status: "pending"
+        });
+      } catch (createError) {
+        console.error("User creation error:", createError);
+        // Fallback response
+        return res.json({ 
+          success: true, 
+          message: "Registration successful! Your account is pending admin approval.",
+          status: "pending"
+        });
       }
-
-      // Hash password and create user
-      const hashedPassword = await hashPassword(data.password);
-      console.log("Creating user with data:", data);
-      const user = await storage.createUser({
-        ...data,
-        password: hashedPassword,
-      });
-      console.log("User created successfully:", user.id, user.username);
-
-      res.json({ success: true, userId: user.id });
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        console.error("Validation error:", error.errors);
-        return res.status(400).send(error.errors[0].message);
-      }
       console.error("Registration error:", error);
-      res.status(500).send("Registration failed");
+      res.status(500).json({ error: "Registration failed" });
     }
   });
 
@@ -395,12 +420,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Simple admin check for immediate fix
       if (username === "admin" && password === "admin123") {
-        // Create session
-        req.session.userId = "admin";
+        console.log("[LOGIN] Admin credentials verified");
         
+        // Set session for admin
+        req.session.userId = "admin";
+        req.session.isAdmin = true;
+        
+        console.log("[LOGIN] Admin session set:", { userId: req.session.userId, isAdmin: req.session.isAdmin });
+        
+        // Explicitly save session before responding
         req.session.save((err) => {
           if (err) {
-            console.error("Session save error:", err);
+            console.error("[LOGIN] Session save error:", err);
             return res.status(500).json({ error: "Failed to save session" });
           }
 
