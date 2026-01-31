@@ -358,17 +358,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Username, email, and password are required" });
       }
 
-      // For now, simulate successful registration without database
-      // This allows the frontend to work while we debug database issues
-      console.log("Registration successful for:", username, email);
-      
-      return res.json({ 
-        success: true, 
-        userId: "temp_" + Date.now(), // Temporary ID
-        message: "Registration successful! Your account is pending admin approval.",
-        status: "pending",
-        note: "Account created successfully (awaiting admin activation)"
-      });
+      // Hash password
+      const hashedPassword = await hashPassword(password);
+      console.log("Password hashed successfully");
+
+      // Create user in database with all required fields
+      try {
+        const user = await storage.createUser({
+          username,
+          email,
+          password: hashedPassword,
+          firstName: firstName || '',
+          lastName: lastName || '',
+          status: 'pending',
+          isAdmin: false,
+          // Include all required fields with defaults
+          milestoneAmount: "0",
+          milestoneReward: "0", 
+          destinationAmount: "0",
+          ongoingMilestone: "0",
+          totalAdsCompleted: 0,
+          points: 0,
+          pendingAmount: "0",
+          hasDeposit: false,
+          restrictedAdsCompleted: 0,
+          notificationsEnabled: true,
+          language: "en",
+          theme: "dark",
+        });
+        console.log("User created successfully:", user.id, user.username);
+        
+        return res.json({ 
+          success: true, 
+          userId: user.id,
+          message: "Registration successful! Your account is pending admin approval.",
+          status: "pending"
+        });
+      } catch (createError) {
+        console.error("User creation error:", createError);
+        
+        // Check for duplicate errors
+        const errorMessage = createError.message || '';
+        if (errorMessage.includes('duplicate') || errorMessage.includes('unique')) {
+          if (errorMessage.includes('username') || errorMessage.includes('users_username')) {
+            return res.status(400).json({ error: "Username already exists" });
+          }
+          if (errorMessage.includes('email') || errorMessage.includes('users_email')) {
+            return res.status(400).json({ error: "Email already exists" });
+          }
+          return res.status(400).json({ error: "Account already exists" });
+        }
+        
+        // Log the full error for debugging
+        console.error("Full error details:", JSON.stringify(createError, null, 2));
+        return res.status(500).json({ error: "Failed to create user account" });
+      }
       
     } catch (error) {
       console.error("Registration error:", error);
