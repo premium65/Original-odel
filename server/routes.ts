@@ -125,6 +125,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Additional missing endpoints for new frontend
+  app.get("/api/auth/user", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+    // Return admin user if session exists
+    if (req.session.userId === "admin") {
+      res.json({
+        id: "admin",
+        username: "admin",
+        email: "admin@gameSitePro.com",
+        fullName: "System Administrator",
+        firstName: "System",
+        lastName: "Administrator",
+        mobileNumber: "0000000000",
+        status: "active",
+        isAdmin: 1,
+        registeredAt: new Date().toISOString(),
+        destinationAmount: "0.00",
+        milestoneAmount: "0.00",
+        milestoneReward: "0.00",
+        totalAdsCompleted: 0,
+        points: 100
+      });
+    } else {
+      res.status(401).json({ error: "Not authenticated" });
+    }
+  });
+
+  app.get("/api/settings", async (req, res) => {
+    try {
+      // Return empty settings for now
+      res.json({});
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch settings" });
+    }
+  });
+
+  app.get("/api/slides", async (req, res) => {
+    try {
+      // Return empty slides array for now
+      res.json([]);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch slides" });
+    }
+  });
+
+  app.get("/api/contact", async (req, res) => {
+    try {
+      // Return empty contact data for now
+      res.json({});
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch contact data" });
+    }
+  });
+
+  app.get("/api/users", async (req, res) => {
+    try {
+      // Return empty users array for now
+      res.json([]);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  app.get("/api/pages", async (req, res) => {
+    try {
+      // Return empty pages array for now
+      res.json([]);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch pages" });
+    }
+  });
+
   // Generate password hash endpoint
   app.get("/api/generate-hash", async (req, res) => {
     try {
