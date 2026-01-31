@@ -21,6 +21,7 @@ export default function AuthPage({ defaultMode = "login" }: AuthPageProps) {
   
   // Form state
   const [formData, setFormData] = useState({
+    username: "",
     firstName: "",
     lastName: "",
     email: "",
@@ -151,28 +152,40 @@ export default function AuthPage({ defaultMode = "login" }: AuthPageProps) {
             {/* Form Fields */}
             <div className="space-y-4">
               {!isLogin && (
-                <div className="grid grid-cols-2 gap-3">
+                <>
                   <div>
-                    <label className="text-xs font-medium text-gray-700 mb-1 block">First Name</label>
+                    <label className="text-xs font-medium text-gray-700 mb-1 block">Username</label>
                     <Input
-                      placeholder="John"
-                      value={formData.firstName}
-                      onChange={(e) => handleInputChange("firstName", e.target.value)}
+                      placeholder="Choose a username"
+                      value={formData.username}
+                      onChange={(e) => handleInputChange("username", e.target.value)}
                       className="h-11 border-gray-300 focus:border-gray-900 text-sm"
-                      data-testid="input-first-name"
+                      data-testid="input-username"
                     />
                   </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-700 mb-1 block">Last Name</label>
-                    <Input
-                      placeholder="Last Name"
-                      value={formData.lastName}
-                      onChange={(e) => handleInputChange("lastName", e.target.value)}
-                      className="h-11 border-gray-300 focus:border-gray-900 text-sm"
-                      data-testid="input-last-name"
-                    />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-medium text-gray-700 mb-1 block">First Name</label>
+                      <Input
+                        placeholder="John"
+                        value={formData.firstName}
+                        onChange={(e) => handleInputChange("firstName", e.target.value)}
+                        className="h-11 border-gray-300 focus:border-gray-900 text-sm"
+                        data-testid="input-first-name"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-700 mb-1 block">Last Name</label>
+                      <Input
+                        placeholder="Last Name"
+                        value={formData.lastName}
+                        onChange={(e) => handleInputChange("lastName", e.target.value)}
+                        className="h-11 border-gray-300 focus:border-gray-900 text-sm"
+                        data-testid="input-last-name"
+                      />
+                    </div>
                   </div>
-                </div>
+                </>
               )}
 
               <div>
