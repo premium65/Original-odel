@@ -32,6 +32,7 @@ export const api = {
   updateUser: (id: number | string, data: any) => fetchAPI(`/admin/users/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   deleteUser: (id: number | string) => fetchAPI(`/admin/users/${id}`, { method: "DELETE" }),
   approveUser: (id: number | string) => fetchAPI(`/admin/users/${id}/approve`, { method: "POST" }),
+  rejectUser: (id: number | string) => fetchAPI(`/admin/users/${id}/reject`, { method: "POST" }),
   createMilestone: (id: number | string, data: any) => fetchAPI(`/admin/users/${id}/milestone`, { method: "POST", body: JSON.stringify(data) }),
   updateBalance: (id: number | string, data: any) => fetchAPI(`/admin/users/${id}/balance`, { method: "POST", body: JSON.stringify(data) }),
 

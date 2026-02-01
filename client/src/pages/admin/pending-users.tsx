@@ -7,7 +7,12 @@ export default function AdminPendingUsers() {
   const { data: users, isLoading } = useQuery({ queryKey: ["pending-users"], queryFn: api.getPendingUsers });
 
   const approveMutation = useMutation({
-    mutationFn: (id: number) => api.approveUser(id),
+    mutationFn: (id: number | string) => api.approveUser(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["pending-users"] }),
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: (id: number | string) => api.rejectUser(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["pending-users"] }),
   });
 
@@ -37,8 +42,8 @@ export default function AdminPendingUsers() {
                   <td className="p-4 text-[#9ca3af]">{user.email}</td>
                   <td className="p-4 text-[#9ca3af]">{new Date(user.createdAt).toLocaleDateString()}</td>
                   <td className="p-4"><div className="flex gap-2">
-                    <button onClick={() => approveMutation.mutate(user.id)} className="px-3 py-1.5 bg-[#10b981] text-white rounded-lg flex items-center gap-1 text-sm"><Check className="h-4 w-4" /> Approve</button>
-                    <button className="px-3 py-1.5 bg-[#ef4444] text-white rounded-lg flex items-center gap-1 text-sm"><X className="h-4 w-4" /> Reject</button>
+                    <button onClick={() => approveMutation.mutate(user.id)} disabled={approveMutation.isPending} className="px-3 py-1.5 bg-[#10b981] text-white rounded-lg flex items-center gap-1 text-sm disabled:opacity-50"><Check className="h-4 w-4" /> Approve</button>
+                    <button onClick={() => rejectMutation.mutate(user.id)} disabled={rejectMutation.isPending} className="px-3 py-1.5 bg-[#ef4444] text-white rounded-lg flex items-center gap-1 text-sm disabled:opacity-50"><X className="h-4 w-4" /> Reject</button>
                   </div></td>
                 </tr>
               )) : <tr><td colSpan={4} className="p-8 text-center text-[#6b7280]">No pending users</td></tr>}

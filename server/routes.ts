@@ -1171,6 +1171,137 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get pending users
+  app.get("/api/admin/users/pending", async (req, res) => {
+    try {
+      console.log("[ADMIN/USERS/PENDING] Fetching pending users");
+
+      let allUsers: any[] = [];
+
+      // Try to get database users
+      try {
+        const dbUsers = await storage.getAllUsers();
+        allUsers = allUsers.concat(dbUsers);
+      } catch (dbError: any) {
+        console.log("Database users fetch failed:", dbError.message);
+      }
+
+      // Add in-memory users
+      if (inMemoryUsers.length > 0) {
+        allUsers = allUsers.concat(inMemoryUsers);
+      }
+
+      // Filter for pending users only
+      const pendingUsers = allUsers.filter(u => u.status === "pending");
+      console.log(`Found ${pendingUsers.length} pending users`);
+
+      // Remove passwords from response
+      const usersWithoutPasswords = pendingUsers.map(({ password, ...user }) => user);
+      res.json(usersWithoutPasswords);
+    } catch (error: any) {
+      console.error("Fetch pending users error:", error);
+      res.status(500).send("Failed to fetch pending users");
+    }
+  });
+
+  // Get admin users
+  app.get("/api/admin/users/admins", async (req, res) => {
+    try {
+      console.log("[ADMIN/USERS/ADMINS] Fetching admin users");
+
+      let allUsers: any[] = [];
+
+      try {
+        const dbUsers = await storage.getAllUsers();
+        allUsers = allUsers.concat(dbUsers);
+      } catch (dbError: any) {
+        console.log("Database users fetch failed:", dbError.message);
+      }
+
+      if (inMemoryUsers.length > 0) {
+        allUsers = allUsers.concat(inMemoryUsers);
+      }
+
+      // Filter for admin users only
+      const adminUsers = allUsers.filter(u => u.isAdmin === true || u.isAdmin === 1);
+      console.log(`Found ${adminUsers.length} admin users`);
+
+      const usersWithoutPasswords = adminUsers.map(({ password, ...user }) => user);
+      res.json(usersWithoutPasswords);
+    } catch (error: any) {
+      console.error("Fetch admin users error:", error);
+      res.status(500).send("Failed to fetch admin users");
+    }
+  });
+
+  // Approve user (set status to active)
+  app.post("/api/admin/users/:userId/approve", async (req, res) => {
+    try {
+      console.log(`[ADMIN/APPROVE] Approving user ${req.params.userId}`);
+
+      const { userId } = req.params;
+
+      // Try database first
+      try {
+        const updatedUser = await storage.updateUserStatus(userId, "active");
+        if (updatedUser) {
+          console.log(`[ADMIN/APPROVE] User ${userId} approved successfully`);
+          const { password: _, ...userWithoutPassword } = updatedUser;
+          return res.json(userWithoutPassword);
+        }
+      } catch (dbError: any) {
+        console.log(`[ADMIN/APPROVE] Database update failed for ${userId}:`, dbError.message);
+      }
+
+      // Check in-memory users
+      const memoryUser = inMemoryUsers.find(u => u.id === userId);
+      if (memoryUser) {
+        memoryUser.status = "active";
+        console.log(`[ADMIN/APPROVE] In-memory user ${userId} approved`);
+        const { password: _, ...userWithoutPassword } = memoryUser;
+        return res.json(userWithoutPassword);
+      }
+
+      return res.status(404).send("User not found");
+    } catch (error: any) {
+      console.error("Approve user error:", error);
+      res.status(500).send("Failed to approve user");
+    }
+  });
+
+  // Reject user (delete or set status to rejected)
+  app.post("/api/admin/users/:userId/reject", async (req, res) => {
+    try {
+      console.log(`[ADMIN/REJECT] Rejecting user ${req.params.userId}`);
+
+      const { userId } = req.params;
+
+      // Try database first - delete the user
+      try {
+        const deleted = await storage.deleteUser(userId);
+        if (deleted) {
+          console.log(`[ADMIN/REJECT] User ${userId} rejected and deleted`);
+          return res.json({ success: true, message: "User rejected" });
+        }
+      } catch (dbError: any) {
+        console.log(`[ADMIN/REJECT] Database delete failed for ${userId}:`, dbError.message);
+      }
+
+      // Check in-memory users
+      const memoryIndex = inMemoryUsers.findIndex(u => u.id === userId);
+      if (memoryIndex !== -1) {
+        inMemoryUsers.splice(memoryIndex, 1);
+        console.log(`[ADMIN/REJECT] In-memory user ${userId} rejected and removed`);
+        return res.json({ success: true, message: "User rejected" });
+      }
+
+      return res.status(404).send("User not found");
+    } catch (error: any) {
+      console.error("Reject user error:", error);
+      res.status(500).send("Failed to reject user");
+    }
+  });
+
   app.get("/api/admin/users/:userId", async (req, res) => {
     try {
       const auth = await checkAdminAuth(req);
