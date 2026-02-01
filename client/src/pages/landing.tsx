@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
+import { useSettings } from "@/hooks/use-settings";
 
 // Products Data
 const allProducts = [
@@ -23,6 +24,7 @@ const mensProducts = [
 
 export default function LandingPage() {
   const [, setLocation] = useLocation();
+  const { branding } = useSettings();
   const [showSplash, setShowSplash] = useState(true);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showMessageModal, setShowMessageModal] = useState(false);
@@ -210,7 +212,7 @@ export default function LandingPage() {
           <div className="w-[120px] h-[120px] rounded-3xl flex items-center justify-center shadow-2xl animate-pulse" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)', boxShadow: '0 20px 60px rgba(249, 115, 22, 0.3)' }}>
             <span className="text-6xl font-bold text-white">O</span>
           </div>
-          <h1 className="text-white text-3xl font-bold mt-6 tracking-wider">ODEL</h1>
+          <h1 className="text-white text-3xl font-bold mt-6 tracking-wider">{branding.siteName?.replace(' ADS', '') || 'ODEL'}</h1>
           <p className="text-orange-500 text-sm font-medium tracking-widest mt-1">ADS</p>
           <div className="flex gap-2 mt-10">
             <span className="w-2.5 h-2.5 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></span>
@@ -247,8 +249,8 @@ export default function LandingPage() {
 
             <div className="p-6">
               <div className="flex items-center justify-center gap-2 mb-6">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center"><span className="text-white font-bold text-xl">O</span></div>
-                <span className="text-xl font-bold">ODEL</span>
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center"><span className="text-white font-bold text-xl">{(branding.siteName || 'ODEL')[0]}</span></div>
+                <span className="text-xl font-bold">{branding.siteName?.replace(' ADS', '') || 'ODEL'}</span>
                 <span className="text-orange-500 text-sm font-medium">ADS</span>
               </div>
 
@@ -366,8 +368,8 @@ export default function LandingPage() {
           <div className="max-w-7xl mx-auto px-4">
             <div className="flex items-center justify-between h-14">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center"><span className="text-white font-bold">O</span></div>
-                <span className="text-lg font-bold">ODEL</span>
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center"><span className="text-white font-bold">{(branding.siteName || 'ODEL')[0]}</span></div>
+                <span className="text-lg font-bold">{branding.siteName?.replace(' ADS', '') || 'ODEL'}</span>
                 <span className="text-orange-500 text-xs font-medium">ADS</span>
               </div>
               {!isLoggedIn ? (

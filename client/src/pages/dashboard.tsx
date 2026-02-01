@@ -1,4 +1,5 @@
 import { useAuth } from "@/hooks/use-auth";
+import { useSettings } from "@/hooks/use-settings";
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 
@@ -32,6 +33,7 @@ const watchProducts = [
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { branding } = useSettings();
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState("Rewards");
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -237,7 +239,7 @@ export default function Dashboard() {
                       </button>
                       <div>
                         <p className="text-white font-semibold">Watch & Earn</p>
-                        <p className="text-gray-300 text-sm">ODELADS</p>
+                        <p className="text-gray-300 text-sm">{branding.siteName || 'ODEL ADS'}</p>
                       </div>
                       <div className="ml-auto text-gray-300 text-sm">
                         <span className="text-white">3:40</span> / 3:02
@@ -400,7 +402,7 @@ export default function Dashboard() {
                 </div>
                 <div className="flex-1">
                   <p className="text-white text-sm font-medium">Account Created</p>
-                  <p className="text-gray-500 text-xs">Welcome to ODEL ADS!</p>
+                  <p className="text-gray-500 text-xs">Welcome to {branding.siteName || 'ODEL ADS'}!</p>
                 </div>
                 <span className="text-gray-500 text-xs">Just now</span>
               </div>
@@ -438,7 +440,7 @@ export default function Dashboard() {
                 <span className="text-blue-600 font-bold text-[8px]">Amex</span>
               </div>
             </div>
-            <p className="text-gray-500 text-sm">© 2026 ODEL ADS. All rights reserved.</p>
+            <p className="text-gray-500 text-sm">{branding.copyrightText || `© 2026 ${branding.siteName || 'ODEL ADS'}. All rights reserved.`}</p>
           </div>
         </footer>
       </main>
