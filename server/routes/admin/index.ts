@@ -5,6 +5,7 @@ import transactionsRoutes from "./transactions";
 import adsRoutes from "./ads";
 import settingsRoutes from "./settings";
 import authRoutes from "./auth";
+import premiumRoutes from "./premium";
 
 export function registerAdminRoutes(app: Router) {
     const router = Router();
@@ -16,6 +17,7 @@ export function registerAdminRoutes(app: Router) {
     router.use("/admin/ads", adsRoutes);
     router.use("/admin/settings", settingsRoutes);
     router.use("/admin/auth", authRoutes);
+    router.use("/admin/premium", premiumRoutes);
 
     app.use("/api", router);
 }

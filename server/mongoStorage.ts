@@ -97,6 +97,7 @@ export class MongoStorage {
   async resetUserAds(userId: string | number): Promise<User | undefined> { return undefined; }
   async getAllDeposits(): Promise<User[]> { return []; }
   async getAllCommissions(): Promise<User[]> { return []; }
+  async getAllPremiumPurchases(): Promise<any[]> { return []; }
 }
 
 export const mongoStorage = new MongoStorage();

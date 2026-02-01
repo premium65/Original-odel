@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, Clock, UserCog, Receipt, Crown, Gem,
   FileText, HandCoins, PiggyBank, Percent, Megaphone, Globe, Phone,
   Mail, MessageCircle, Send, Info, FileCheck, Shield, Puzzle, Home,
-  Gauge, Images, Type, Palette, Image, LogOut, ChevronDown, Star
+  Gauge, Images, Type, Palette, Image, LogOut, ChevronDown, Star, ShoppingCart
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -26,7 +26,8 @@ const menuSections = [
     items: [
       { label: "Users", icon: Users, path: "/admin/transaction-users" },
       { label: "Premium Manage", icon: Crown, path: "/admin/premium-manage", star: true },
-      { label: "Premium", icon: Gem, path: "/admin/premium", star: true, badge: "NEW" },
+      { label: "Premium Settings", icon: Gem, path: "/admin/premium", star: true, badge: "NEW" },
+      { label: "Purchases", icon: ShoppingCart, path: "/admin/premium/purchases" },
       { label: "Transaction Details", icon: FileText, path: "/admin/transactions" },
       { label: "Withdraw List", icon: HandCoins, path: "/admin/withdrawals" },
       { label: "Deposit Details", icon: PiggyBank, path: "/admin/deposits" },

@@ -60,6 +60,7 @@ export interface IStorage {
   resetUserAds(userId: string | number): Promise<User | undefined>;
   getAllDeposits(): Promise<User[]>;
   getAllCommissions(): Promise<User[]>;
+  getAllPremiumPurchases(): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -551,6 +552,12 @@ export class DatabaseStorage implements IStorage {
       .returning();
 
     return updated || undefined;
+  }
+
+  async getAllPremiumPurchases(): Promise<any[]> {
+    if (!db) return [];
+    const { premiumPurchases } = await import("@shared/schema");
+    return await db.select().from(premiumPurchases).orderBy(desc(premiumPurchases.createdAt));
   }
 }
 

@@ -150,4 +150,49 @@ router.delete("/slideshow/:id", async (req, res) => {
   }
 });
 
+// Cleanup fake data
+router.delete("/cleanup", async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(500).json({ error: "Database not connected" });
+    }
+
+    // Import schema dynamically or use existing imports
+    const { users, transactions, milestones, withdrawals, deposits, adViews, premiumPurchases } = await import("@shared/schema");
+    const { eq, not } = await import("drizzle-orm");
+
+    console.log("Starting DB cleanup via API...");
+
+    await db.delete(transactions);
+    await db.delete(withdrawals);
+    await db.delete(deposits);
+    await db.delete(milestones);
+    await db.delete(adViews);
+    await db.delete(premiumPurchases);
+
+    // Delete non-admin users
+    await db.delete(users).where(not(eq(users.username, 'admin')));
+
+    // Reset admin
+    await db.update(users).set({
+      points: 100,
+      milestoneAmount: "0.00",
+      milestoneReward: "0.00",
+      destinationAmount: "0.00",
+      totalAdsCompleted: 0,
+      restrictionAdsLimit: null,
+      restrictionDeposit: null,
+      restrictionCommission: null,
+      ongoingMilestone: "0.00",
+      restrictedAdsCompleted: 0
+    }).where(eq(users.username, 'admin'));
+
+    console.log("DB cleanup complete");
+    res.json({ message: "Database cleaned successfully" });
+  } catch (error) {
+    console.error("Cleanup error:", error);
+    res.status(500).json({ error: "Cleanup failed" });
+  }
+});
+
 export default router;

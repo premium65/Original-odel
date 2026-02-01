@@ -36,6 +36,7 @@ import AdminAdmins from "@/pages/admin/admins";
 import AdminTransactionUsers from "@/pages/admin/transaction-users";
 import AdminPremiumManage from "@/pages/admin/premium-manage";
 import AdminPremium from "@/pages/admin/premium";
+import AdminPremiumPurchases from "@/pages/admin/premium-purchases";
 import AdminTransactions from "@/pages/admin/transactions";
 import AdminWithdrawals from "@/pages/admin/withdrawals";
 import AdminDeposits from "@/pages/admin/deposits";
@@ -208,6 +209,9 @@ function Router() {
       </Route>
       <Route path="/admin/premium">
         {() => <AdminProtectedRoute component={() => <AdminLayout><AdminPremium /></AdminLayout>} />}
+      </Route>
+      <Route path="/admin/premium/purchases">
+        {() => <AdminProtectedRoute component={() => <AdminLayout><AdminPremiumPurchases /></AdminLayout>} />}
       </Route>
       <Route path="/admin/transactions">
         {() => <AdminProtectedRoute component={() => <AdminLayout><AdminTransactions /></AdminLayout>} />}

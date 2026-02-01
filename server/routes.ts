@@ -142,33 +142,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("[AUTH/USER] Session check:", req.session);
       console.log("[AUTH/USER] Session userId:", req.session?.userId);
 
-      // IMMEDIATE BYPASS: Always return a user for dashboard access
       if (!req.session || !req.session.userId) {
-        console.log("[AUTH/USER] No session found - creating demo user");
-        // Return a demo user to allow dashboard access
-        return res.json({
-          id: "demo_user",
-          username: "demo_user",
-          email: "demo@example.com",
-          fullName: "Demo User",
-          firstName: "Demo",
-          lastName: "User",
-          mobileNumber: "0000000000",
-          status: "active",
-          isAdmin: 0,
-          registeredAt: new Date().toISOString(),
-          destinationAmount: "0.00",
-          milestoneAmount: "0.00",
-          milestoneReward: "0.00",
-          totalAdsCompleted: 0,
-          points: 0,
-          pendingAmount: "0.00",
-          hasDeposit: false,
-          restrictedAdsCompleted: 0,
-          notificationsEnabled: true,
-          language: "en",
-          theme: "dark"
-        });
+        console.log("[AUTH/USER] No session found");
+        return res.status(401).json({ error: "Not authenticated" });
       }
 
       // Return admin user if session exists
