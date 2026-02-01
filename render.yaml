@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: original-odel
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: original-odel-db
+          property: connectionString
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: NODE_VERSION
+        value: 20.12.2
+
+databases:
+  - name: original-odel-db
+    plan: free
+    databaseName: original_odel
+    user: original_odel
+
+version: "1"

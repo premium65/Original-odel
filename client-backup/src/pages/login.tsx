@@ -1,0 +1,129 @@
+import { Link } from "wouter";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
+import { Star } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+
+const loginBgStyle = "linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)";
+
+const loginSchema = z.object({
+  username: z.string().min(1, "Username is required"),
+  password: z.string().min(1, "Password is required"),
+});
+
+type LoginForm = z.infer<typeof loginSchema>;
+
+export default function Login() {
+  const { toast } = useToast();
+
+  const form = useForm<LoginForm>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      username: "",
+      password: "",
+    },
+  });
+
+  const onSubmit = async (data: LoginForm) => {
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error || "Login failed");
+      }
+
+      const user = await response.json();
+
+      toast({
+        title: "Welcome back!",
+        description: `Logged in as ${user.username}`,
+      });
+
+      setTimeout(() => {
+        window.location.href = user.isAdmin === 1 ? "/admin" : "/dashboard";
+      }, 500);
+
+    } catch (error: any) {
+      toast({
+        title: "Login Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center p-4 relative">
+      <div className="absolute inset-0 bg-cover bg-center" style={{ background: loginBgStyle }} />
+      <div className="absolute inset-0 bg-black/40" />
+      <div className="relative z-10 w-full max-w-md">
+        <div className="text-center mb-8">
+          <Link href="/">
+            <span className="inline-flex items-center gap-2 mb-4 cursor-pointer hover:opacity-80 transition-opacity">
+              <Star className="h-8 w-8 text-white" />
+              <span className="text-2xl font-bold text-white">Rating - Ads</span>
+            </span>
+          </Link>
+        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-2xl">Welcome Back</CardTitle>
+            <CardDescription>Sign in to your account to continue</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="username"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Username</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter your username" data-testid="input-username" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="Enter your password" data-testid="input-password" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button type="submit" className="w-full" disabled={form.formState.isSubmitting} data-testid="button-submit-login">
+                  {form.formState.isSubmitting ? "Signing in..." : "Sign In"}
+                </Button>
+              </form>
+            </Form>
+            <div className="mt-6 text-center text-sm">
+              <span className="text-muted-foreground">Don't have an account? </span>
+              <Link href="/register" data-testid="link-register">
+                <span className="text-primary hover:underline cursor-pointer">Create one</span>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}

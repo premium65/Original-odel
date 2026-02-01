@@ -1,0 +1,15 @@
+attached_assets/
+*.zip
+v.local/
+.config/
+.cache/
+node_modules/
+dist/
+build/
+.env
+node_modules
+dist
+.DS_Store
+server/public
+vite.config.ts.*
+*.tar.gz
