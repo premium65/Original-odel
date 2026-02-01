@@ -176,21 +176,26 @@ export default function AdsHubPage() {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
           >
-            <Card className="border-2 border-green-400 bg-white dark:bg-zinc-900">
+            <Card className="border-2 border-orange-400 bg-white dark:bg-zinc-900">
               <CardContent className="p-8 text-center">
-                <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-500/20 flex items-center justify-center mx-auto mb-4">
-                  <CheckCircle className="w-8 h-8 text-green-500" />
+                <div className="w-16 h-16 rounded-full bg-orange-100 dark:bg-orange-500/20 flex items-center justify-center mx-auto mb-4">
+                  <Target className="w-8 h-8 text-orange-500" />
                 </div>
-                <h2 className="text-xl font-bold text-green-500 mb-2">All Ads Completed!</h2>
-                <p className="text-zinc-500 dark:text-zinc-400">
-                  You have completed all available ads. Check back later for more.
+                <h2 className="text-xl font-bold text-orange-500 mb-2">No Ads Available Yet</h2>
+                <p className="text-zinc-500 dark:text-zinc-400 mb-4">
+                  Ads will be available soon. Please check back later or contact admin.
                 </p>
+                <div className="bg-zinc-100 dark:bg-zinc-800 rounded-lg p-4 mb-4">
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400">Your Stats</p>
+                  <p className="text-lg font-bold text-zinc-700 dark:text-zinc-300">Ads Completed: {totalAdsCompleted}</p>
+                  <p className="text-lg font-bold text-green-500">Balance: {milestoneAmount.toLocaleString()} LKR</p>
+                </div>
                 <Button
-                  onClick={() => setLocation("/withdraw")}
-                  className="mt-4 bg-green-500 hover:bg-green-600"
-                  data-testid="button-go-withdraw"
+                  onClick={() => setLocation("/contact")}
+                  className="bg-orange-500 hover:bg-orange-600"
+                  data-testid="button-contact"
                 >
-                  Go to Payouts
+                  Contact Admin
                 </Button>
               </CardContent>
             </Card>

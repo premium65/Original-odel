@@ -1,40 +1,62 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Palette, Save, RotateCcw } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+
+const defaultColors = {
+  primary: "#f59e0b",
+  secondary: "#10b981",
+  accent: "#3b82f6",
+  background: "#0f1419",
+  cardBackground: "#1a2332",
+  border: "#2a3a4d",
+  textPrimary: "#ffffff",
+  textSecondary: "#9ca3af",
+  textMuted: "#6b7280",
+  success: "#10b981",
+  warning: "#f59e0b",
+  error: "#ef4444",
+  info: "#3b82f6",
+};
 
 export default function Theme() {
-  const [colors, setColors] = useState({
-    primary: "#f59e0b",
-    secondary: "#10b981",
-    accent: "#3b82f6",
-    background: "#0f1419",
-    cardBackground: "#1a2332",
-    border: "#2a3a4d",
-    textPrimary: "#ffffff",
-    textSecondary: "#9ca3af",
-    textMuted: "#6b7280",
-    success: "#10b981",
-    warning: "#f59e0b",
-    error: "#ef4444",
-    info: "#3b82f6",
+  const { toast } = useToast();
+  const [colors, setColors] = useState(defaultColors);
+
+  const { data: savedConfig, isLoading } = useQuery({
+    queryKey: ["/api/admin/settings/config"],
   });
 
-  const defaultColors = {
-    primary: "#f59e0b",
-    secondary: "#10b981",
-    accent: "#3b82f6",
-    background: "#0f1419",
-    cardBackground: "#1a2332",
-    border: "#2a3a4d",
-    textPrimary: "#ffffff",
-    textSecondary: "#9ca3af",
-    textMuted: "#6b7280",
-    success: "#10b981",
-    warning: "#f59e0b",
-    error: "#ef4444",
-    info: "#3b82f6",
-  };
+  useEffect(() => {
+    if (savedConfig && typeof savedConfig === 'object') {
+      const configData = savedConfig as Record<string, string>;
+      if (configData.theme_colors) {
+        try {
+          setColors(JSON.parse(configData.theme_colors));
+        } catch (e) {
+          console.error("Error parsing theme colors:", e);
+        }
+      }
+    }
+  }, [savedConfig]);
 
-  const handleSave = () => alert("Theme colors saved!");
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("PUT", "/api/admin/settings/config", {
+        theme_colors: JSON.stringify(colors)
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/config"] });
+      toast({ title: "Success", description: "Theme colors saved!" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to save theme", variant: "destructive" });
+    }
+  });
+
+  const handleSave = () => saveMutation.mutate();
   const handleReset = () => setColors(defaultColors);
 
   const colorGroups = [
@@ -60,6 +82,14 @@ export default function Theme() {
     info: "Info",
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#ec4899]"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -76,8 +106,12 @@ export default function Theme() {
           <button onClick={handleReset} className="px-5 py-2.5 bg-[#1a2332] border border-[#2a3a4d] text-white font-medium rounded-xl flex items-center gap-2 hover:bg-[#2a3a4d]">
             <RotateCcw className="h-5 w-5" /> Reset
           </button>
-          <button onClick={handleSave} className="px-5 py-2.5 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90">
-            <Save className="h-5 w-5" /> Save
+          <button
+            onClick={handleSave}
+            disabled={saveMutation.isPending}
+            className="px-5 py-2.5 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90 disabled:opacity-50"
+          >
+            <Save className="h-5 w-5" /> {saveMutation.isPending ? "Saving..." : "Save"}
           </button>
         </div>
       </div>
@@ -91,22 +125,22 @@ export default function Theme() {
             <div className="p-6 space-y-4">
               {group.colors.map((colorKey) => (
                 <div key={colorKey} className="flex items-center gap-4">
-                  <input 
-                    type="color" 
-                    value={colors[colorKey as keyof typeof colors]} 
-                    onChange={(e) => setColors({...colors, [colorKey]: e.target.value})} 
+                  <input
+                    type="color"
+                    value={colors[colorKey as keyof typeof colors]}
+                    onChange={(e) => setColors({...colors, [colorKey]: e.target.value})}
                     className="w-12 h-12 rounded-lg cursor-pointer border-0"
                   />
                   <div className="flex-1">
                     <label className="block text-white text-sm font-medium">{colorLabels[colorKey]}</label>
-                    <input 
-                      type="text" 
-                      value={colors[colorKey as keyof typeof colors]} 
-                      onChange={(e) => setColors({...colors, [colorKey]: e.target.value})} 
+                    <input
+                      type="text"
+                      value={colors[colorKey as keyof typeof colors]}
+                      onChange={(e) => setColors({...colors, [colorKey]: e.target.value})}
                       className="w-full mt-1 px-3 py-2 bg-[#0f1419] border border-[#2a3a4d] rounded-lg text-white text-sm font-mono outline-none"
                     />
                   </div>
-                  <div 
+                  <div
                     className="w-24 h-12 rounded-lg border border-[#2a3a4d]"
                     style={{ backgroundColor: colors[colorKey as keyof typeof colors] }}
                   />

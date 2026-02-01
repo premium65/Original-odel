@@ -1,18 +1,75 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Shield, Save, Plus, Trash2, GripVertical } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+
+interface Section {
+  id: number;
+  title: string;
+  content: string;
+}
 
 export default function InfoPrivacy() {
+  const { toast } = useToast();
   const [pageTitle, setPageTitle] = useState("Privacy Policy");
   const [lastUpdated, setLastUpdated] = useState("2024-01-15");
-  
-  const [sections, setSections] = useState([
+  const [sections, setSections] = useState<Section[]>([
     { id: 1, title: "Information We Collect", content: "We collect information you provide directly, such as name, email, and phone number. We also collect usage data including IP address and device information." },
     { id: 2, title: "How We Use Your Information", content: "We use your information to provide and improve our services, process transactions, send notifications, and comply with legal obligations." },
     { id: 3, title: "Data Security", content: "We implement industry-standard security measures to protect your personal information from unauthorized access, disclosure, or destruction." },
     { id: 4, title: "Your Rights", content: "You have the right to access, correct, or delete your personal data. Contact us at privacy@odelads.com for any requests." },
   ]);
 
-  const handleSave = () => alert("Privacy Policy saved!");
+  const { data: savedContent, isLoading } = useQuery({
+    queryKey: ["/api/admin/settings/content/privacy"],
+  });
+
+  useEffect(() => {
+    if (savedContent && Array.isArray(savedContent) && savedContent.length > 0) {
+      try {
+        const parsed = savedContent[0].metadata ? JSON.parse(savedContent[0].metadata) : {};
+        setPageTitle(savedContent[0].title || "Privacy Policy");
+        setLastUpdated(parsed.lastUpdated || "2024-01-15");
+        if (parsed.sections) {
+          setSections(parsed.sections);
+        }
+      } catch (e) {
+        console.error("Error parsing privacy content:", e);
+      }
+    }
+  }, [savedContent]);
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("PUT", "/api/admin/settings/content/privacy", {
+        section: "main",
+        title: pageTitle,
+        content: sections.map(s => `${s.title}: ${s.content}`).join("\n\n"),
+        metadata: JSON.stringify({
+          lastUpdated,
+          sections
+        })
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/content/privacy"] });
+      toast({ title: "Success", description: "Privacy Policy saved!" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to save content", variant: "destructive" });
+    }
+  });
+
+  const handleSave = () => saveMutation.mutate();
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#8b5cf6]"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -26,8 +83,12 @@ export default function InfoPrivacy() {
             <p className="text-[#9ca3af]">Edit privacy policy content</p>
           </div>
         </div>
-        <button onClick={handleSave} className="px-5 py-2.5 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90">
-          <Save className="h-5 w-5" /> Save
+        <button
+          onClick={handleSave}
+          disabled={saveMutation.isPending}
+          className="px-5 py-2.5 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90 disabled:opacity-50"
+        >
+          <Save className="h-5 w-5" /> {saveMutation.isPending ? "Saving..." : "Save"}
         </button>
       </div>
 

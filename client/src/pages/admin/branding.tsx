@@ -1,7 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Image, Save, Upload, X } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Branding() {
+  const { toast } = useToast();
   const [branding, setBranding] = useState({
     siteName: "ODEL-ADS",
     tagline: "Earn Money by Watching Ads",
@@ -14,7 +18,47 @@ export default function Branding() {
     adminPanelName: "OdelADS Admin Panel",
   });
 
-  const handleSave = () => alert("Branding settings saved!");
+  const { data: savedConfig, isLoading } = useQuery({
+    queryKey: ["/api/admin/settings/config"],
+  });
+
+  useEffect(() => {
+    if (savedConfig && typeof savedConfig === 'object') {
+      const configData = savedConfig as Record<string, string>;
+      if (configData.branding) {
+        try {
+          setBranding(JSON.parse(configData.branding));
+        } catch (e) {
+          console.error("Error parsing branding:", e);
+        }
+      }
+    }
+  }, [savedConfig]);
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("PUT", "/api/admin/settings/config", {
+        branding: JSON.stringify(branding)
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/config"] });
+      toast({ title: "Success", description: "Branding settings saved!" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to save branding", variant: "destructive" });
+    }
+  });
+
+  const handleSave = () => saveMutation.mutate();
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#f59e0b]"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -28,8 +72,12 @@ export default function Branding() {
             <p className="text-[#9ca3af]">Manage site identity and branding</p>
           </div>
         </div>
-        <button onClick={handleSave} className="px-5 py-2.5 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90">
-          <Save className="h-5 w-5" /> Save
+        <button
+          onClick={handleSave}
+          disabled={saveMutation.isPending}
+          className="px-5 py-2.5 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90 disabled:opacity-50"
+        >
+          <Save className="h-5 w-5" /> {saveMutation.isPending ? "Saving..." : "Save"}
         </button>
       </div>
 
