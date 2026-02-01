@@ -22,10 +22,44 @@ router.get("/", async (req, res) => {
 // Get pending users
 router.get("/pending", async (req, res) => {
   try {
-    const pendingUsers = await db.select().from(users).where(eq(users.status, "pending")).orderBy(desc(users.createdAt));
-    const usersWithoutPassword = pendingUsers.map(({ password, ...user }: any) => user);
+    let pendingUsers: any[] = [];
+    try {
+      pendingUsers = await db.select().from(users).where(eq(users.status, "pending")).orderBy(desc(users.createdAt));
+    } catch (dbError) {
+      console.error("Postgres Error (using fallback):", dbError);
+    }
+
+    // Also fetch in-memory pending users
+    const { inMemoryUsers } = await import("../../memStorage");
+    const memPending = inMemoryUsers.filter(u => u.status === 'pending');
+
+    // Also fetch Mongo users if connected
+    const { isMongoConnected } = await import("../../mongoConnection");
+    const { mongoStorage } = await import("../../mongoStorage");
+
+    let mongoPending: any[] = [];
+    if (isMongoConnected()) {
+      // Fetch from Mongo if connected
+      try {
+        // We need a method to get all users from Mongo, or use existing methods
+        // Assuming getAllUsers exists on mongoStorage interface
+        const allMongo = await mongoStorage.getAllUsers();
+        mongoPending = allMongo.filter(u => u.status === 'pending');
+      } catch (err) {
+        console.error("Error fetching Mongo users:", err);
+      }
+    }
+
+    // Merge lists (avoid duplicates based on username or email)
+    const allPending = [...pendingUsers, ...mongoPending, ...memPending];
+
+    // Deduplicate by username
+    const uniquePending = Array.from(new Map(allPending.map(item => [item.username, item])).values());
+
+    const usersWithoutPassword = uniquePending.map(({ password, ...user }: any) => user);
     res.json(usersWithoutPassword);
   } catch (error) {
+    console.error("Pending users error:", error);
     res.status(500).json({ error: "Server error" });
   }
 });

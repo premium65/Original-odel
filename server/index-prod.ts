@@ -26,6 +26,9 @@ export async function serveStatic(app: Express, _server: Server) {
   });
 }
 
+import { repairDatabase } from "./repair";
+
 (async () => {
+  await repairDatabase();
   await runApp(serveStatic);
 })();

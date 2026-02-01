@@ -63,6 +63,9 @@ export async function setupVite(app: Express, server: Server) {
   });
 }
 
+import { repairDatabase } from "./repair";
+
 (async () => {
+  await repairDatabase();
   await runApp(setupVite);
 })();
