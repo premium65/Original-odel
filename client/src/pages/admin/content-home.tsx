@@ -1,7 +1,13 @@
-import { useState } from "react";
-import { Home, Save, Plus, Trash2, Upload, GripVertical, Eye, EyeOff } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Home, Save, Plus, Trash2, Upload, GripVertical, Eye, EyeOff, Loader2 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 export default function ContentHome() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
   const [heroSection, setHeroSection] = useState({
     enabled: true,
     title: "Welcome to ODEL-ADS",
@@ -40,7 +46,55 @@ export default function ContentHome() {
     ]
   });
 
-  const handleSave = () => alert("Home page content saved!");
+  const { data: contentData, isLoading } = useQuery({
+    queryKey: ["admin-content", "home"],
+    queryFn: () => api.getContent("home"),
+  });
+
+  useEffect(() => {
+    if (contentData && contentData.length > 0) {
+      try {
+        const content = contentData[0];
+        if (content.metadata) {
+          const parsed = typeof content.metadata === 'string' ? JSON.parse(content.metadata) : content.metadata;
+          if (parsed.heroSection) setHeroSection(prev => ({ ...prev, ...parsed.heroSection }));
+          if (parsed.features) setFeatures(parsed.features);
+          if (parsed.howItWorks) setHowItWorks(prev => ({ ...prev, ...parsed.howItWorks }));
+          if (parsed.stats) setStats(prev => ({ ...prev, ...parsed.stats }));
+        }
+      } catch (e) {
+        console.error("Failed to parse home content:", e);
+      }
+    }
+  }, [contentData]);
+
+  const mutation = useMutation({
+    mutationFn: (data: any) => api.updateContent("home", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-content", "home"] });
+      toast({ title: "Home page content saved!" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save home page content", variant: "destructive" });
+    },
+  });
+
+  const handleSave = () => {
+    mutation.mutate({
+      section: "main",
+      title: heroSection.title,
+      content: heroSection.description,
+      metadata: JSON.stringify({ heroSection, features, howItWorks, stats }),
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-[#10b981]" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -54,8 +108,8 @@ export default function ContentHome() {
             <p className="text-[#9ca3af]">Manage the home/landing page content</p>
           </div>
         </div>
-        <button onClick={handleSave} className="px-5 py-2.5 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90">
-          <Save className="h-5 w-5" /> Save Changes
+        <button onClick={handleSave} disabled={mutation.isPending} className="px-5 py-2.5 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90 disabled:opacity-50">
+          {mutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />} Save Changes
         </button>
       </div>
 

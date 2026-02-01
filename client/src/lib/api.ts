@@ -46,6 +46,8 @@ export const api = {
   // Ads
   getAds: () => fetchAPI("/admin/ads"),
   getAd: (id: number) => fetchAPI(`/admin/ads/${id}`),
+  createAd: (data: any) => fetchAPI("/admin/ads", { method: "POST", body: JSON.stringify(data) }),
+  updateAd: (id: number, data: any) => fetchAPI(`/admin/ads/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   deleteAd: (id: number) => fetchAPI(`/admin/ads/${id}`, { method: "DELETE" }),
 
   // Settings

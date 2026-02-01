@@ -1,7 +1,13 @@
-import { useState } from "react";
-import { Gauge, Save, Type, Target, Video, Sparkles, Monitor, DollarSign, Coins, Zap, Plus, Trash2, GripVertical, Eye } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Gauge, Save, Type, Target, Video, Sparkles, Monitor, DollarSign, Coins, Zap, Plus, Trash2, GripVertical, Eye, Loader2 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 export default function ContentDashboard() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
   const [settings, setSettings] = useState({
     welcomeText: "Hi",
     showUserName: true,
@@ -46,7 +52,54 @@ export default function ContentDashboard() {
     { id: 4, name: "Premium", color: "#8b5cf6", enabled: true },
   ]);
 
-  const handleSave = () => alert("Dashboard settings saved!");
+  const { data: contentData, isLoading } = useQuery({
+    queryKey: ["admin-content", "dashboard"],
+    queryFn: () => api.getContent("dashboard"),
+  });
+
+  useEffect(() => {
+    if (contentData && contentData.length > 0) {
+      try {
+        const content = contentData[0];
+        if (content.metadata) {
+          const parsed = typeof content.metadata === 'string' ? JSON.parse(content.metadata) : content.metadata;
+          if (parsed.settings) setSettings(prev => ({ ...prev, ...parsed.settings }));
+          if (parsed.tabs) setTabs(parsed.tabs);
+          if (parsed.badges) setBadges(parsed.badges);
+        }
+      } catch (e) {
+        console.error("Failed to parse dashboard content:", e);
+      }
+    }
+  }, [contentData]);
+
+  const mutation = useMutation({
+    mutationFn: (data: any) => api.updateContent("dashboard", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-content", "dashboard"] });
+      toast({ title: "Dashboard settings saved!" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save dashboard settings", variant: "destructive" });
+    },
+  });
+
+  const handleSave = () => {
+    mutation.mutate({
+      section: "main",
+      title: "Dashboard Settings",
+      content: "",
+      metadata: JSON.stringify({ settings, tabs, badges }),
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-[#f59e0b]" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -60,8 +113,8 @@ export default function ContentDashboard() {
             <p className="text-[#9ca3af]">Configure user dashboard appearance</p>
           </div>
         </div>
-        <button onClick={handleSave} className="px-5 py-2.5 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90">
-          <Save className="h-5 w-5" /> Save Changes
+        <button onClick={handleSave} disabled={mutation.isPending} className="px-5 py-2.5 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90 disabled:opacity-50">
+          {mutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />} Save Changes
         </button>
       </div>
 
