@@ -983,11 +983,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } else {
         // Normal ad click (no restriction)
-        // Check for first ad click bonus reset
-        if (user.totalAdsCompleted === 0 && user.milestoneAmount === "25000") {
-          await storage.updateUser(req.session.userId, { milestoneAmount: "0" });
-        }
-
         // Record click
         const click = await storage.recordAdClick(req.session.userId, adId);
 
