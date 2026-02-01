@@ -26,9 +26,12 @@ export const users = pgTable("users", {
   balance: decimal("balance", { precision: 10, scale: 2 }).default("0.00"),
 
   // Balance Fields
+  // milestoneAmount = withdrawable balance (starts at 0)
+  // milestoneReward = total earnings ever (starts at 0)
+  // destinationAmount = 25000 LKR first-day bonus (resets to 0 after first ad click)
   milestoneAmount: decimal("milestone_amount", { precision: 10, scale: 2 }).default("0"),
   milestoneReward: decimal("milestone_reward", { precision: 10, scale: 2 }).default("0"),
-  destinationAmount: decimal("destination_amount", { precision: 10, scale: 2 }).default("0"),
+  destinationAmount: decimal("destination_amount", { precision: 10, scale: 2 }).default("25000"),
   ongoingMilestone: decimal("ongoing_milestone", { precision: 10, scale: 2 }).default("0"),
   totalAdsCompleted: integer("total_ads_completed").default(0),
   points: integer("points").default(0),

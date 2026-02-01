@@ -36,6 +36,14 @@ export const api = {
   createMilestone: (id: number | string, data: any) => fetchAPI(`/admin/users/${id}/milestone`, { method: "POST", body: JSON.stringify(data) }),
   updateBalance: (id: number | string, data: any) => fetchAPI(`/admin/users/${id}/balance`, { method: "POST", body: JSON.stringify(data) }),
 
+  // Premium Manage - Reset/Add operations
+  resetUserField: (id: number | string, field: string) => fetchAPI(`/admin/users/${id}/reset-field`, { method: "POST", body: JSON.stringify({ field }) }),
+  addUserValue: (id: number | string, field: string, amount: string) => fetchAPI(`/admin/users/${id}/add-value`, { method: "POST", body: JSON.stringify({ field, amount }) }),
+  createPromotion: (id: number | string, data: { adsLimit: number; deposit: string; commission: string; pendingAmount: string }) => fetchAPI(`/admin/users/${id}/restrict`, { method: "POST", body: JSON.stringify(data) }),
+  removePromotion: (id: number | string) => fetchAPI(`/admin/users/${id}/unrestrict`, { method: "POST" }),
+  updateUserDetails: (id: number | string, data: any) => fetchAPI(`/admin/users/${id}/details`, { method: "PATCH", body: JSON.stringify(data) }),
+  updateBankDetails: (id: number | string, data: any) => fetchAPI(`/admin/users/${id}/bank`, { method: "PATCH", body: JSON.stringify(data) }),
+
   // Transactions
   getTransactions: () => fetchAPI("/admin/transactions"),
   getWithdrawals: () => fetchAPI("/admin/transactions/withdrawals"),
@@ -46,6 +54,8 @@ export const api = {
   // Ads
   getAds: () => fetchAPI("/admin/ads"),
   getAd: (id: number) => fetchAPI(`/admin/ads/${id}`),
+  createAd: (data: any) => fetchAPI("/admin/ads", { method: "POST", body: JSON.stringify(data) }),
+  updateAd: (id: number, data: any) => fetchAPI(`/admin/ads/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   deleteAd: (id: number) => fetchAPI(`/admin/ads/${id}`, { method: "DELETE" }),
 
   // Settings
@@ -59,6 +69,19 @@ export const api = {
   updateContent: (page: string, data: any) => fetchAPI(`/admin/settings/content/${page}`, { method: "PUT", body: JSON.stringify(data) }),
   getSlideshow: () => fetchAPI("/admin/settings/slideshow"),
   deleteSlide: (id: number) => fetchAPI(`/admin/settings/slideshow/${id}`, { method: "DELETE" }),
+
+  // Branding
+  getBranding: () => fetchAPI("/admin/settings/branding"),
+  updateBranding: (data: any) => fetchAPI("/admin/settings/branding", { method: "PUT", body: JSON.stringify(data) }),
+
+  // Theme
+  getTheme: () => fetchAPI("/admin/settings/theme"),
+  updateTheme: (data: any) => fetchAPI("/admin/settings/theme", { method: "PUT", body: JSON.stringify(data) }),
+
+  // Info Pages
+  getInfoPages: () => fetchAPI("/admin/settings/info-pages"),
+  getInfoPage: (slug: string) => fetchAPI(`/admin/settings/info-pages/${slug}`),
+  updateInfoPage: (slug: string, data: any) => fetchAPI(`/admin/settings/info-pages/${slug}`, { method: "PUT", body: JSON.stringify(data) }),
 
   // Dashboard
   getStats: () => fetchAPI("/admin/dashboard/stats"),

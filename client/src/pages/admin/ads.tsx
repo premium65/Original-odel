@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { 
-  Megaphone, Plus, Edit, Trash2, Save, X, Upload, Image, 
+import { useToast } from "@/hooks/use-toast";
+import {
+  Megaphone, Plus, Edit, Trash2, Save, X, Upload, Image,
   Tag, CheckCircle, MousePointer, Settings, Eye, List,
-  ShoppingCart, ArrowRight, ExternalLink, Play, Download
+  ShoppingCart, ArrowRight, ExternalLink, Play, Download, Loader2
 } from "lucide-react";
 
 interface Ad {
@@ -85,16 +86,41 @@ const iconOptions = [
 ];
 
 export default function AdminAds() {
-  const [ads, setAds] = useState<Ad[]>(sampleAds);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [currentAd, setCurrentAd] = useState<Ad | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [formData, setFormData] = useState<Omit<Ad, 'id'>>(defaultAd);
 
+  // Fetch ads from API
+  const { data: adsData, isLoading } = useQuery({
+    queryKey: ["admin-ads"],
+    queryFn: api.getAds,
+  });
+
+  // Convert API data to Ad format or use sample ads as fallback
+  const ads: Ad[] = adsData?.length > 0 ? adsData.map((ad: any) => ({
+    id: ad.id,
+    title: ad.title || "",
+    description: ad.description || "",
+    image: ad.imageUrl || ad.image || "",
+    currency: ad.currency || "LKR",
+    price: Number(ad.price) || Number(ad.reward) || 0,
+    priceColor: ad.priceColor || "#f59e0b",
+    features: ad.features || [],
+    buttonText: ad.buttonText || "Add to Cart",
+    buttonIcon: ad.buttonIcon || "shopping-cart",
+    buttonUrl: ad.buttonUrl || ad.targetUrl || "",
+    isActive: ad.isActive ?? true,
+    showOnDashboard: ad.showOnDashboard ?? true,
+    displayOrder: ad.displayOrder || ad.id || 1
+  })) : sampleAds;
+
   useEffect(() => {
-    if (ads.length > 0 && !currentAd) {
+    if (ads.length > 0 && !currentAd && !isCreating) {
       selectAd(ads[0]);
     }
-  }, []);
+  }, [ads]);
 
   const selectAd = (ad: Ad) => {
     setCurrentAd(ad);
@@ -116,6 +142,42 @@ export default function AdminAds() {
     });
   };
 
+  // Mutations
+  const createMutation = useMutation({
+    mutationFn: (data: any) => api.createAd(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-ads"] });
+      toast({ title: "Ad created successfully!" });
+      setIsCreating(false);
+    },
+    onError: () => {
+      toast({ title: "Failed to create ad", variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => api.updateAd(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-ads"] });
+      toast({ title: "Ad updated successfully!" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update ad", variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => api.deleteAd(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-ads"] });
+      toast({ title: "Ad deleted successfully!" });
+      setCurrentAd(null);
+    },
+    onError: () => {
+      toast({ title: "Failed to delete ad", variant: "destructive" });
+    },
+  });
+
   const createNewAd = () => {
     setCurrentAd(null);
     setIsCreating(true);
@@ -128,48 +190,43 @@ export default function AdminAds() {
 
   const saveAd = () => {
     if (!formData.title.trim()) {
-      alert("Please enter an ad title");
+      toast({ title: "Please enter an ad title", variant: "destructive" });
       return;
     }
     if (formData.price <= 0) {
-      alert("Please enter a valid price");
+      toast({ title: "Please enter a valid price", variant: "destructive" });
       return;
     }
 
     const cleanedFeatures = formData.features.filter(f => f.trim() !== "");
 
+    const adData = {
+      title: formData.title,
+      description: formData.description,
+      imageUrl: formData.image,
+      price: formData.price,
+      reward: formData.price,
+      targetUrl: formData.buttonUrl,
+      isActive: formData.isActive,
+      currency: formData.currency,
+      priceColor: formData.priceColor,
+      features: cleanedFeatures,
+      buttonText: formData.buttonText,
+      buttonIcon: formData.buttonIcon,
+      showOnDashboard: formData.showOnDashboard,
+      displayOrder: formData.displayOrder
+    };
+
     if (isCreating) {
-      const newAd: Ad = {
-        ...formData,
-        id: Date.now(),
-        features: cleanedFeatures.length > 0 ? cleanedFeatures : []
-      };
-      setAds([...ads, newAd]);
-      setCurrentAd(newAd);
-      setIsCreating(false);
+      createMutation.mutate(adData);
     } else if (currentAd) {
-      const updatedAds = ads.map(ad => 
-        ad.id === currentAd.id 
-          ? { ...ad, ...formData, features: cleanedFeatures }
-          : ad
-      );
-      setAds(updatedAds);
-      setCurrentAd({ ...currentAd, ...formData, features: cleanedFeatures });
+      updateMutation.mutate({ id: currentAd.id, data: adData });
     }
-    alert("Ad saved successfully!");
   };
 
   const deleteAd = (id: number) => {
     if (!confirm("Are you sure you want to delete this ad?")) return;
-    const filtered = ads.filter(ad => ad.id !== id);
-    setAds(filtered);
-    if (currentAd?.id === id) {
-      if (filtered.length > 0) {
-        selectAd(filtered[0]);
-      } else {
-        createNewAd();
-      }
-    }
+    deleteMutation.mutate(id);
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -213,6 +270,16 @@ export default function AdminAds() {
     }
     return null;
   };
+
+  const isSaving = createMutation.isPending || updateMutation.isPending;
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-[#3b82f6]" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -321,11 +388,12 @@ export default function AdminAds() {
                 >
                   Cancel
                 </button>
-                <button 
+                <button
                   onClick={saveAd}
-                  className="px-4 py-2 bg-gradient-to-r from-[#10b981] to-[#059669] text-white text-sm font-semibold rounded-lg flex items-center gap-2 hover:opacity-90 transition-all"
+                  disabled={isSaving}
+                  className="px-4 py-2 bg-gradient-to-r from-[#10b981] to-[#059669] text-white text-sm font-semibold rounded-lg flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-50"
                 >
-                  <Save className="h-4 w-4" /> Save
+                  {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save
                 </button>
               </div>
             </div>
@@ -574,11 +642,12 @@ export default function AdminAds() {
 
               {/* Save Button */}
               <div className="flex gap-3 pt-4">
-                <button 
+                <button
                   onClick={saveAd}
-                  className="flex-1 py-3 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl flex items-center justify-center gap-2 hover:opacity-90 transition-all"
+                  disabled={isSaving}
+                  className="flex-1 py-3 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl flex items-center justify-center gap-2 hover:opacity-90 transition-all disabled:opacity-50"
                 >
-                  <Save className="h-5 w-5" /> Save Changes
+                  {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />} Save Changes
                 </button>
                 <button 
                   onClick={() => currentAd ? selectAd(currentAd) : createNewAd()}

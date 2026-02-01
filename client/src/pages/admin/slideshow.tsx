@@ -1,7 +1,13 @@
-import { useState } from "react";
-import { Images, Save, Plus, Trash2, Upload, GripVertical, Eye, EyeOff } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Images, Save, Plus, Trash2, Upload, GripVertical, Eye, EyeOff, Loader2 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Slideshow() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
   const [settings, setSettings] = useState({
     enabled: true,
     autoplay: true,
@@ -16,11 +22,57 @@ export default function Slideshow() {
     { id: 3, title: "Refer & Earn", subtitle: "Invite friends and earn commission", image: "", link: "/referral", enabled: true },
   ]);
 
-  const handleSave = () => alert("Slideshow settings saved!");
+  const { data: contentData, isLoading } = useQuery({
+    queryKey: ["admin-content", "slideshow"],
+    queryFn: () => api.getContent("slideshow"),
+  });
+
+  useEffect(() => {
+    if (contentData && contentData.length > 0) {
+      try {
+        const content = contentData[0];
+        if (content.metadata) {
+          const parsed = typeof content.metadata === 'string' ? JSON.parse(content.metadata) : content.metadata;
+          if (parsed.settings) setSettings(prev => ({ ...prev, ...parsed.settings }));
+          if (parsed.slides) setSlides(parsed.slides);
+        }
+      } catch (e) {
+        console.error("Failed to parse slideshow content:", e);
+      }
+    }
+  }, [contentData]);
+
+  const mutation = useMutation({
+    mutationFn: (data: any) => api.updateContent("slideshow", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-content", "slideshow"] });
+      toast({ title: "Slideshow settings saved!" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save slideshow settings", variant: "destructive" });
+    },
+  });
+
+  const handleSave = () => {
+    mutation.mutate({
+      section: "main",
+      title: "Slideshow",
+      content: "",
+      metadata: JSON.stringify({ settings, slides }),
+    });
+  };
 
   const addSlide = () => {
     setSlides([...slides, { id: Date.now(), title: "New Slide", subtitle: "", image: "", link: "", enabled: true }]);
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-[#ec4899]" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -38,8 +90,8 @@ export default function Slideshow() {
           <button onClick={addSlide} className="px-5 py-2.5 bg-[#3b82f6] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90">
             <Plus className="h-5 w-5" /> Add Slide
           </button>
-          <button onClick={handleSave} className="px-5 py-2.5 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90">
-            <Save className="h-5 w-5" /> Save
+          <button onClick={handleSave} disabled={mutation.isPending} className="px-5 py-2.5 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90 disabled:opacity-50">
+            {mutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />} Save
           </button>
         </div>
       </div>

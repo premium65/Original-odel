@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "../../db";
-import { settings, siteContent, contacts, slideshow } from "@shared/schema";
+import { settings, siteContent, contacts, slideshow, branding, themeSettings, infoPages } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
 import multer from "multer";
 import path from "path";
@@ -146,6 +146,136 @@ router.delete("/slideshow/:id", async (req, res) => {
     await db.delete(slideshow).where(eq(slideshow.id, Number(req.params.id)));
     res.json({ message: "Slide deleted" });
   } catch (error) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ===== BRANDING =====
+router.get("/branding", async (req, res) => {
+  try {
+    const brandingData = await db.select().from(branding).limit(1);
+    res.json(brandingData[0] || {
+      siteName: "OdelADS",
+      siteTagline: "Watch & Earn",
+      logoUrl: "",
+      logoIconUrl: "",
+      faviconUrl: "",
+      footerText: "",
+      copyrightText: ""
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.put("/branding", async (req, res) => {
+  try {
+    const { siteName, siteTagline, logoUrl, logoIconUrl, faviconUrl, footerText, copyrightText } = req.body;
+
+    // Check if branding record exists
+    const existing = await db.select().from(branding).limit(1);
+
+    if (existing.length > 0) {
+      // Update existing record
+      const updated = await db.update(branding)
+        .set({ siteName, siteTagline, logoUrl, logoIconUrl, faviconUrl, footerText, copyrightText, updatedAt: new Date() })
+        .where(eq(branding.id, existing[0].id))
+        .returning();
+      res.json(updated[0]);
+    } else {
+      // Insert new record
+      const newBranding = await db.insert(branding)
+        .values({ siteName, siteTagline, logoUrl, logoIconUrl, faviconUrl, footerText, copyrightText })
+        .returning();
+      res.json(newBranding[0]);
+    }
+  } catch (error) {
+    console.error("[BRANDING] Error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ===== THEME SETTINGS =====
+router.get("/theme", async (req, res) => {
+  try {
+    const themeData = await db.select().from(themeSettings);
+    const themeObj: Record<string, any> = {};
+    themeData.forEach((t: any) => {
+      themeObj[t.key] = { value: t.value, label: t.label, category: t.category };
+    });
+    res.json(themeObj);
+  } catch (error) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.put("/theme", async (req, res) => {
+  try {
+    const updates = req.body; // { key: value, key2: value2, ... }
+    for (const [key, value] of Object.entries(updates)) {
+      await db.insert(themeSettings)
+        .values({ key, value: String(value), updatedAt: new Date() })
+        .onConflictDoUpdate({ target: themeSettings.key, set: { value: String(value), updatedAt: new Date() } });
+    }
+    res.json({ message: "Theme settings updated" });
+  } catch (error) {
+    console.error("[THEME] Error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ===== INFO PAGES (About, Terms, Privacy) =====
+router.get("/info-pages", async (req, res) => {
+  try {
+    const pages = await db.select().from(infoPages);
+    res.json(pages);
+  } catch (error) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.get("/info-pages/:slug", async (req, res) => {
+  try {
+    const page = await db.select().from(infoPages).where(eq(infoPages.slug, req.params.slug)).limit(1);
+    if (page.length === 0) {
+      // Return default content for the slug
+      return res.json({
+        slug: req.params.slug,
+        title: req.params.slug.charAt(0).toUpperCase() + req.params.slug.slice(1),
+        content: "",
+        isActive: true
+      });
+    }
+    res.json(page[0]);
+  } catch (error) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.put("/info-pages/:slug", async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const { title, content, isActive } = req.body;
+
+    // Check if page exists
+    const existing = await db.select().from(infoPages).where(eq(infoPages.slug, slug)).limit(1);
+
+    if (existing.length > 0) {
+      // Update existing page
+      const updated = await db.update(infoPages)
+        .set({ title, content, isActive, updatedAt: new Date() })
+        .where(eq(infoPages.slug, slug))
+        .returning();
+      res.json(updated[0]);
+    } else {
+      // Insert new page
+      const newPage = await db.insert(infoPages)
+        .values({ slug, title, content, isActive: isActive ?? true })
+        .returning();
+      res.json(newPage[0]);
+    }
+  } catch (error) {
+    console.error("[INFO-PAGES] Error:", error);
     res.status(500).json({ error: "Server error" });
   }
 });
