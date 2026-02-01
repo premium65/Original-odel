@@ -455,54 +455,118 @@ export default function Dashboard() {
       {/* Product Modal */}
       {selectedProduct && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedProduct(null)}>
-          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-end p-4">
-              <button onClick={() => setSelectedProduct(null)} className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
-                <i className="fas fa-times text-gray-600" />
-              </button>
+          <div className="bg-white rounded-xl max-w-[1000px] w-full max-h-[90vh] overflow-y-auto shadow-2xl relative" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setSelectedProduct(null)} className="absolute top-4 right-4 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 z-10">
+              <i className="fas fa-times text-gray-600" />
+            </button>
+
+            {/* Breadcrumb */}
+            <div className="p-3 border-b border-gray-200">
+              <p className="text-xs text-gray-500">
+                <span className="cursor-pointer hover:text-orange-500 hover:underline" onClick={() => setSelectedProduct(null)}>Home</span>
+              </p>
             </div>
-            <div className="px-6 pb-6">
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className="bg-gray-50 rounded-2xl p-4 flex items-center justify-center">
-                  <img src={selectedProduct.image} className="max-h-64 object-contain" alt={selectedProduct.title} />
+
+            <div className="p-4 md:p-6 grid md:grid-cols-2 gap-6">
+              {/* Images Section */}
+              <div className="flex gap-3">
+                <div className="flex flex-col gap-2">
+                  <img src={selectedProduct.image} className="w-16 h-20 object-cover rounded-lg cursor-pointer border-2 border-orange-500" />
+                  <img src={selectedProduct.image} className="w-16 h-20 object-cover rounded-lg cursor-pointer border-2 border-transparent hover:border-gray-300 opacity-70" />
+                  <img src={selectedProduct.image} className="w-16 h-20 object-cover rounded-lg cursor-pointer border-2 border-transparent hover:border-gray-300 opacity-70" />
                 </div>
-                <div className="flex flex-col justify-center">
-                  <span className="bg-orange-500 text-white text-xs font-bold px-3 py-1 rounded-full w-fit mb-3">{selectedProduct.badge}</span>
-                  <h2 className="text-gray-900 text-xl font-bold mb-2">{selectedProduct.title}</h2>
-                  <p className="text-gray-500 text-sm mb-4">{selectedProduct.code}</p>
-                  <div className="flex items-center gap-3 mb-4">
-                    <span className="text-orange-500 text-2xl font-bold">{selectedProduct.price}</span>
-                    {selectedProduct.oldPrice && <span className="text-gray-400 text-lg line-through">{selectedProduct.oldPrice}</span>}
-                  </div>
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="flex text-yellow-400">
-                      {[1, 2, 3, 4].map((s) => <i key={s} className="fas fa-star" />)}
-                      <i className="fas fa-star-half-alt" />
-                    </div>
-                    <span className="text-gray-500 text-sm">(4.5 / 128 reviews)</span>
-                  </div>
-                  <div className="mb-4">
-                    <p className="text-gray-600 text-sm mb-2">Size:</p>
-                    <div className="flex gap-2">
-                      {["S", "M", "L", "XL"].map((size) => (
-                        <span key={size} className={`w-10 h-10 rounded-lg border flex items-center justify-center text-sm cursor-pointer hover:border-orange-500 ${size === "M" ? "border-2 border-orange-500 bg-orange-50" : "border-gray-300"}`}>{size}</span>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex gap-3">
-                    <button className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-xl font-semibold transition-colors">
-                      <i className="fas fa-shopping-cart mr-2" /> Add to Cart
-                    </button>
-                    <button className="w-12 h-12 rounded-xl border border-gray-300 flex items-center justify-center hover:border-orange-500 transition-colors">
-                      <i className="far fa-heart text-gray-600 hover:text-red-500" />
-                    </button>
-                  </div>
+                <div className="flex-1 relative">
+                  <img src={selectedProduct.image} className="w-full rounded-xl object-cover" alt={selectedProduct.title} />
                 </div>
               </div>
-              <div className="mt-6 pt-6 border-t border-gray-200">
-                <h3 className="text-gray-900 font-bold mb-2">Product Description</h3>
-                <p className="text-gray-600 text-sm">Premium quality product with excellent craftsmanship. Perfect for everyday use with a modern design that suits any style.</p>
+
+              {/* Details Section */}
+              <div>
+                <span className="bg-orange-500 text-white text-xs font-bold px-3 py-1 rounded-full inline-block mb-3">{selectedProduct.badge}</span>
+                <h1 className="text-xl font-bold text-gray-900 mb-2">{selectedProduct.title}</h1>
+                <p className="text-gray-500 text-sm mb-3">Product Code: {selectedProduct.code}</p>
+
+                {/* Delivery Info */}
+                <div className="space-y-1.5 mb-3 text-sm text-gray-600">
+                  <p className="flex items-center gap-2"><i className="fas fa-box text-gray-400 w-4" /> Cash on Delivery</p>
+                  <p className="flex items-center gap-2"><i className="fas fa-exchange-alt text-gray-400 w-4" /> Easy Exchange & Refund Policy</p>
+                  <p className="flex items-center gap-2"><i className="fas fa-truck text-gray-400 w-4" /> Island Wide Delivery</p>
+                </div>
+
+                {/* Price */}
+                <p className="text-2xl font-bold text-orange-500 mb-1">{selectedProduct.price}</p>
+                {selectedProduct.oldPrice && <p className="text-gray-400 line-through text-sm mb-2">{selectedProduct.oldPrice}</p>}
+
+                {/* Installments */}
+                <div className="text-xs text-gray-600 mb-1">
+                  Or 3 Installments with <span className="text-teal-600 font-bold">mintpay</span>
+                </div>
+                <div className="text-xs text-gray-600 mb-3">
+                  Or 3 Installments with <span className="text-pink-500 font-bold">KOKO</span>
+                </div>
+
+                {/* Reviews */}
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="flex text-yellow-400">
+                    {[1, 2, 3, 4].map((s) => <i key={s} className="fas fa-star text-sm" />)}
+                    <i className="fas fa-star-half-alt text-sm" />
+                  </div>
+                  <span className="text-gray-500 text-xs">(4.5 / 128 reviews)</span>
+                </div>
+
+                {/* Size Selector */}
+                <div className="mb-4">
+                  <p className="text-xs text-gray-600 mb-1">Size</p>
+                  <div className="flex gap-2">
+                    {["S", "M", "L", "XL"].map((size) => (
+                      <button key={size} className={`w-9 h-9 border-2 rounded-lg text-xs font-medium transition-all hover:border-orange-500 ${size === "M" ? "border-orange-500 bg-orange-50" : "border-gray-300"}`}>{size}</button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Promo Tag */}
+                <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg mb-3">
+                  <div className="w-8 h-8 bg-red-100 rounded flex items-center justify-center">
+                    <i className="fas fa-tag text-red-500 text-sm" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-gray-500">40%-EOSS - JAN</p>
+                    <p className="text-[10px] text-gray-500">2026 EXTENSION</p>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-2 mb-3">
+                  <button className="text-xs text-gray-600 flex items-center gap-1 hover:text-orange-500">
+                    <i className="far fa-file-alt" /> Size Guide
+                  </button>
+                  <button className="flex-1 bg-gray-900 text-white py-2.5 px-4 rounded-full font-semibold text-sm hover:bg-gray-800 transition-colors">
+                    <i className="fas fa-shopping-cart mr-2" /> Add to Cart
+                  </button>
+                  <button className="w-10 h-10 border-2 border-gray-200 rounded-full flex items-center justify-center hover:border-red-500 hover:text-red-500 transition-colors">
+                    <i className="far fa-heart" />
+                  </button>
+                </div>
+
+                {/* Social Share */}
+                <div className="flex gap-2">
+                  <button className="flex items-center gap-1 px-2 py-1 border border-gray-200 rounded text-xs hover:bg-gray-50 transition-colors">
+                    <i className="fab fa-twitter text-blue-400" /> Tweet
+                  </button>
+                  <button className="flex items-center gap-1 px-2 py-1 border border-gray-200 rounded text-xs hover:bg-gray-50 transition-colors">
+                    <i className="fab fa-facebook text-blue-600" /> Share
+                  </button>
+                  <button className="flex items-center gap-1 px-2 py-1 border border-gray-200 rounded text-xs hover:bg-gray-50 transition-colors">
+                    <i className="far fa-copy" /> Copy Link
+                  </button>
+                </div>
               </div>
+            </div>
+
+            {/* Product Description */}
+            <div className="px-6 pb-6 pt-4 border-t border-gray-200">
+              <h3 className="text-gray-900 font-bold mb-2">Product Description</h3>
+              <p className="text-gray-600 text-sm">Premium quality product with excellent craftsmanship. Perfect for everyday use with a modern design that suits any style.</p>
             </div>
           </div>
         </div>

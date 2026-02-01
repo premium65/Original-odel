@@ -322,33 +322,123 @@ export default function LandingPage() {
         <div className="fixed inset-0 bg-black/50 z-[1000] flex items-center justify-center" onClick={() => setShowProductModal(false)}>
           <div className="bg-white max-w-[1000px] w-[95%] max-h-[90vh] overflow-y-auto rounded-xl relative" onClick={e => e.stopPropagation()}>
             <button onClick={() => setShowProductModal(false)} className="absolute top-4 right-4 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 z-10">✕</button>
+
+            {/* Breadcrumb */}
+            <div className="p-3 border-b border-gray-200">
+              <p className="text-xs text-gray-500">
+                <span className="cursor-pointer hover:text-orange-500 hover:underline" onClick={() => setShowProductModal(false)}>Home</span>
+              </p>
+            </div>
+
             <div className="p-4 md:p-6 grid md:grid-cols-2 gap-6">
+              {/* Images Section */}
               <div className="flex gap-3">
                 <div className="flex flex-col gap-2">
                   {selectedProduct.images.map((img: string, idx: number) => (
-                    <img key={idx} src={img} className={`w-16 h-20 object-cover rounded-lg cursor-pointer border-2 ${mainImage === img ? 'border-orange-500' : 'border-transparent'}`} onClick={() => setMainImage(img)} />
+                    <img
+                      key={idx}
+                      src={img}
+                      className={`w-16 h-20 object-cover rounded-lg cursor-pointer border-2 transition-all ${mainImage === img ? 'border-orange-500' : 'border-transparent hover:border-gray-300'}`}
+                      onClick={() => setMainImage(img)}
+                    />
                   ))}
                 </div>
-                <div className="flex-1"><img src={mainImage} className="w-full rounded-xl object-cover" /></div>
+                <div className="flex-1 relative">
+                  <img src={mainImage} className="w-full rounded-xl object-cover" />
+                </div>
               </div>
+
+              {/* Details Section */}
               <div>
                 <h1 className="text-xl font-bold text-gray-900 mb-2">{selectedProduct.name}</h1>
                 <p className="text-gray-500 text-sm mb-3">Product Code: {selectedProduct.code}</p>
+
+                {/* Delivery Info */}
+                <div className="space-y-1.5 mb-3 text-sm text-gray-600">
+                  <p className="flex items-center gap-2">📦 Cash on Delivery</p>
+                  <p className="flex items-center gap-2">🔄 Easy Exchange & Refund Policy</p>
+                  <p className="flex items-center gap-2">🚚 Island Wide Delivery</p>
+                </div>
+
+                {/* Price */}
                 <p className="text-2xl font-bold text-orange-500 mb-1">LKR {selectedProduct.price.toLocaleString()}.00</p>
-                {selectedProduct.oldPrice > 0 && <p className="text-gray-400 line-through text-sm mb-2">LKR {selectedProduct.oldPrice.toLocaleString()}.00</p>}
+                {selectedProduct.oldPrice > 0 && (
+                  <p className="text-gray-400 line-through text-sm mb-2">LKR {selectedProduct.oldPrice.toLocaleString()}.00</p>
+                )}
+
+                {/* Installments */}
+                <div className="text-xs text-gray-600 mb-1">
+                  Or 3 Installments of <b>LKR {Math.round(selectedProduct.price / 3).toLocaleString()}.00</b> with <span className="text-teal-600 font-bold">mintpay</span>
+                </div>
+                <div className="text-xs text-gray-600 mb-3">
+                  Or 3 Installments of <b>LKR {Math.round(selectedProduct.price / 3).toLocaleString()}.00</b> with <span className="text-pink-500 font-bold">KOKO</span>
+                </div>
+
+                {/* Color (for clothing) */}
+                {selectedProduct.color && (
+                  <div className="mb-3">
+                    <p className="text-xs text-gray-600 mb-1">Color: <span className="font-medium">{selectedProduct.color}</span></p>
+                    <div className={`w-7 h-7 rounded-full border-2 border-gray-300 ${selectedProduct.color === 'Black' ? 'bg-gray-800' : selectedProduct.color === 'Blue' ? 'bg-blue-600' : selectedProduct.color === 'Olive' ? 'bg-green-700' : 'bg-gray-400'}`}></div>
+                  </div>
+                )}
+
+                {/* Size Selector */}
                 {selectedProduct.hasSize && (
                   <div className="mb-3">
                     <p className="text-xs text-gray-600 mb-1">Size</p>
                     <div className="flex gap-2">
                       {['S', 'M', 'L', 'XL'].map(s => (
-                        <button key={s} onClick={() => setSelectedSize(s)} className={`w-9 h-9 border-2 rounded-lg text-xs font-medium ${selectedSize === s ? 'border-orange-500 bg-orange-50' : 'border-gray-300'}`}>{s}</button>
+                        <button
+                          key={s}
+                          onClick={() => setSelectedSize(s)}
+                          className={`w-9 h-9 border-2 rounded-lg text-xs font-medium transition-all hover:border-orange-500 ${selectedSize === s ? 'border-orange-500 bg-orange-50' : 'border-gray-300'}`}
+                        >
+                          {s}
+                        </button>
                       ))}
                     </div>
                   </div>
                 )}
+
+                {/* Promo Tag */}
+                <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg mb-3">
+                  <div className="w-8 h-8 bg-red-100 rounded flex items-center justify-center">🏷️</div>
+                  <div>
+                    <p className="text-[10px] text-gray-500">40%-EOSS - JAN</p>
+                    <p className="text-[10px] text-gray-500">2026 EXTENSION</p>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-2 mb-3">
+                  {selectedProduct.hasSize && (
+                    <button className="text-xs text-gray-600 flex items-center gap-1 hover:text-orange-500">📄 Size Guide</button>
+                  )}
+                  <button
+                    onClick={() => { setShowProductModal(false); handleAction(); }}
+                    className="flex-1 bg-gray-900 text-white py-2.5 px-4 rounded-full font-semibold text-sm hover:bg-gray-800 transition-colors"
+                  >
+                    Add to Cart
+                  </button>
+                  <button
+                    onClick={() => { setShowProductModal(false); handleAction(); }}
+                    className="w-10 h-10 border-2 border-gray-200 rounded-full flex items-center justify-center hover:border-red-500 hover:text-red-500 transition-colors"
+                  >
+                    ♡
+                  </button>
+                </div>
+
+                {/* Social Share */}
                 <div className="flex gap-2">
-                  <button onClick={() => { setShowProductModal(false); handleAction(); }} className="flex-1 bg-gray-900 text-white py-2.5 px-4 rounded-full font-semibold text-sm hover:bg-gray-800">Add to Cart</button>
-                  <button onClick={() => { setShowProductModal(false); handleAction(); }} className="w-10 h-10 border-2 border-gray-200 rounded-full flex items-center justify-center hover:border-red-500 hover:text-red-500">♡</button>
+                  <button onClick={handleAction} className="flex items-center gap-1 px-2 py-1 border border-gray-200 rounded text-xs hover:bg-gray-50 transition-colors">
+                    🐦 Tweet
+                  </button>
+                  <button onClick={handleAction} className="flex items-center gap-1 px-2 py-1 border border-gray-200 rounded text-xs hover:bg-gray-50 transition-colors">
+                    📘 Share
+                  </button>
+                  <button onClick={handleAction} className="flex items-center gap-1 px-2 py-1 border border-gray-200 rounded text-xs hover:bg-gray-50 transition-colors">
+                    📋 Copy Link
+                  </button>
                 </div>
               </div>
             </div>
