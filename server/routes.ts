@@ -72,22 +72,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   repairDatabase().catch(console.error);
 
   // setup client sessions
-  const PgStore = connectPgSimple(session);
-  app.use(session({
+  const sessionConfig: session.SessionOptions = {
     secret: process.env.SESSION_SECRET || "default_secret",
     resave: false,
     saveUninitialized: false,
-    store: new PgStore({
-      pool: pool,
-      createTableIfMissing: true
-    }),
     cookie: {
-      secure: app.get("env") === "production",
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: true,
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
       path: "/"
     },
     name: "connect.sid"
-  }));
+  };
+
+  // Only use PgStore if pool is available
+  if (pool) {
+    const PgStore = connectPgSimple(session);
+    sessionConfig.store = new PgStore({
+      pool: pool,
+      createTableIfMissing: true
+    });
+    console.log("[SESSION] Using PostgreSQL session store");
+  } else {
+    console.log("[SESSION] Using memory session store (PostgreSQL unavailable)");
+  }
+
+  app.use(session(sessionConfig));
 
   // ⭐ CRITICAL FIX: Trust proxy for secure cookies behind Render's reverse proxy
   app.set('trust proxy', 1);
