@@ -1,12 +1,13 @@
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import AdminLayout from "@/components/admin-layout";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
 
 import SplashPage from "@/pages/splash";
 import LandingPage from "@/pages/landing";
@@ -99,8 +100,40 @@ function ProtectedRoute({ component: Component, adminOnly = false }: { component
 }
 
 function AdminProtectedRoute({ component: Component }: { component: React.ComponentType }) {
-  // IMMEDIATE BYPASS: Always return admin component
-  // This bypasses all authentication issues for immediate admin access
+  const [, setLocation] = useLocation();
+  const { data: admin, isLoading, error } = useQuery({
+    queryKey: ["admin-auth"],
+    queryFn: api.getMe,
+    retry: false,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-[#0f1419]">
+        <Loader2 className="h-8 w-8 animate-spin text-[#f59e0b]" />
+      </div>
+    );
+  }
+
+  if (error || !admin) {
+    // Not logged in - redirect to admin login
+    setLocation("/admin/login");
+    return null;
+  }
+
+  if (!admin.isAdmin) {
+    // Logged in but not admin
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-[#0f1419]">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-white mb-2">Access Denied</h1>
+          <p className="text-[#9ca3af]">You don't have admin privileges.</p>
+        </div>
+      </div>
+    );
+  }
+
   return <Component />;
 }
 
