@@ -9,12 +9,40 @@ const router = Router();
 // Get all users
 router.get("/", async (req, res) => {
   try {
-    const { status, search, limit = 50, offset = 0 } = req.query;
-    let query = db.select().from(users).orderBy(desc(users.createdAt)).limit(Number(limit)).offset(Number(offset));
-    const allUsers = await query;
-    const usersWithoutPassword = allUsers.map(({ password, ...user }: any) => user);
+    let allUsers: any[] = [];
+
+    // Try PostgreSQL
+    if (db) {
+      try {
+        const { limit = 50, offset = 0 } = req.query;
+        allUsers = await db.select().from(users).orderBy(desc(users.createdAt)).limit(Number(limit)).offset(Number(offset));
+      } catch (dbErr) {
+        console.error("PostgreSQL error:", dbErr);
+      }
+    }
+
+    // Add in-memory users
+    const { inMemoryUsers } = await import("../../memStorage");
+    allUsers = [...allUsers, ...inMemoryUsers];
+
+    // Add MongoDB users if connected
+    const { isMongoConnected } = await import("../../mongoConnection");
+    const { mongoStorage } = await import("../../mongoStorage");
+    if (isMongoConnected()) {
+      try {
+        const mongoUsers = await mongoStorage.getAllUsers();
+        allUsers = [...allUsers, ...mongoUsers];
+      } catch (err) {
+        console.error("MongoDB error:", err);
+      }
+    }
+
+    // Deduplicate by username
+    const uniqueUsers = Array.from(new Map(allUsers.map(item => [item.username, item])).values());
+    const usersWithoutPassword = uniqueUsers.map(({ password, ...user }: any) => user);
     res.json(usersWithoutPassword);
   } catch (error) {
+    console.error("Get users error:", error);
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -155,9 +183,88 @@ router.delete("/:id", async (req, res) => {
 // Approve user
 router.post("/:id/approve", async (req, res) => {
   try {
-    const updated = await db.update(users).set({ status: "active", updatedAt: new Date() }).where(eq(users.id, req.params.id)).returning();
-    res.json(updated[0]);
+    const userId = req.params.id;
+
+    // Try in-memory users first
+    const { inMemoryUsers } = await import("../../memStorage");
+    const memUserIndex = inMemoryUsers.findIndex(u => u.id === userId || u.username === userId);
+
+    if (memUserIndex !== -1) {
+      inMemoryUsers[memUserIndex].status = "active";
+      const { password, ...userData } = inMemoryUsers[memUserIndex];
+      return res.json({ ...userData, message: "User approved successfully" });
+    }
+
+    // Try MongoDB
+    const { isMongoConnected } = await import("../../mongoConnection");
+    const { mongoStorage } = await import("../../mongoStorage");
+
+    if (isMongoConnected()) {
+      try {
+        const mongoUser = await mongoStorage.getUser(userId);
+        if (mongoUser) {
+          await mongoStorage.updateUser(userId, { status: "active" });
+          return res.json({ ...mongoUser, status: "active", message: "User approved successfully" });
+        }
+      } catch (err) {
+        console.error("MongoDB approve error:", err);
+      }
+    }
+
+    // Try PostgreSQL
+    if (db) {
+      const updated = await db.update(users).set({ status: "active", updatedAt: new Date() }).where(eq(users.id, userId)).returning();
+      if (updated.length) {
+        return res.json({ ...updated[0], message: "User approved successfully" });
+      }
+    }
+
+    res.status(404).json({ error: "User not found" });
   } catch (error) {
+    console.error("Approve error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Reject user
+router.post("/:id/reject", async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    // Try in-memory users first
+    const { inMemoryUsers } = await import("../../memStorage");
+    const memUserIndex = inMemoryUsers.findIndex(u => u.id === userId || u.username === userId);
+
+    if (memUserIndex !== -1) {
+      inMemoryUsers.splice(memUserIndex, 1);
+      return res.json({ message: "User rejected and removed" });
+    }
+
+    // Try MongoDB
+    const { isMongoConnected } = await import("../../mongoConnection");
+    const { mongoStorage } = await import("../../mongoStorage");
+
+    if (isMongoConnected()) {
+      try {
+        const mongoUser = await mongoStorage.getUser(userId);
+        if (mongoUser) {
+          await mongoStorage.deleteUser(userId);
+          return res.json({ message: "User rejected and removed" });
+        }
+      } catch (err) {
+        console.error("MongoDB reject error:", err);
+      }
+    }
+
+    // Try PostgreSQL
+    if (db) {
+      await db.delete(users).where(eq(users.id, userId));
+      return res.json({ message: "User rejected and removed" });
+    }
+
+    res.status(404).json({ error: "User not found" });
+  } catch (error) {
+    console.error("Reject error:", error);
     res.status(500).json({ error: "Server error" });
   }
 });
