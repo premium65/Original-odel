@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Crown, Search, CheckCircle, RotateCcw, Star, Gem, Wallet, UserCog, AlertCircle, Loader2, X } from "lucide-react";
+import { Crown, Search, CheckCircle, RotateCcw, Star, Gem, Wallet, UserCog, AlertCircle, Loader2, X, Plus, Eye, EyeOff, Phone, Mail, Lock, Building2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -10,7 +10,7 @@ function Modal({ isOpen, onClose, title, children }: { isOpen: boolean; onClose:
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative bg-[#1a2332] rounded-2xl border border-[#2a3a4d] p-6 w-full max-w-md mx-4 shadow-xl">
+      <div className="relative bg-[#1a2332] rounded-2xl border border-[#2a3a4d] p-6 w-full max-w-md mx-4 shadow-xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-white">{title}</h3>
           <button onClick={onClose} className="text-[#6b7280] hover:text-white"><X className="h-5 w-5" /></button>
@@ -21,6 +21,15 @@ function Modal({ isOpen, onClose, title, children }: { isOpen: boolean; onClose:
   );
 }
 
+// Field mappings for reset/add operations
+const FIELD_MAPPINGS = {
+  booking: { field: "totalAdsCompleted", label: "Booking (Ads Count)", color: "#3b82f6" },
+  points: { field: "points", label: "Points (0-100)", color: "#8b5cf6" },
+  premiumTreasure: { field: "milestoneReward", label: "Premium Treasure (Total Earned)", color: "#10b981" },
+  normalTreasure: { field: "destinationAmount", label: "Normal Treasure (Bonus)", color: "#f59e0b" },
+  bookingValue: { field: "milestoneAmount", label: "Booking Value (Withdrawable)", color: "#ef4444" },
+};
+
 export default function AdminPremiumManage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -30,15 +39,29 @@ export default function AdminPremiumManage() {
   // Modal states
   const [promotionModal, setPromotionModal] = useState(false);
   const [resetModal, setResetModal] = useState<{ open: boolean; field: string; label: string }>({ open: false, field: "", label: "" });
-  const [addValueModal, setAddValueModal] = useState<{ open: boolean; field: string; label: string }>({ open: false, field: "", label: "" });
+  const [addValueModal, setAddValueModal] = useState<{ open: boolean; field: string; label: string; isPoints?: boolean }>({ open: false, field: "", label: "" });
   const [editUserModal, setEditUserModal] = useState(false);
   const [editBankModal, setEditBankModal] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Form states
   const [promotionForm, setPromotionForm] = useState({ adsLimit: "", deposit: "", commission: "", pendingAmount: "" });
   const [addValueAmount, setAddValueAmount] = useState("");
-  const [userForm, setUserForm] = useState({ username: "", email: "", firstName: "", lastName: "" });
-  const [bankForm, setBankForm] = useState({ bankName: "", accountNumber: "", accountHolderName: "" });
+  const [userForm, setUserForm] = useState({
+    username: "",
+    email: "",
+    firstName: "",
+    lastName: "",
+    mobileNumber: "",
+    status: "active",
+    password: ""
+  });
+  const [bankForm, setBankForm] = useState({
+    bankName: "",
+    accountNumber: "",
+    accountHolderName: "",
+    branchName: ""
+  });
 
   // Fetch users for search
   const { data: users = [] } = useQuery({
@@ -55,8 +78,8 @@ export default function AdminPremiumManage() {
   });
 
   const filteredUsers = users.filter((u: any) =>
-    u.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    u.email.toLowerCase().includes(searchQuery.toLowerCase())
+    u.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    u.email?.toLowerCase().includes(searchQuery.toLowerCase())
   ).slice(0, 5);
 
   // Mutations
@@ -141,7 +164,10 @@ export default function AdminPremiumManage() {
         username: selectedUser.username || "",
         email: selectedUser.email || "",
         firstName: selectedUser.firstName || "",
-        lastName: selectedUser.lastName || ""
+        lastName: selectedUser.lastName || "",
+        mobileNumber: selectedUser.mobileNumber || "",
+        status: selectedUser.status || "active",
+        password: ""
       });
       setEditUserModal(true);
     }
@@ -152,23 +178,20 @@ export default function AdminPremiumManage() {
       setBankForm({
         bankName: selectedUser.bankName || "",
         accountNumber: selectedUser.accountNumber || "",
-        accountHolderName: selectedUser.accountHolderName || ""
+        accountHolderName: selectedUser.accountHolderName || "",
+        branchName: selectedUser.branchName || ""
       });
       setEditBankModal(true);
     }
   };
 
-  const milestoneStats = selectedUser ? [
-    { label: "Ads Completed", value: selectedUser.totalAdsCompleted || 0, color: "#3b82f6" },
-    { label: "Milestone Amount", value: `LKR ${parseFloat(selectedUser.milestoneAmount || 0).toLocaleString()}`, color: "#ef4444", sub: "Withdrawable" },
-    { label: "Milestone Reward", value: `LKR ${parseFloat(selectedUser.milestoneReward || 0).toLocaleString()}`, color: "#10b981", sub: "Total Earned" },
-    { label: "Destination Amount", value: `LKR ${parseFloat(selectedUser.destinationAmount || 0).toLocaleString()}`, color: "#f59e0b", sub: "First Day Bonus" },
-  ] : [];
-
-  const treasureStats = selectedUser ? [
-    { label: "Premium Treasure", value: parseFloat(selectedUser.premiumTreasure || 0).toFixed(2), color: "#8b5cf6", field: "premiumTreasure" },
-    { label: "Normal Treasure", value: parseFloat(selectedUser.normalTreasure || 0).toFixed(2), color: "#06b6d4", field: "normalTreasure" },
-    { label: "Booking Value", value: parseFloat(selectedUser.bookingValue || 0).toFixed(2), color: "#10b981", field: "bookingValue" },
+  // Stats displays with correct field mappings
+  const financialStats = selectedUser ? [
+    { label: "Booking (Ads)", value: selectedUser.totalAdsCompleted || 0, color: "#3b82f6", field: "totalAdsCompleted", isNumber: true },
+    { label: "Points", value: `${selectedUser.points || 0}/100`, color: "#8b5cf6", field: "points", isNumber: true },
+    { label: "Booking Value", value: `LKR ${parseFloat(selectedUser.milestoneAmount || 0).toLocaleString()}`, color: "#ef4444", field: "milestoneAmount", sub: "Withdrawable" },
+    { label: "Premium Treasure", value: `LKR ${parseFloat(selectedUser.milestoneReward || 0).toLocaleString()}`, color: "#10b981", field: "milestoneReward", sub: "Total Earned" },
+    { label: "Normal Treasure", value: `LKR ${parseFloat(selectedUser.destinationAmount || 0).toLocaleString()}`, color: "#f59e0b", field: "destinationAmount", sub: "Bonus" },
   ] : [];
 
   const promotionStats = selectedUser ? [
@@ -179,51 +202,6 @@ export default function AdminPremiumManage() {
   ] : [];
 
   const hasActivePromotion = selectedUser && selectedUser.restrictionAdsLimit && selectedUser.restrictionAdsLimit > 0;
-
-  const actions = [
-    {
-      label: hasActivePromotion ? "Remove Promotion" : "Create Promotion",
-      desc: hasActivePromotion ? "End current promotion" : "Set milestone",
-      icon: Crown,
-      color: "#f59e0b",
-      onClick: () => hasActivePromotion ? removePromotionMutation.mutate() : setPromotionModal(true)
-    },
-    {
-      label: "RESET Booking",
-      desc: "Reset ads completed",
-      icon: RotateCcw,
-      color: "#ef4444",
-      onClick: () => setResetModal({ open: true, field: "totalAdsCompleted", label: "Ads Completed (Booking)" })
-    },
-    {
-      label: "SET Points",
-      desc: "Reset milestone amount",
-      icon: Star,
-      color: "#8b5cf6",
-      onClick: () => setResetModal({ open: true, field: "milestoneAmount", label: "Milestone Amount (Points)" })
-    },
-    {
-      label: "ADD Treasure",
-      desc: "Add to treasures",
-      icon: Gem,
-      color: "#10b981",
-      onClick: () => setAddValueModal({ open: true, field: "premiumTreasure", label: "Premium Treasure" })
-    },
-    {
-      label: "ADD Booking Value",
-      desc: "Add booking value",
-      icon: Wallet,
-      color: "#3b82f6",
-      onClick: () => setAddValueModal({ open: true, field: "bookingValue", label: "Booking Value" })
-    },
-    {
-      label: "EDIT User/Bank",
-      desc: "Edit details",
-      icon: UserCog,
-      color: "#06b6d4",
-      onClick: openEditUserModal
-    },
-  ];
 
   return (
     <div className="space-y-6">
@@ -272,6 +250,7 @@ export default function AdminPremiumManage() {
 
         {selectedUser && !isLoadingUser ? (
           <>
+            {/* User Info Header */}
             <div className="flex items-center gap-4 p-5 bg-[#10b981]/10 border border-[#10b981]/30 rounded-xl mb-6 relative">
               <button
                 onClick={() => { setSelectedUserId(null); setSearchQuery(""); }}
@@ -279,86 +258,150 @@ export default function AdminPremiumManage() {
               >
                 Change
               </button>
-              <div className="w-14 h-14 bg-gradient-to-br from-[#3b82f6] to-[#2563eb] rounded-full flex items-center justify-center text-2xl font-bold text-white uppercase">{selectedUser.username.charAt(0)}</div>
-              <div>
+              <div className="w-14 h-14 bg-gradient-to-br from-[#3b82f6] to-[#2563eb] rounded-full flex items-center justify-center text-2xl font-bold text-white uppercase">{selectedUser.username?.charAt(0) || "U"}</div>
+              <div className="flex-1">
                 <h4 className="text-lg font-semibold text-white">{selectedUser.username}</h4>
                 <p className="text-[#9ca3af] text-sm">{selectedUser.email}</p>
-                <div className="flex gap-2 mt-2">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#10b981]/20 text-[#10b981] rounded-full text-xs font-medium"><CheckCircle className="h-3 w-3" /> {selectedUser.status}</span>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
+                    selectedUser.status === "active" ? "bg-[#10b981]/20 text-[#10b981]" :
+                    selectedUser.status === "frozen" ? "bg-[#ef4444]/20 text-[#ef4444]" :
+                    "bg-[#f59e0b]/20 text-[#f59e0b]"
+                  }`}><CheckCircle className="h-3 w-3" /> {selectedUser.status}</span>
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#3b82f6]/20 text-[#3b82f6] rounded-full text-xs font-medium">LKR {parseFloat(selectedUser.balance || 0).toLocaleString()}</span>
+                  {selectedUser.mobileNumber && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#6b7280]/20 text-[#9ca3af] rounded-full text-xs font-medium">
+                      <Phone className="h-3 w-3" /> {selectedUser.mobileNumber}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
 
-            <h4 className="text-white font-semibold mb-4">Milestone Status</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              {milestoneStats.map((stat) => (
-                <div key={stat.label} className="bg-[#0f1419] border border-[#2a3a4d] rounded-xl p-5 text-center">
-                  <p className="text-xs text-[#6b7280] mb-2">{stat.label}</p>
-                  <p className="text-2xl font-bold" style={{ color: stat.color }}>{stat.value}</p>
-                  {stat.sub && <p className="text-[10px] text-[#6b7280] mt-1">{stat.sub}</p>}
-                </div>
-              ))}
-            </div>
-
-            {/* Treasure Stats */}
-            <h4 className="text-white font-semibold mb-4">Treasure & Values</h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              {treasureStats.map((stat) => (
-                <div key={stat.label} className="bg-[#0f1419] border border-[#2a3a4d] rounded-xl p-5">
-                  <div className="flex items-center justify-between mb-3">
+            {/* Financial Stats with Reset/Add buttons */}
+            <h4 className="text-white font-semibold mb-4">Financial Details</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+              {financialStats.map((stat) => (
+                <div key={stat.label} className="bg-[#0f1419] border border-[#2a3a4d] rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-2">
                     <p className="text-xs text-[#6b7280]">{stat.label}</p>
-                    <div className="flex gap-2">
+                    <div className="flex gap-1">
                       <button
-                        onClick={() => setAddValueModal({ open: true, field: stat.field, label: stat.label })}
-                        className="text-xs px-2 py-1 bg-[#10b981]/20 text-[#10b981] rounded hover:bg-[#10b981]/30"
+                        onClick={() => setAddValueModal({
+                          open: true,
+                          field: stat.field,
+                          label: stat.label,
+                          isPoints: stat.field === "points"
+                        })}
+                        className="text-[10px] px-1.5 py-0.5 bg-[#10b981]/20 text-[#10b981] rounded hover:bg-[#10b981]/30"
+                        title="Add"
                       >
-                        +Add
+                        <Plus className="h-3 w-3" />
                       </button>
                       <button
                         onClick={() => setResetModal({ open: true, field: stat.field, label: stat.label })}
-                        className="text-xs px-2 py-1 bg-[#ef4444]/20 text-[#ef4444] rounded hover:bg-[#ef4444]/30"
+                        className="text-[10px] px-1.5 py-0.5 bg-[#ef4444]/20 text-[#ef4444] rounded hover:bg-[#ef4444]/30"
+                        title="Reset"
                       >
-                        Reset
+                        <RotateCcw className="h-3 w-3" />
                       </button>
                     </div>
                   </div>
-                  <p className="text-2xl font-bold text-center" style={{ color: stat.color }}>LKR {stat.value}</p>
+                  <p className="text-xl font-bold text-center" style={{ color: stat.color }}>{stat.value}</p>
+                  {stat.sub && <p className="text-[10px] text-[#6b7280] text-center mt-1">{stat.sub}</p>}
                 </div>
               ))}
             </div>
 
+            {/* Promotion Status */}
             <div className="bg-[#f59e0b]/10 border border-[#f59e0b]/30 rounded-xl p-4 mb-6">
-              <div className="flex items-center gap-2 mb-3">
-                <AlertCircle className="h-5 w-5 text-[#f59e0b]" />
-                <span className="text-[#f59e0b] font-semibold">Promotion Status</span>
-                {!hasActivePromotion && (
-                  <span className="ml-auto text-xs text-[#f59e0b]/70">No active promotion</span>
-                )}
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5 text-[#f59e0b]" />
+                  <span className="text-[#f59e0b] font-semibold">Promotion Status</span>
+                </div>
+                <button
+                  onClick={() => hasActivePromotion ? removePromotionMutation.mutate() : setPromotionModal(true)}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-lg ${
+                    hasActivePromotion
+                      ? "bg-[#ef4444]/20 text-[#ef4444] hover:bg-[#ef4444]/30"
+                      : "bg-[#10b981]/20 text-[#10b981] hover:bg-[#10b981]/30"
+                  }`}
+                >
+                  {hasActivePromotion ? "Remove Promotion" : "Create Promotion"}
+                </button>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {!hasActivePromotion && (
+                <p className="text-xs text-[#f59e0b]/70 mb-3">No active promotion</p>
+              )}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {promotionStats.map((stat) => (
-                  <div key={stat.label} className="bg-[#1a2332] border border-[#2a3a4d] rounded-xl p-4 text-center">
-                    <p className="text-xs text-[#6b7280] mb-2">{stat.label}</p>
-                    <p className="text-xl font-bold" style={{ color: stat.color }}>{stat.value}</p>
+                  <div key={stat.label} className="bg-[#1a2332] border border-[#2a3a4d] rounded-xl p-3 text-center">
+                    <p className="text-xs text-[#6b7280] mb-1">{stat.label}</p>
+                    <p className="text-lg font-bold" style={{ color: stat.color }}>{stat.value}</p>
                   </div>
                 ))}
               </div>
             </div>
 
+            {/* Bank Info Display */}
+            <h4 className="text-white font-semibold mb-4">Bank Information</h4>
+            <div className="bg-[#0f1419] border border-[#2a3a4d] rounded-xl p-4 mb-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <p className="text-xs text-[#6b7280]">Bank Name</p>
+                  <p className="text-white font-medium">{selectedUser.bankName || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-[#6b7280]">Account Number</p>
+                  <p className="text-white font-medium">{selectedUser.accountNumber || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-[#6b7280]">Account Holder</p>
+                  <p className="text-white font-medium">{selectedUser.accountHolderName || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-[#6b7280]">Branch</p>
+                  <p className="text-white font-medium">{selectedUser.branchName || "-"}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Actions */}
             <h4 className="text-white font-semibold mb-4">Quick Actions</h4>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {actions.map((action) => (
-                <button
-                  key={action.label}
-                  onClick={action.onClick}
-                  className="bg-[#0f1419] border border-[#2a3a4d] rounded-xl p-6 text-center cursor-pointer hover:border-[#10b981] hover:-translate-y-1 transition-all group"
-                >
-                  <action.icon className="h-8 w-8 mx-auto mb-3 transition-transform group-hover:scale-110" style={{ color: action.color }} />
-                  <h4 className="text-white font-medium text-sm mb-1">{action.label}</h4>
-                  <p className="text-[#6b7280] text-xs">{action.desc}</p>
-                </button>
-              ))}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <button
+                onClick={openEditUserModal}
+                className="bg-[#0f1419] border border-[#2a3a4d] rounded-xl p-4 text-center cursor-pointer hover:border-[#06b6d4] transition-all group"
+              >
+                <UserCog className="h-6 w-6 mx-auto mb-2 text-[#06b6d4] group-hover:scale-110 transition-transform" />
+                <h4 className="text-white font-medium text-sm">Edit User</h4>
+                <p className="text-[#6b7280] text-xs">Name, Email, Status</p>
+              </button>
+              <button
+                onClick={openEditBankModal}
+                className="bg-[#0f1419] border border-[#2a3a4d] rounded-xl p-4 text-center cursor-pointer hover:border-[#8b5cf6] transition-all group"
+              >
+                <Building2 className="h-6 w-6 mx-auto mb-2 text-[#8b5cf6] group-hover:scale-110 transition-transform" />
+                <h4 className="text-white font-medium text-sm">Edit Bank</h4>
+                <p className="text-[#6b7280] text-xs">Bank Details</p>
+              </button>
+              <button
+                onClick={() => setResetModal({ open: true, field: "totalAdsCompleted", label: "Booking (Ads Count)" })}
+                className="bg-[#0f1419] border border-[#2a3a4d] rounded-xl p-4 text-center cursor-pointer hover:border-[#ef4444] transition-all group"
+              >
+                <RotateCcw className="h-6 w-6 mx-auto mb-2 text-[#ef4444] group-hover:scale-110 transition-transform" />
+                <h4 className="text-white font-medium text-sm">Reset Booking</h4>
+                <p className="text-[#6b7280] text-xs">Clear ad history</p>
+              </button>
+              <button
+                onClick={() => setAddValueModal({ open: true, field: "points", label: "Points", isPoints: true })}
+                className="bg-[#0f1419] border border-[#2a3a4d] rounded-xl p-4 text-center cursor-pointer hover:border-[#8b5cf6] transition-all group"
+              >
+                <Star className="h-6 w-6 mx-auto mb-2 text-[#8b5cf6] group-hover:scale-110 transition-transform" />
+                <h4 className="text-white font-medium text-sm">Add Points</h4>
+                <p className="text-[#6b7280] text-xs">Up to 100</p>
+              </button>
             </div>
           </>
         ) : !isLoadingUser && (
@@ -378,11 +421,11 @@ export default function AdminPremiumManage() {
               className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#f59e0b]"
               value={promotionForm.adsLimit}
               onChange={(e) => setPromotionForm({ ...promotionForm, adsLimit: e.target.value })}
-              placeholder="e.g. 28"
+              placeholder="e.g. 12"
             />
           </div>
           <div>
-            <label className="block text-sm text-[#9ca3af] mb-1">Deposit Amount (LKR)</label>
+            <label className="block text-sm text-[#9ca3af] mb-1">Deposit Requirement (LKR)</label>
             <input
               type="text"
               className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#f59e0b]"
@@ -457,14 +500,20 @@ export default function AdminPremiumManage() {
       <Modal isOpen={addValueModal.open} onClose={() => { setAddValueModal({ open: false, field: "", label: "" }); setAddValueAmount(""); }} title={`Add to ${addValueModal.label}`}>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm text-[#9ca3af] mb-1">Amount to Add (LKR)</label>
+            <label className="block text-sm text-[#9ca3af] mb-1">
+              {addValueModal.isPoints ? "Points to Add (max 100 total)" : "Amount to Add (LKR)"}
+            </label>
             <input
-              type="text"
+              type={addValueModal.isPoints ? "number" : "text"}
               className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#10b981]"
               value={addValueAmount}
               onChange={(e) => setAddValueAmount(e.target.value)}
-              placeholder="e.g. 1000"
+              placeholder={addValueModal.isPoints ? "e.g. 10" : "e.g. 1000"}
+              max={addValueModal.isPoints ? 100 : undefined}
             />
+            {addValueModal.isPoints && (
+              <p className="text-xs text-[#6b7280] mt-1">Current: {selectedUser?.points || 0} points</p>
+            )}
           </div>
           <button
             onClick={() => addValueMutation.mutate({ field: addValueModal.field, amount: addValueAmount })}
@@ -480,24 +529,6 @@ export default function AdminPremiumManage() {
       {/* Edit User Modal */}
       <Modal isOpen={editUserModal} onClose={() => setEditUserModal(false)} title="Edit User Details">
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm text-[#9ca3af] mb-1">Username</label>
-            <input
-              type="text"
-              className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#06b6d4]"
-              value={userForm.username}
-              onChange={(e) => setUserForm({ ...userForm, username: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-[#9ca3af] mb-1">Email</label>
-            <input
-              type="email"
-              className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#06b6d4]"
-              value={userForm.email}
-              onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
-            />
-          </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm text-[#9ca3af] mb-1">First Name</label>
@@ -518,7 +549,63 @@ export default function AdminPremiumManage() {
               />
             </div>
           </div>
-          <div className="flex gap-3">
+          <div>
+            <label className="block text-sm text-[#9ca3af] mb-1">
+              <Mail className="h-3 w-3 inline mr-1" /> Email
+            </label>
+            <input
+              type="email"
+              className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#06b6d4]"
+              value={userForm.email}
+              onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-[#9ca3af] mb-1">
+              <Phone className="h-3 w-3 inline mr-1" /> Mobile Number
+            </label>
+            <input
+              type="tel"
+              className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#06b6d4]"
+              value={userForm.mobileNumber}
+              onChange={(e) => setUserForm({ ...userForm, mobileNumber: e.target.value })}
+              placeholder="e.g. 0771234567"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-[#9ca3af] mb-1">Status</label>
+            <select
+              className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#06b6d4]"
+              value={userForm.status}
+              onChange={(e) => setUserForm({ ...userForm, status: e.target.value })}
+            >
+              <option value="pending">Pending</option>
+              <option value="active">Active</option>
+              <option value="frozen">Frozen</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm text-[#9ca3af] mb-1">
+              <Lock className="h-3 w-3 inline mr-1" /> New Password (leave empty to keep current)
+            </label>
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#06b6d4] pr-12"
+                value={userForm.password}
+                onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
+                placeholder="Enter new password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6b7280] hover:text-white"
+              >
+                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
+            </div>
+          </div>
+          <div className="flex gap-3 pt-2">
             <button
               onClick={openEditBankModal}
               className="flex-1 py-3 bg-[#2a3a4d] text-white font-semibold rounded-xl"
@@ -526,7 +613,11 @@ export default function AdminPremiumManage() {
               Edit Bank
             </button>
             <button
-              onClick={() => updateUserMutation.mutate(userForm)}
+              onClick={() => {
+                const updateData: any = { ...userForm };
+                if (!updateData.password) delete updateData.password;
+                updateUserMutation.mutate(updateData);
+              }}
               disabled={updateUserMutation.isPending}
               className="flex-1 py-3 bg-gradient-to-r from-[#06b6d4] to-[#0891b2] text-white font-semibold rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
             >
@@ -547,6 +638,7 @@ export default function AdminPremiumManage() {
               className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#06b6d4]"
               value={bankForm.bankName}
               onChange={(e) => setBankForm({ ...bankForm, bankName: e.target.value })}
+              placeholder="e.g. Commercial Bank"
             />
           </div>
           <div>
@@ -556,6 +648,7 @@ export default function AdminPremiumManage() {
               className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#06b6d4]"
               value={bankForm.accountNumber}
               onChange={(e) => setBankForm({ ...bankForm, accountNumber: e.target.value })}
+              placeholder="e.g. 1234567890"
             />
           </div>
           <div>
@@ -565,6 +658,17 @@ export default function AdminPremiumManage() {
               className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#06b6d4]"
               value={bankForm.accountHolderName}
               onChange={(e) => setBankForm({ ...bankForm, accountHolderName: e.target.value })}
+              placeholder="e.g. John Doe"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-[#9ca3af] mb-1">Branch Name</label>
+            <input
+              type="text"
+              className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#06b6d4]"
+              value={bankForm.branchName}
+              onChange={(e) => setBankForm({ ...bankForm, branchName: e.target.value })}
+              placeholder="e.g. Colombo Main Branch"
             />
           </div>
           <button
