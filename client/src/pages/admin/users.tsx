@@ -1,11 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { Users, Search, Plus, Edit, Trash2, Eye, CheckCircle } from "lucide-react";
+import { Users, Search, Plus, Edit, Trash2, Eye, CheckCircle, X, Phone, Mail, CreditCard, Calendar, Wallet, Target, Award, TrendingUp, Building2 } from "lucide-react";
 import { useState } from "react";
 
 export default function AdminUsers() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+  const [selectedUser, setSelectedUser] = useState<any>(null);
   const { data: users, isLoading } = useQuery({ queryKey: ["users"], queryFn: api.getUsers });
 
   const deleteMutation = useMutation({
@@ -57,7 +58,7 @@ export default function AdminUsers() {
                   <td className="p-4 text-[#10b981] font-semibold">LKR {Number(user.balance).toLocaleString()}</td>
                   <td className="p-4"><span className={`px-3 py-1 rounded-full text-xs font-medium ${user.status === "active" ? "bg-[#10b981]/20 text-[#10b981]" : user.status === "pending" ? "bg-[#f59e0b]/20 text-[#f59e0b]" : "bg-[#ef4444]/20 text-[#ef4444]"}`}>{user.status}</span></td>
                   <td className="p-4"><div className="flex gap-2">
-                    <button className="w-8 h-8 bg-[#3b82f6]/20 text-[#3b82f6] rounded-lg flex items-center justify-center hover:bg-[#3b82f6]/30"><Eye className="h-4 w-4" /></button>
+                    <button onClick={() => setSelectedUser(user)} className="w-8 h-8 bg-[#3b82f6]/20 text-[#3b82f6] rounded-lg flex items-center justify-center hover:bg-[#3b82f6]/30"><Eye className="h-4 w-4" /></button>
                     <button className="w-8 h-8 bg-[#f59e0b]/20 text-[#f59e0b] rounded-lg flex items-center justify-center hover:bg-[#f59e0b]/30"><Edit className="h-4 w-4" /></button>
                     <button onClick={() => deleteMutation.mutate(user.id)} className="w-8 h-8 bg-[#ef4444]/20 text-[#ef4444] rounded-lg flex items-center justify-center hover:bg-[#ef4444]/30"><Trash2 className="h-4 w-4" /></button>
                   </div></td>
@@ -69,6 +70,196 @@ export default function AdminUsers() {
           </table>
         </div>
       </div>
+
+      {/* View Details Modal */}
+      {selectedUser && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setSelectedUser(null)}>
+          <div className="bg-[#1a2332] max-w-3xl w-full max-h-[90vh] overflow-y-auto rounded-2xl border border-[#2a3a4d]" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-[#2a3a4d]">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 bg-gradient-to-br from-[#3b82f6] to-[#2563eb] rounded-full flex items-center justify-center text-white text-2xl font-semibold">
+                  {selectedUser.username?.[0]?.toUpperCase() || "U"}
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">{selectedUser.firstName || selectedUser.username} {selectedUser.lastName || ""}</h2>
+                  <p className="text-[#6b7280]">@{selectedUser.username}</p>
+                  <span className={`inline-block mt-1 px-3 py-1 rounded-full text-xs font-medium ${selectedUser.status === "active" ? "bg-[#10b981]/20 text-[#10b981]" : selectedUser.status === "pending" ? "bg-[#f59e0b]/20 text-[#f59e0b]" : "bg-[#ef4444]/20 text-[#ef4444]"}`}>
+                    {selectedUser.status}
+                  </span>
+                </div>
+              </div>
+              <button onClick={() => setSelectedUser(null)} className="w-10 h-10 bg-[#2a3a4d] hover:bg-[#374151] rounded-lg flex items-center justify-center text-[#9ca3af]">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-6">
+              {/* Contact Information */}
+              <div className="bg-[#0f1419] rounded-xl p-4 border border-[#2a3a4d]">
+                <h3 className="text-[#9ca3af] text-sm uppercase font-medium mb-4 flex items-center gap-2"><Mail className="h-4 w-4" /> Contact Information</h3>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[#6b7280] text-xs mb-1">Email</p>
+                    <p className="text-white">{selectedUser.email || "Not provided"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[#6b7280] text-xs mb-1">Mobile Number</p>
+                    <p className="text-white">{selectedUser.mobileNumber || "Not provided"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[#6b7280] text-xs mb-1">First Name</p>
+                    <p className="text-white">{selectedUser.firstName || "Not provided"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[#6b7280] text-xs mb-1">Last Name</p>
+                    <p className="text-white">{selectedUser.lastName || "Not provided"}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Balance Information */}
+              <div className="bg-[#0f1419] rounded-xl p-4 border border-[#2a3a4d]">
+                <h3 className="text-[#9ca3af] text-sm uppercase font-medium mb-4 flex items-center gap-2"><Wallet className="h-4 w-4" /> Balance Information</h3>
+                <div className="grid md:grid-cols-3 gap-4">
+                  <div className="bg-[#10b981]/10 rounded-lg p-3 border border-[#10b981]/30">
+                    <p className="text-[#10b981] text-xs mb-1">Current Balance</p>
+                    <p className="text-[#10b981] text-xl font-bold">LKR {Number(selectedUser.balance || 0).toLocaleString()}</p>
+                  </div>
+                  <div className="bg-[#3b82f6]/10 rounded-lg p-3 border border-[#3b82f6]/30">
+                    <p className="text-[#3b82f6] text-xs mb-1">Withdrawable (Milestone)</p>
+                    <p className="text-[#3b82f6] text-xl font-bold">LKR {Number(selectedUser.milestoneAmount || 0).toLocaleString()}</p>
+                  </div>
+                  <div className="bg-[#f59e0b]/10 rounded-lg p-3 border border-[#f59e0b]/30">
+                    <p className="text-[#f59e0b] text-xs mb-1">Total Earned</p>
+                    <p className="text-[#f59e0b] text-xl font-bold">LKR {Number(selectedUser.milestoneReward || 0).toLocaleString()}</p>
+                  </div>
+                </div>
+                <div className="grid md:grid-cols-3 gap-4 mt-4">
+                  <div>
+                    <p className="text-[#6b7280] text-xs mb-1">Destination Amount (Bonus)</p>
+                    <p className="text-white font-semibold">LKR {Number(selectedUser.destinationAmount || 0).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-[#6b7280] text-xs mb-1">Ongoing Milestone</p>
+                    <p className="text-white font-semibold">LKR {Number(selectedUser.ongoingMilestone || 0).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-[#6b7280] text-xs mb-1">Pending Amount</p>
+                    <p className="text-white font-semibold">LKR {Number(selectedUser.pendingAmount || 0).toLocaleString()}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Ad Statistics */}
+              <div className="bg-[#0f1419] rounded-xl p-4 border border-[#2a3a4d]">
+                <h3 className="text-[#9ca3af] text-sm uppercase font-medium mb-4 flex items-center gap-2"><Target className="h-4 w-4" /> Ad Statistics</h3>
+                <div className="grid md:grid-cols-3 gap-4">
+                  <div className="bg-[#8b5cf6]/10 rounded-lg p-3 border border-[#8b5cf6]/30">
+                    <p className="text-[#8b5cf6] text-xs mb-1">Total Ads Completed</p>
+                    <p className="text-[#8b5cf6] text-xl font-bold">{selectedUser.totalAdsCompleted || 0}</p>
+                  </div>
+                  <div className="bg-[#ec4899]/10 rounded-lg p-3 border border-[#ec4899]/30">
+                    <p className="text-[#ec4899] text-xs mb-1">Points</p>
+                    <p className="text-[#ec4899] text-xl font-bold">{selectedUser.points || 0}</p>
+                  </div>
+                  <div>
+                    <p className="text-[#6b7280] text-xs mb-1">Has Deposit</p>
+                    <p className="text-white font-semibold">{selectedUser.hasDeposit ? "Yes" : "No"}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Restriction/Promotion Info */}
+              {(selectedUser.restrictionAdsLimit || selectedUser.restrictionDeposit || selectedUser.restrictionCommission) && (
+                <div className="bg-[#0f1419] rounded-xl p-4 border border-[#f59e0b]/30">
+                  <h3 className="text-[#f59e0b] text-sm uppercase font-medium mb-4 flex items-center gap-2"><Award className="h-4 w-4" /> Active Promotion</h3>
+                  <div className="grid md:grid-cols-4 gap-4">
+                    <div>
+                      <p className="text-[#6b7280] text-xs mb-1">Ads Limit</p>
+                      <p className="text-white font-semibold">{selectedUser.restrictionAdsLimit || "N/A"}</p>
+                    </div>
+                    <div>
+                      <p className="text-[#6b7280] text-xs mb-1">Deposit Required</p>
+                      <p className="text-white font-semibold">LKR {Number(selectedUser.restrictionDeposit || 0).toLocaleString()}</p>
+                    </div>
+                    <div>
+                      <p className="text-[#6b7280] text-xs mb-1">Commission</p>
+                      <p className="text-white font-semibold">LKR {Number(selectedUser.restrictionCommission || 0).toLocaleString()}</p>
+                    </div>
+                    <div>
+                      <p className="text-[#6b7280] text-xs mb-1">Ads Completed</p>
+                      <p className="text-white font-semibold">{selectedUser.restrictedAdsCompleted || 0}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Bank Details */}
+              <div className="bg-[#0f1419] rounded-xl p-4 border border-[#2a3a4d]">
+                <h3 className="text-[#9ca3af] text-sm uppercase font-medium mb-4 flex items-center gap-2"><Building2 className="h-4 w-4" /> Bank Details</h3>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[#6b7280] text-xs mb-1">Bank Name</p>
+                    <p className="text-white">{selectedUser.bankName || "Not provided"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[#6b7280] text-xs mb-1">Account Number</p>
+                    <p className="text-white font-mono">{selectedUser.accountNumber || "Not provided"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[#6b7280] text-xs mb-1">Account Holder Name</p>
+                    <p className="text-white">{selectedUser.accountHolderName || "Not provided"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[#6b7280] text-xs mb-1">Branch Name</p>
+                    <p className="text-white">{selectedUser.branchName || "Not provided"}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Account Info */}
+              <div className="bg-[#0f1419] rounded-xl p-4 border border-[#2a3a4d]">
+                <h3 className="text-[#9ca3af] text-sm uppercase font-medium mb-4 flex items-center gap-2"><Calendar className="h-4 w-4" /> Account Information</h3>
+                <div className="grid md:grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-[#6b7280] text-xs mb-1">User ID</p>
+                    <p className="text-white font-mono text-sm">{selectedUser.id}</p>
+                  </div>
+                  <div>
+                    <p className="text-[#6b7280] text-xs mb-1">Admin Status</p>
+                    <p className="text-white">{selectedUser.isAdmin ? "Yes" : "No"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[#6b7280] text-xs mb-1">Language</p>
+                    <p className="text-white">{selectedUser.language || "en"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[#6b7280] text-xs mb-1">Created At</p>
+                    <p className="text-white">{selectedUser.createdAt ? new Date(selectedUser.createdAt).toLocaleDateString() : "N/A"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[#6b7280] text-xs mb-1">Updated At</p>
+                    <p className="text-white">{selectedUser.updatedAt ? new Date(selectedUser.updatedAt).toLocaleDateString() : "N/A"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[#6b7280] text-xs mb-1">Notifications</p>
+                    <p className="text-white">{selectedUser.notificationsEnabled ? "Enabled" : "Disabled"}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div className="p-6 border-t border-[#2a3a4d] flex justify-end gap-3">
+              <button onClick={() => setSelectedUser(null)} className="px-4 py-2 bg-[#2a3a4d] hover:bg-[#374151] text-white rounded-lg">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
