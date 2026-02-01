@@ -138,24 +138,7 @@ function AdminProtectedRoute({ component: Component }: { component: React.Compon
 }
 
 function HomePage() {
-  const { user, isLoading } = useAuth();
-
-  if (isLoading) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (user) {
-    // Check if user account is pending activation (not for admins)
-    if ((user as any).status === "pending" && !(user as any).isAdmin) {
-      return <PendingAccountPage />;
-    }
-    return <Dashboard />;
-  }
-
+  // Always show landing page at "/"
   return <LandingPage />;
 }
 
