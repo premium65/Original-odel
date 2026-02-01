@@ -1,22 +1,75 @@
 import { useState } from "react";
-import { PiggyBank, Search, CheckCircle, XCircle, Clock, Eye, Loader2 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { PiggyBank, Search, CheckCircle, XCircle, Clock, Plus, Loader2, X } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { api } from "@/lib/api";
 import { format } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Deposits() {
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newDeposit, setNewDeposit] = useState({ userId: "", amount: "", notes: "" });
 
   const { data: deposits = [], isLoading } = useQuery({
     queryKey: ["admin-deposits"],
     queryFn: api.getDeposits
   });
 
+  const { data: users = [] } = useQuery({
+    queryKey: ["/api/admin/users"],
+  });
+
   const { data: stats } = useQuery({
     queryKey: ["admin-stats"],
     queryFn: api.getStats
   });
+
+  const approveMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      return apiRequest("PUT", `/api/admin/transactions/deposits/${id}`, { status });
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-deposits"] });
+      toast({
+        title: variables.status === "approved" ? "Deposit Approved" : "Deposit Rejected",
+        description: `Deposit has been ${variables.status}`
+      });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update deposit", variant: "destructive" });
+    }
+  });
+
+  const addDepositMutation = useMutation({
+    mutationFn: async (data: { userId: string; amount: number; notes: string }) => {
+      return apiRequest("POST", "/api/admin/deposits", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-deposits"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      setShowAddModal(false);
+      setNewDeposit({ userId: "", amount: "", notes: "" });
+      toast({ title: "Success", description: "Deposit added to user balance" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to add deposit", variant: "destructive" });
+    }
+  });
+
+  const handleAddDeposit = () => {
+    if (!newDeposit.userId || !newDeposit.amount) {
+      toast({ title: "Error", description: "Please select user and enter amount", variant: "destructive" });
+      return;
+    }
+    addDepositMutation.mutate({
+      userId: newDeposit.userId,
+      amount: parseFloat(newDeposit.amount),
+      notes: newDeposit.notes
+    });
+  };
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
@@ -51,7 +104,6 @@ export default function Deposits() {
     )
   );
 
-  // Calculate local stats from deposits list if needed, or use global stats
   const completedCount = deposits.filter((d: any) => d.status === "approved" || d.status === "completed").length;
   const pendingCount = deposits.filter((d: any) => d.status === "pending").length;
   const failedCount = deposits.filter((d: any) => d.status === "rejected" || d.status === "failed").length;
@@ -76,6 +128,12 @@ export default function Deposits() {
             <p className="text-[#9ca3af]">View and manage user deposits</p>
           </div>
         </div>
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="px-5 py-2.5 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90"
+        >
+          <Plus className="h-5 w-5" /> Add Manual Deposit
+        </button>
       </div>
 
       {/* Stats */}
@@ -121,7 +179,7 @@ export default function Deposits() {
                 <th className="px-6 py-4 text-left text-xs font-semibold text-[#9ca3af] uppercase">Method</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-[#9ca3af] uppercase">Date</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-[#9ca3af] uppercase">Status</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-[#9ca3af] uppercase">Action</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-[#9ca3af] uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#2a3a4d]">
@@ -142,15 +200,32 @@ export default function Deposits() {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-[#10b981] font-semibold">LKR {Number(deposit.amount).toLocaleString()}</td>
-                    <td className="px-6 py-4 text-[#9ca3af]">{deposit.method}</td>
+                    <td className="px-6 py-4 text-[#9ca3af]">{deposit.method || "Manual"}</td>
                     <td className="px-6 py-4 text-[#9ca3af] text-sm">
                       {deposit.createdAt ? format(new Date(deposit.createdAt), "yyyy-MM-dd HH:mm") : "-"}
                     </td>
                     <td className="px-6 py-4">{getStatusBadge(deposit.status)}</td>
                     <td className="px-6 py-4">
-                      <button className="w-8 h-8 bg-[#3b82f6]/20 text-[#3b82f6] rounded-lg flex items-center justify-center hover:bg-[#3b82f6]/30">
-                        <Eye className="h-4 w-4" />
-                      </button>
+                      {deposit.status === "pending" ? (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => approveMutation.mutate({ id: deposit.id, status: "approved" })}
+                            disabled={approveMutation.isPending}
+                            className="px-3 py-1.5 bg-[#10b981]/20 text-[#10b981] text-sm rounded-lg hover:bg-[#10b981]/30 flex items-center gap-1"
+                          >
+                            <CheckCircle className="h-4 w-4" /> Approve
+                          </button>
+                          <button
+                            onClick={() => approveMutation.mutate({ id: deposit.id, status: "rejected" })}
+                            disabled={approveMutation.isPending}
+                            className="px-3 py-1.5 bg-[#ef4444]/20 text-[#ef4444] text-sm rounded-lg hover:bg-[#ef4444]/30 flex items-center gap-1"
+                          >
+                            <XCircle className="h-4 w-4" /> Reject
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-[#6b7280] text-sm">Processed</span>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -159,6 +234,64 @@ export default function Deposits() {
           </table>
         </div>
       </div>
+
+      {/* Add Manual Deposit Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-[#1a2332] rounded-2xl border border-[#2a3a4d] w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-white">Add Manual Deposit</h3>
+              <button onClick={() => setShowAddModal(false)} className="text-[#6b7280] hover:text-white">
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-[#9ca3af] mb-2">Select User</label>
+                <select
+                  value={newDeposit.userId}
+                  onChange={(e) => setNewDeposit({ ...newDeposit, userId: e.target.value })}
+                  className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none"
+                >
+                  <option value="">Select a user...</option>
+                  {Array.isArray(users) && users.map((user: any) => (
+                    <option key={user.id} value={user.id}>
+                      {user.username} ({user.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm text-[#9ca3af] mb-2">Amount (LKR)</label>
+                <input
+                  type="number"
+                  value={newDeposit.amount}
+                  onChange={(e) => setNewDeposit({ ...newDeposit, amount: e.target.value })}
+                  placeholder="Enter amount"
+                  className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-[#9ca3af] mb-2">Notes (optional)</label>
+                <textarea
+                  value={newDeposit.notes}
+                  onChange={(e) => setNewDeposit({ ...newDeposit, notes: e.target.value })}
+                  placeholder="Add notes..."
+                  className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none resize-none"
+                  rows={3}
+                />
+              </div>
+              <button
+                onClick={handleAddDeposit}
+                disabled={addDepositMutation.isPending}
+                className="w-full py-3 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl hover:opacity-90 disabled:opacity-50"
+              >
+                {addDepositMutation.isPending ? "Adding..." : "Add Deposit"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

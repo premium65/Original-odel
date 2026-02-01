@@ -1,7 +1,20 @@
-import { useState } from "react";
-import { Percent, Save, Plus, Trash2, Edit, Users, DollarSign, TrendingUp } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Percent, Save, Plus, Trash2, Edit, TrendingUp } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+
+interface CommissionTier {
+  id: number;
+  name: string;
+  minReferrals: number;
+  maxReferrals: number;
+  percentage: number;
+  enabled: boolean;
+}
 
 export default function Commission() {
+  const { toast } = useToast();
   const [settings, setSettings] = useState({
     enableCommission: true,
     defaultPercentage: 10,
@@ -9,13 +22,55 @@ export default function Commission() {
     minWithdrawal: 500,
   });
 
-  const [tiers, setTiers] = useState([
+  const [tiers, setTiers] = useState<CommissionTier[]>([
     { id: 1, name: "Bronze", minReferrals: 0, maxReferrals: 10, percentage: 5, enabled: true },
     { id: 2, name: "Silver", minReferrals: 11, maxReferrals: 50, percentage: 10, enabled: true },
     { id: 3, name: "Gold", minReferrals: 51, maxReferrals: 100, percentage: 15, enabled: true },
   ]);
 
-  const handleSave = () => alert("Commission settings saved!");
+  const { data: savedConfig, isLoading } = useQuery({
+    queryKey: ["/api/admin/settings/config"],
+  });
+
+  useEffect(() => {
+    if (savedConfig && typeof savedConfig === 'object') {
+      const configData = savedConfig as Record<string, string>;
+      if (configData.commissionSettings) {
+        try {
+          const parsed = JSON.parse(configData.commissionSettings);
+          if (parsed.settings) setSettings(parsed.settings);
+          if (parsed.tiers) setTiers(parsed.tiers);
+        } catch (e) {
+          console.error("Error parsing commission settings:", e);
+        }
+      }
+    }
+  }, [savedConfig]);
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("PUT", "/api/admin/settings/config", {
+        commissionSettings: JSON.stringify({ settings, tiers })
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/config"] });
+      toast({ title: "Success", description: "Commission settings saved!" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to save settings", variant: "destructive" });
+    }
+  });
+
+  const handleSave = () => saveMutation.mutate();
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#8b5cf6]"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -29,8 +84,12 @@ export default function Commission() {
             <p className="text-[#9ca3af]">Manage referral commission rates</p>
           </div>
         </div>
-        <button onClick={handleSave} className="px-5 py-2.5 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90">
-          <Save className="h-5 w-5" /> Save
+        <button
+          onClick={handleSave}
+          disabled={saveMutation.isPending}
+          className="px-5 py-2.5 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90 disabled:opacity-50"
+        >
+          <Save className="h-5 w-5" /> {saveMutation.isPending ? "Saving..." : "Save"}
         </button>
       </div>
 
