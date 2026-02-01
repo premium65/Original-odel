@@ -36,6 +36,14 @@ export const api = {
   createMilestone: (id: number | string, data: any) => fetchAPI(`/admin/users/${id}/milestone`, { method: "POST", body: JSON.stringify(data) }),
   updateBalance: (id: number | string, data: any) => fetchAPI(`/admin/users/${id}/balance`, { method: "POST", body: JSON.stringify(data) }),
 
+  // Premium Manage - Reset/Add operations
+  resetUserField: (id: number | string, field: string) => fetchAPI(`/admin/users/${id}/reset-field`, { method: "POST", body: JSON.stringify({ field }) }),
+  addUserValue: (id: number | string, field: string, amount: string) => fetchAPI(`/admin/users/${id}/add-value`, { method: "POST", body: JSON.stringify({ field, amount }) }),
+  createPromotion: (id: number | string, data: { adsLimit: number; deposit: string; commission: string; pendingAmount: string }) => fetchAPI(`/admin/users/${id}/restrict`, { method: "POST", body: JSON.stringify(data) }),
+  removePromotion: (id: number | string) => fetchAPI(`/admin/users/${id}/unrestrict`, { method: "POST" }),
+  updateUserDetails: (id: number | string, data: any) => fetchAPI(`/admin/users/${id}/details`, { method: "PATCH", body: JSON.stringify(data) }),
+  updateBankDetails: (id: number | string, data: any) => fetchAPI(`/admin/users/${id}/bank`, { method: "PATCH", body: JSON.stringify(data) }),
+
   // Transactions
   getTransactions: () => fetchAPI("/admin/transactions"),
   getWithdrawals: () => fetchAPI("/admin/transactions/withdrawals"),
