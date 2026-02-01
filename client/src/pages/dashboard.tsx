@@ -76,7 +76,14 @@ export default function Dashboard() {
   const userName = user?.firstName || user?.username || "User";
   const userInitial = userName.charAt(0).toUpperCase();
 
-  const tabs = ["Exclusives", "Ads Hub", "Rewards", "Events", "Promos", "Status"];
+  const tabs = [
+    { label: "Exclusives", path: "/exclusives" },
+    { label: "Ads Hub", path: "/ads-hub" },
+    { label: "Rewards", path: "/withdraw" },
+    { label: "Events", path: "/events" },
+    { label: "Promos", path: "/exclusives" },
+    { label: "Status", path: "/status" },
+  ];
 
   return (
     <div className="min-h-screen flex bg-white">
@@ -148,11 +155,11 @@ export default function Dashboard() {
             <div className="flex items-center gap-2 lg:gap-4 flex-wrap">
               {tabs.map((tab) => (
                 <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-3 lg:px-4 py-2 text-xs lg:text-sm font-medium rounded-full transition-all ${activeTab === tab ? "bg-[#1a1a1a] text-white" : "text-gray-500 hover:bg-gray-100"}`}
+                  key={tab.label}
+                  onClick={() => setLocation(tab.path)}
+                  className={`px-3 lg:px-4 py-2 text-xs lg:text-sm font-medium rounded-full transition-all ${activeTab === tab.label ? "bg-[#1a1a1a] text-white" : "text-gray-500 hover:bg-gray-100"}`}
                 >
-                  {tab}
+                  {tab.label}
                 </button>
               ))}
             </div>
