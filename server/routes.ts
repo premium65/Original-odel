@@ -13,6 +13,8 @@ import fs from "fs";
 import { mongoStorage } from "./mongoStorage";
 import { isMongoConnected } from "./mongoConnection";
 import cors from "cors";
+import connectPgSimple from "connect-pg-simple";
+import { pool } from "./db";
 
 const SALT_ROUNDS = 10;
 
@@ -70,12 +72,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   repairDatabase().catch(console.error);
 
   // setup client sessions
+  const PgStore = connectPgSimple(session);
   app.use(session({
     secret: process.env.SESSION_SECRET || "default_secret",
     resave: false,
     saveUninitialized: false,
-    store: new (require("connect-pg-simple")(session))({
-      pool: require("./db").pool,
+    store: new PgStore({
+      pool: pool,
       createTableIfMissing: true
     }),
     cookie: {
