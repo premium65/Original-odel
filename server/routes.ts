@@ -89,10 +89,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Only use PgStore if pool is available
   if (pool) {
     try {
+      // Create session table if it doesn't exist
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "session" (
+          "sid" varchar NOT NULL COLLATE "default",
+          "sess" json NOT NULL,
+          "expire" timestamp(6) NOT NULL,
+          CONSTRAINT "session_pkey" PRIMARY KEY ("sid")
+        );
+        CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
+      `).catch(() => {
+        // Ignore errors - table/index might already exist
+      });
+
       const PgStore = connectPgSimple(session);
       sessionConfig.store = new PgStore({
         pool: pool,
-        createTableIfMissing: false  // Table already exists in production
+        createTableIfMissing: false
       });
       console.log("[SESSION] Using PostgreSQL session store");
     } catch (err) {
