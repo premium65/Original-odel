@@ -3,7 +3,9 @@ import { registerPremiumRoutes } from "./premiumRoutes";
 import { registerAdminRoutes } from "./routes/admin/index";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertUserSchema, insertRatingSchema, insertAdSchema } from "@shared/schema";
+import { insertUserSchema, insertRatingSchema, insertAdSchema, contacts, infoPages, branding, themeSettings, slideshow } from "@shared/schema";
+import { db } from "./db";
+import { eq, desc } from "drizzle-orm";
 import session from "express-session";
 import { z } from "zod";
 import bcrypt from "bcrypt";
@@ -251,19 +253,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/slides", async (req, res) => {
     try {
-      // Return empty slides array for now
-      res.json([]);
+      // Fetch active slides from database
+      const slides = await db.select().from(slideshow).where(eq(slideshow.isActive, true)).orderBy(slideshow.sortOrder);
+      res.json(slides);
     } catch (error) {
+      console.error("[API/SLIDES] Error:", error);
       res.status(500).json({ error: "Failed to fetch slides" });
     }
   });
 
   app.get("/api/contact", async (req, res) => {
     try {
-      // Return empty contact data for now
-      res.json({});
+      // Fetch contacts from database
+      const allContacts = await db.select().from(contacts).where(eq(contacts.isActive, true));
+
+      // Transform into key-value format for frontend
+      const contactData: Record<string, { value: string; isActive: boolean; label?: string }> = {};
+      allContacts.forEach((c: any) => {
+        contactData[c.type] = { value: c.value, isActive: c.isActive, label: c.label };
+      });
+
+      res.json(contactData);
     } catch (error) {
+      console.error("[API/CONTACT] Error:", error);
       res.status(500).json({ error: "Failed to fetch contact data" });
+    }
+  });
+
+  // Public endpoint for branding
+  app.get("/api/branding", async (req, res) => {
+    try {
+      const brandingData = await db.select().from(branding).limit(1);
+      res.json(brandingData[0] || {
+        siteName: "OdelADS",
+        siteTagline: "Watch & Earn",
+        logoUrl: "",
+        faviconUrl: ""
+      });
+    } catch (error) {
+      console.error("[API/BRANDING] Error:", error);
+      res.status(500).json({ error: "Failed to fetch branding" });
+    }
+  });
+
+  // Public endpoint for theme settings
+  app.get("/api/theme", async (req, res) => {
+    try {
+      const themeData = await db.select().from(themeSettings);
+      const themeObj: Record<string, string> = {};
+      themeData.forEach((t: any) => {
+        themeObj[t.key] = t.value;
+      });
+      res.json(themeObj);
+    } catch (error) {
+      console.error("[API/THEME] Error:", error);
+      res.status(500).json({ error: "Failed to fetch theme" });
+    }
+  });
+
+  // Public endpoint for info pages (about, terms, privacy)
+  app.get("/api/info-pages/:slug", async (req, res) => {
+    try {
+      const { slug } = req.params;
+      const page = await db.select().from(infoPages).where(eq(infoPages.slug, slug)).limit(1);
+      if (page.length === 0) {
+        return res.status(404).json({ error: "Page not found" });
+      }
+      res.json(page[0]);
+    } catch (error) {
+      console.error("[API/INFO-PAGES] Error:", error);
+      res.status(500).json({ error: "Failed to fetch info page" });
     }
   });
 

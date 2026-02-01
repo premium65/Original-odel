@@ -60,6 +60,19 @@ export const api = {
   getSlideshow: () => fetchAPI("/admin/settings/slideshow"),
   deleteSlide: (id: number) => fetchAPI(`/admin/settings/slideshow/${id}`, { method: "DELETE" }),
 
+  // Branding
+  getBranding: () => fetchAPI("/admin/settings/branding"),
+  updateBranding: (data: any) => fetchAPI("/admin/settings/branding", { method: "PUT", body: JSON.stringify(data) }),
+
+  // Theme
+  getTheme: () => fetchAPI("/admin/settings/theme"),
+  updateTheme: (data: any) => fetchAPI("/admin/settings/theme", { method: "PUT", body: JSON.stringify(data) }),
+
+  // Info Pages
+  getInfoPages: () => fetchAPI("/admin/settings/info-pages"),
+  getInfoPage: (slug: string) => fetchAPI(`/admin/settings/info-pages/${slug}`),
+  updateInfoPage: (slug: string, data: any) => fetchAPI(`/admin/settings/info-pages/${slug}`, { method: "PUT", body: JSON.stringify(data) }),
+
   // Dashboard
   getStats: () => fetchAPI("/admin/dashboard/stats"),
   getRecent: () => fetchAPI("/admin/dashboard/recent"),
