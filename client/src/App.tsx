@@ -122,7 +122,7 @@ function HomePage() {
     return <Dashboard />;
   }
 
-  return <SplashPage />;
+  return <LandingPage />;
 }
 
 function WelcomePage() {

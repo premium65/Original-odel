@@ -431,6 +431,26 @@ export function registerMongoRoutes(app: Express) {
     }
   });
 
+  app.post("/api/auth/logout", (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).send("Failed to logout");
+      }
+      res.clearCookie("connect.sid");
+      res.sendStatus(200);
+    });
+  });
+
+  app.get("/api/logout", (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).send("Failed to logout");
+      }
+      res.clearCookie("connect.sid");
+      res.redirect("/");
+    });
+  });
+
   // Ads routes
   app.get("/api/ads", async (req, res) => {
     try {

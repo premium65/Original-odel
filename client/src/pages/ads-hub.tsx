@@ -69,14 +69,20 @@ export default function AdsHubPage() {
   const TOTAL_ADS_REQUIRED = 28;
   const milestoneAmount = parseFloat(userData.milestoneAmount || "0");
   const hasDeposit = userData.hasDeposit || false;
-  
+
   // Deposit blocking - if negative balance and no deposit, block ad clicking
   const isDepositBlocked = milestoneAmount < 0 && !hasDeposit;
 
   const activeAds = ads.filter((ad: Ad) => ad.isActive);
-  const currentAdIndex = totalAdsCompleted;
+
+  // Cycle through ads using modulo to allow continuous earning
+  // If no ads are active, index is 0 (safe check below)
+  const currentAdIndex = activeAds.length > 0 ? totalAdsCompleted % activeAds.length : 0;
+
   const currentAd = activeAds[currentAdIndex];
-  const allAdsCompleted = totalAdsCompleted >= TOTAL_ADS_REQUIRED || currentAdIndex >= activeAds.length;
+
+  // Only show "All Ads Completed" if there are genuinely NO active ads in the system
+  const allAdsCompleted = activeAds.length === 0;
 
   const handleViewAd = () => {
     if (!currentAd || adState !== "ready") return;
@@ -148,7 +154,7 @@ export default function AdsHubPage() {
                 </div>
                 <h2 className="text-xl font-bold text-red-500 mb-2">Deposit Required</h2>
                 <p className="text-zinc-500 dark:text-zinc-400 mb-4">
-                  You must deposit to start clicking ads.<br/>
+                  You must deposit to start clicking ads.<br />
                   Contact admin to make your deposit.
                 </p>
                 <div className="bg-zinc-100 dark:bg-zinc-800 rounded-lg p-4 mb-4">
@@ -322,7 +328,7 @@ export default function AdsHubPage() {
                 >
                   <X className="w-5 h-5" />
                 </Button>
-                
+
                 {currentAd.imageUrl && (
                   <div className="w-full h-64 bg-zinc-100 dark:bg-zinc-800">
                     <img
@@ -338,7 +344,7 @@ export default function AdsHubPage() {
                 <h2 className="text-xl font-bold text-zinc-800 dark:text-zinc-100 mb-2">
                   {currentAd.title}
                 </h2>
-                
+
                 {currentAd.description && (
                   <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
                     {currentAd.description}
