@@ -63,6 +63,8 @@ async function checkAdminAuth(req: any): Promise<{ user: any; error?: string; st
 
 import { repairDatabase } from "./repair";
 
+console.log("--> DEPLOYMENT CHECK: FIX APPLIED (Commit 7378106+) <--");
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auto-repair DB on startup (safeguard)
   repairDatabase().catch(console.error);
