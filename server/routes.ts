@@ -539,9 +539,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           status: 'pending',
           isAdmin: false,
           // Include all required fields with defaults
-          milestoneAmount: "25000",
+          // destinationAmount = 25000 LKR first-day bonus (resets to 0 after first ad click)
+          // milestoneAmount = withdrawable balance (starts at 0)
+          // milestoneReward = total earnings ever (starts at 0)
+          milestoneAmount: "0",
           milestoneReward: "0",
-          destinationAmount: "0",
+          destinationAmount: "25000",
           ongoingMilestone: "0",
           totalAdsCompleted: 0,
           points: 0,
@@ -589,9 +592,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           isAdmin: false,
           createdAt: new Date().toISOString(),
           registeredAt: new Date().toISOString(),
-          milestoneAmount: "25000",
+          milestoneAmount: "0",
           milestoneReward: "0",
-          destinationAmount: "0",
+          destinationAmount: "25000",
           ongoingMilestone: "0",
           totalAdsCompleted: 0,
           points: 0,
