@@ -1,23 +1,53 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Clock, Check, X } from "lucide-react";
+import { useState } from "react";
 
 export default function AdminPendingUsers() {
   const queryClient = useQueryClient();
-  const { data: users, isLoading } = useQuery({ queryKey: ["pending-users"], queryFn: api.getPendingUsers });
+  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const { data: users, isLoading, error } = useQuery({
+    queryKey: ["pending-users"],
+    queryFn: api.getPendingUsers,
+    retry: 1
+  });
 
   const approveMutation = useMutation({
     mutationFn: (id: number | string) => api.approveUser(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["pending-users"] }),
+    onSuccess: (data) => {
+      setMessage({ type: 'success', text: `Account activated! User can now login.` });
+      queryClient.invalidateQueries({ queryKey: ["pending-users"] });
+      setTimeout(() => setMessage(null), 3000);
+    },
+    onError: (error: any) => {
+      setMessage({ type: 'error', text: error.message || 'Failed to approve user' });
+      setTimeout(() => setMessage(null), 3000);
+    }
   });
 
   const rejectMutation = useMutation({
     mutationFn: (id: number | string) => api.rejectUser(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["pending-users"] }),
+    onSuccess: () => {
+      setMessage({ type: 'success', text: 'User rejected and removed.' });
+      queryClient.invalidateQueries({ queryKey: ["pending-users"] });
+      setTimeout(() => setMessage(null), 3000);
+    },
+    onError: (error: any) => {
+      setMessage({ type: 'error', text: error.message || 'Failed to reject user' });
+      setTimeout(() => setMessage(null), 3000);
+    }
   });
 
   return (
     <div className="space-y-6">
+      {/* Success/Error Message Popup */}
+      {message && (
+        <div className={`fixed top-4 right-4 z-50 px-6 py-4 rounded-xl shadow-lg ${
+          message.type === 'success' ? 'bg-green-500' : 'bg-red-500'
+        } text-white font-medium animate-pulse`}>
+          {message.type === 'success' ? '✓ ' : '✗ '}{message.text}
+        </div>
+      )}
       <div className="flex items-center gap-4">
         <div className="w-12 h-12 rounded-xl bg-[#f59e0b] flex items-center justify-center"><Clock className="h-6 w-6 text-white" /></div>
         <div><h1 className="text-2xl font-bold text-white">Pending Users</h1><p className="text-[#9ca3af]">Users awaiting approval</p></div>
@@ -33,6 +63,7 @@ export default function AdminPendingUsers() {
             </tr></thead>
             <tbody>
               {isLoading ? <tr><td colSpan={4} className="p-8 text-center text-[#6b7280]">Loading...</td></tr> :
+               error ? <tr><td colSpan={4} className="p-8 text-center text-red-500">Error loading users. Please refresh.</td></tr> :
                users?.length ? users.map((user: any) => (
                 <tr key={user.id} className="border-b border-[#2a3a4d]">
                   <td className="p-4"><div className="flex items-center gap-3">
