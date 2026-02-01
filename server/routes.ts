@@ -88,12 +88,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Only use PgStore if pool is available
   if (pool) {
-    const PgStore = connectPgSimple(session);
-    sessionConfig.store = new PgStore({
-      pool: pool,
-      createTableIfMissing: true
-    });
-    console.log("[SESSION] Using PostgreSQL session store");
+    try {
+      const PgStore = connectPgSimple(session);
+      sessionConfig.store = new PgStore({
+        pool: pool,
+        createTableIfMissing: false  // Table already exists in production
+      });
+      console.log("[SESSION] Using PostgreSQL session store");
+    } catch (err) {
+      console.error("[SESSION] Failed to initialize PgStore, using memory store:", err);
+    }
   } else {
     console.log("[SESSION] Using memory session store (PostgreSQL unavailable)");
   }
