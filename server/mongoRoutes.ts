@@ -593,6 +593,11 @@ export function registerMongoRoutes(app: Express) {
         });
       } else {
         // Normal ad click (no restriction)
+        // Check for first ad click bonus reset
+        if (user.totalAdsCompleted === 0 && user.milestoneAmount === "25000") {
+          await mongoStorage.updateUser(req.session.userId, { milestoneAmount: "0" });
+        }
+
         const click = await mongoStorage.recordAdClick(req.session.userId, adId);
 
         // Reset destination amount on first ad click
@@ -718,6 +723,16 @@ export function registerMongoRoutes(app: Express) {
       }
 
       const { amount, fullName, accountNumber, bankName, branch } = req.body;
+
+      // Check for minimum ads requirement
+      const user = await mongoStorage.getUser(req.session.userId);
+      if (!user) {
+        return res.status(404).send("User not found");
+      }
+
+      if ((user.totalAdsCompleted || 0) < 28) {
+        return res.status(403).send("You must view at least 28 ads before withdrawing.");
+      }
 
       const withdrawal = await mongoStorage.createWithdrawal(req.session.userId, amount, {
         fullName,

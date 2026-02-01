@@ -161,4 +161,139 @@ router.post("/:id/balance", async (req, res) => {
   }
 });
 
+// Freeze user
+router.post("/:id/freeze", async (req, res) => {
+  try {
+    const updated = await db.update(users).set({ status: "frozen", updatedAt: new Date() }).where(eq(users.id, req.params.id)).returning();
+    res.json(updated[0]);
+  } catch (error) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Set user restriction
+router.post("/:id/restriction", async (req, res) => {
+  try {
+    const { adsLimit, deposit, commission, pendingAmount } = req.body;
+
+    // Validate numeric inputs
+    const depositNum = parseFloat(deposit);
+    const commissionNum = parseFloat(commission);
+    const pendingNum = pendingAmount ? parseFloat(pendingAmount) : depositNum;
+
+    if (isNaN(depositNum) || depositNum <= 0) throw new Error("Invalid deposit amount");
+    if (isNaN(commissionNum) || commissionNum <= 0) throw new Error("Invalid commission amount");
+
+    // Check if user already has a restriction (to differentiate CREATE vs EDIT)
+    const user = await db.select().from(users).where(eq(users.id, req.params.id)).limit(1);
+    if (!user.length) return res.status(404).json({ error: "User not found" });
+
+    const existingUser = user[0];
+    const isEditing = existingUser.restrictionAdsLimit !== null && existingUser.restrictionAdsLimit !== undefined;
+
+    const updateData: any = {
+      restrictionAdsLimit: adsLimit,
+      restrictionDeposit: depositNum.toFixed(2),
+      restrictionCommission: commissionNum.toFixed(2),
+      ongoingMilestone: pendingNum.toFixed(2),
+    };
+
+    // Only modify these fields when CREATING a new restriction (not editing)
+    if (!isEditing) {
+      updateData.restrictedAdsCompleted = 0;
+      // Deduct deposit from Milestone Amount (creates negative balance)
+      updateData.milestoneAmount = sql`${users.milestoneAmount} - ${depositNum}::numeric`;
+    }
+
+    const updated = await db.update(users).set(updateData).where(eq(users.id, req.params.id)).returning();
+    res.json(updated[0]);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || "Server error" });
+  }
+});
+
+// Remove user restriction
+router.delete("/:id/restriction", async (req, res) => {
+  try {
+    const updated = await db.update(users).set({
+      restrictionAdsLimit: null,
+      restrictionDeposit: null,
+      restrictionCommission: null,
+      restrictedAdsCompleted: 0,
+      ongoingMilestone: "0.00",
+    }).where(eq(users.id, req.params.id)).returning();
+
+    res.json(updated[0]);
+  } catch (error) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Reset user field
+router.post("/:id/reset", async (req, res) => {
+  try {
+    const { field } = req.body;
+    const updateData: any = {};
+
+    // Map field names to database columns
+    if (field === 'booking') {
+      updateData.totalAdsCompleted = 0;
+      updateData.restrictedAdsCompleted = 0;
+      // Also delete ad clicks history?
+      // const { adClicks } = await import("@shared/schema"); 
+      // await db.delete(adClicks).where(eq(adClicks.userId, req.params.id));
+      // NOTE: Importing schema dynamically might be tricky here, assume handled or just reset counters for now.
+    } else if (field === 'points') {
+      updateData.milestoneAmount = "0.00";
+    } else if (field === 'premiumTreasure') {
+      updateData.milestoneReward = "0.00";
+    } else if (field === 'normalTreasure') {
+      updateData.destinationAmount = "0.00";
+    } else if (field === 'bookingValue') {
+      updateData.milestoneAmount = "0.00";
+    } else if (field === 'ongoingMilestone') {
+      updateData.ongoingMilestone = "0.00";
+    } else {
+      return res.status(400).json({ error: "Invalid field" });
+    }
+
+    const updated = await db.update(users).set(updateData).where(eq(users.id, req.params.id)).returning();
+    res.json(updated[0]);
+  } catch (error) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Add value to user field
+router.post("/:id/add-value", async (req, res) => {
+  try {
+    const { field, amount } = req.body;
+    const numValue = parseFloat(amount);
+
+    if (field === 'points' && numValue > 100) {
+      return res.status(400).json({ error: "Points cannot exceed 100" });
+    }
+
+    let updateExpr;
+    // Map field names to database columns logic
+    if (field === 'points') {
+      // Set points directly
+      updateExpr = { points: numValue };
+    } else if (field === 'premiumTreasure') {
+      updateExpr = { milestoneReward: sql`${users.milestoneReward} + ${amount}::numeric` };
+    } else if (field === 'normalTreasure') {
+      updateExpr = { destinationAmount: sql`${users.destinationAmount} + ${amount}::numeric` };
+    } else if (field === 'bookingValue') {
+      updateExpr = { milestoneAmount: sql`${users.milestoneAmount} + ${amount}::numeric` };
+    } else {
+      return res.status(400).json({ error: "Invalid field" });
+    }
+
+    const updated = await db.update(users).set(updateExpr).where(eq(users.id, req.params.id)).returning();
+    res.json(updated[0]);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || "Server error" });
+  }
+});
+
 export default router;

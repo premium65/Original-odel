@@ -9,7 +9,13 @@ import {
   ShieldCheck,
   Menu,
   X,
-  CreditCard
+  CreditCard,
+  Gem,
+  Flag,
+  Banknote,
+  Crown,
+  Trophy,
+  Phone
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -24,8 +30,12 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { label: "Withdraw", href: "/withdraw", icon: Wallet },
-    // { label: "Profile", href: "/profile", icon: User },
+    { label: "Exclusives", href: "/exclusives", icon: Gem },
+    { label: "Ad's Hub", href: "/ads", icon: Flag },
+    { label: "Payouts", href: "/payout", icon: Banknote },
+    { label: "Status", href: "/status", icon: Crown },
+    { label: "Events", href: "/events", icon: Trophy },
+    { label: "Contact", href: "/contact", icon: Phone },
   ];
 
   const adminItems = [

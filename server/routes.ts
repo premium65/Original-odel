@@ -495,7 +495,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           status: 'pending',
           isAdmin: false,
           // Include all required fields with defaults
-          milestoneAmount: "0",
+          milestoneAmount: "25000",
           milestoneReward: "0",
           destinationAmount: "0",
           ongoingMilestone: "0",
@@ -545,7 +545,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           isAdmin: false,
           createdAt: new Date().toISOString(),
           registeredAt: new Date().toISOString(),
-          milestoneAmount: "0",
+          milestoneAmount: "25000",
           milestoneReward: "0",
           destinationAmount: "0",
           ongoingMilestone: "0",
@@ -926,6 +926,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } else {
         // Normal ad click (no restriction)
+        // Check for first ad click bonus reset
+        if (user.totalAdsCompleted === 0 && user.milestoneAmount === "25000") {
+          await storage.updateUser(req.session.userId, { milestoneAmount: "0" });
+        }
+
         // Record click
         const click = await storage.recordAdClick(req.session.userId, adId);
 
@@ -1291,6 +1296,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!bankDetails || !bankDetails.fullName || !bankDetails.accountNumber || !bankDetails.bankName || !bankDetails.branch) {
         return res.status(400).send("Bank details are required");
+      }
+
+      // Check for minimum ads requirement
+      const user = await storage.getUser(req.session.userId);
+      if (!user) {
+        return res.status(404).send("User not found");
+      }
+
+      if ((user.totalAdsCompleted || 0) < 28) {
+        return res.status(403).send("You must view at least 28 ads before withdrawing.");
       }
 
       const withdrawal = await storage.createWithdrawal(req.session.userId, amount, bankDetails);

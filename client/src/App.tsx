@@ -25,7 +25,7 @@ import AdminLoginPage from "@/pages/admin-login";
 
 import AdminDashboard from "@/pages/admin/dashboard";
 // Dashboard
-import AdminDashboard from "@/pages/admin/dashboard";
+
 
 // User Management
 import AdminUsers from "@/pages/admin/users";
