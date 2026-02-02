@@ -39,6 +39,8 @@ router.get("/:id", async (req, res) => {
 // Create ad (JSON body)
 router.post("/", async (req, res) => {
   try {
+    console.log("[ADMIN/ADS] Create ad - body:", JSON.stringify(req.body));
+
     const { title, description, type, url, reward, duration, imageUrl, targetUrl, price, isActive } = req.body;
 
     // Use only basic fields that exist in the database
@@ -49,17 +51,25 @@ router.post("/", async (req, res) => {
       url: url || targetUrl || "",
       imageUrl: imageUrl || "",
       targetUrl: targetUrl || url || "",
-      price: price || reward || "0",
-      reward: reward || price || "0",
+      price: (price || reward || "0").toString(),
+      reward: (reward || price || "0").toString(),
       duration: duration ? Number(duration) : 30,
       isActive: isActive !== false
     };
 
+    console.log("[ADMIN/ADS] Insert data:", JSON.stringify(insertData));
+
+    if (!db) {
+      console.error("[ADMIN/ADS] DB is null!");
+      return res.status(500).json({ error: "Database not connected" });
+    }
+
     const newAd = await db.insert(ads).values(insertData).returning();
+    console.log("[ADMIN/ADS] Ad created with ID:", newAd[0]?.id);
     res.json(newAd[0]);
-  } catch (error) {
-    console.error("Create ad error:", error);
-    res.status(500).json({ error: "Server error" });
+  } catch (error: any) {
+    console.error("[ADMIN/ADS] Create error:", error.message || error);
+    res.status(500).json({ error: error.message || "Server error" });
   }
 });
 
