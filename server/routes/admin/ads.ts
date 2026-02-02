@@ -36,8 +36,43 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// Create ad
-router.post("/", upload.single("image"), async (req, res) => {
+// Create ad (JSON body)
+router.post("/", async (req, res) => {
+  try {
+    const { title, description, type, url, reward, duration, imageUrl, targetUrl, price, currency, priceColor, features, buttonText, buttonIcon, showOnDashboard, displayOrder, isActive } = req.body;
+
+    const insertData: any = {
+      title: title || "New Ad",
+      description: description || "",
+      type: type || "click",
+      url: url || targetUrl || "",
+      imageUrl: imageUrl || "",
+      targetUrl: targetUrl || url || "",
+      price: price || reward || "0",
+      reward: reward || price || "0",
+      duration: duration ? Number(duration) : 30,
+      isActive: isActive !== false
+    };
+
+    // Only add extended fields if they have values (handles schema migration)
+    if (currency) insertData.currency = currency;
+    if (priceColor) insertData.priceColor = priceColor;
+    if (features) insertData.features = Array.isArray(features) ? JSON.stringify(features) : features;
+    if (buttonText) insertData.buttonText = buttonText;
+    if (buttonIcon) insertData.buttonIcon = buttonIcon;
+    if (typeof showOnDashboard === 'boolean') insertData.showOnDashboard = showOnDashboard;
+    if (displayOrder) insertData.displayOrder = Number(displayOrder);
+
+    const newAd = await db.insert(ads).values(insertData).returning();
+    res.json(newAd[0]);
+  } catch (error) {
+    console.error("Create ad error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Create ad with image upload (multipart/form-data)
+router.post("/upload", upload.single("image"), async (req, res) => {
   try {
     const { title, description, type, url, reward, duration } = req.body;
     const imageUrl = req.file ? `/uploads/ads/${req.file.filename}` : null;
@@ -57,27 +92,34 @@ router.put("/:id", async (req, res) => {
   try {
     const { title, description, type, url, reward, duration, isActive, imageUrl, targetUrl, price, currency, priceColor, features, buttonText, buttonIcon, showOnDashboard, displayOrder } = req.body;
 
-    const updateData: any = {
-      title,
-      description,
-      type,
-      url: url || targetUrl,
-      reward: reward || price,
-      duration: duration ? Number(duration) : undefined,
-      isActive: typeof isActive === 'boolean' ? isActive : isActive === "true",
-      imageUrl,
-      targetUrl,
-      currency,
-      priceColor,
-      features: features ? JSON.stringify(features) : undefined,
-      buttonText,
-      buttonIcon,
-      showOnDashboard: typeof showOnDashboard === 'boolean' ? showOnDashboard : showOnDashboard === "true",
-      displayOrder: displayOrder ? Number(displayOrder) : undefined
-    };
+    const updateData: any = {};
 
-    // Remove undefined values
-    Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
+    // Basic fields
+    if (title !== undefined) updateData.title = title;
+    if (description !== undefined) updateData.description = description;
+    if (type !== undefined) updateData.type = type;
+    if (url !== undefined || targetUrl !== undefined) updateData.url = url || targetUrl;
+    if (imageUrl !== undefined) updateData.imageUrl = imageUrl;
+    if (targetUrl !== undefined) updateData.targetUrl = targetUrl;
+    if (price !== undefined || reward !== undefined) {
+      updateData.price = price || reward;
+      updateData.reward = reward || price;
+    }
+    if (duration !== undefined) updateData.duration = Number(duration);
+    if (isActive !== undefined) updateData.isActive = typeof isActive === 'boolean' ? isActive : isActive === "true";
+
+    // Extended fields
+    if (currency !== undefined) updateData.currency = currency;
+    if (priceColor !== undefined) updateData.priceColor = priceColor;
+    if (features !== undefined) updateData.features = Array.isArray(features) ? JSON.stringify(features) : features;
+    if (buttonText !== undefined) updateData.buttonText = buttonText;
+    if (buttonIcon !== undefined) updateData.buttonIcon = buttonIcon;
+    if (showOnDashboard !== undefined) updateData.showOnDashboard = typeof showOnDashboard === 'boolean' ? showOnDashboard : showOnDashboard === "true";
+    if (displayOrder !== undefined) updateData.displayOrder = Number(displayOrder);
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ error: "No update data provided" });
+    }
 
     const updated = await db.update(ads).set(updateData).where(eq(ads.id, Number(req.params.id))).returning();
     if (!updated.length) return res.status(404).json({ error: "Ad not found" });

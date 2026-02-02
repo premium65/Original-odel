@@ -19,17 +19,25 @@ export const ratings = pgTable("ratings", {
 export const ads = pgTable("ads", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
-  description: text("description").notNull(),
-  imageUrl: text("image_url").notNull(),
-  targetUrl: text("target_url").notNull(),
-  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
-  // New fields for admin panel
+  description: text("description"),
+  imageUrl: text("image_url"),
+  targetUrl: text("target_url"),
+  price: decimal("price", { precision: 10, scale: 2 }),
+  // Admin panel fields
   type: text("type").default("click"),
   url: text("url"),
   reward: decimal("reward", { precision: 10, scale: 2 }),
   duration: integer("duration").default(30),
   totalViews: integer("total_views").default(0),
   isActive: boolean("is_active").default(true),
+  // Extended ad card fields
+  currency: text("currency").default("LKR"),
+  priceColor: text("price_color").default("#f59e0b"),
+  features: text("features"), // JSON array as text
+  buttonText: text("button_text").default("Add to Cart"),
+  buttonIcon: text("button_icon").default("shopping-cart"),
+  showOnDashboard: boolean("show_on_dashboard").default(true),
+  displayOrder: integer("display_order").default(1),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
