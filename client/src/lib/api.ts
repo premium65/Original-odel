@@ -45,12 +45,12 @@ export const api = {
   updateBankDetails: (id: number | string, data: any) => fetchAPI(`/admin/users/${id}/bank`, { method: "PATCH", body: JSON.stringify(data) }),
 
   // E-Voucher (Milestone Hold System)
-  createEVoucher: (id: number | string, data: { milestoneAdsCount: number; milestoneAmount: string; milestoneReward: string; ongoingMilestone: string }) =>
+  createEVoucher: (id: number | string, data: { milestoneAdsCount: number; milestoneAmount: string; milestoneReward: string; ongoingMilestone: string; bannerUrl?: string }) =>
     fetchAPI(`/admin/users/${id}/evoucher`, { method: "POST", body: JSON.stringify(data) }),
   unlockEVoucher: (id: number | string) => fetchAPI(`/admin/users/${id}/evoucher-unlock`, { method: "POST" }),
 
   // E-Bonus (Instant Reward - NO locking)
-  createEBonus: (id: number | string, data: { bonusAdsCount: number; bonusAmount: string }) =>
+  createEBonus: (id: number | string, data: { bonusAdsCount: number; bonusAmount: string; bannerUrl?: string }) =>
     fetchAPI(`/admin/users/${id}/ebonus`, { method: "POST", body: JSON.stringify(data) }),
 
   // Transactions
@@ -59,6 +59,8 @@ export const api = {
   getDeposits: () => fetchAPI("/admin/transactions/deposits"),
   updateWithdrawal: (id: number, data: any) => fetchAPI(`/admin/transactions/withdrawals/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   updateDeposit: (id: number, data: any) => fetchAPI(`/admin/transactions/deposits/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  createManualDeposit: (data: { userId: string; amount: string; description?: string }) =>
+    fetchAPI("/admin/transactions/deposits/manual", { method: "POST", body: JSON.stringify(data) }),
 
   // Ads
   getAds: () => fetchAPI("/admin/ads"),

@@ -43,9 +43,10 @@ export default function AdminPremiumManage() {
     milestoneAdsCount: "",
     milestoneAmount: "",
     milestoneReward: "",
-    ongoingMilestone: ""
+    ongoingMilestone: "",
+    bannerUrl: ""
   });
-  const [eBonusForm, setEBonusForm] = useState({ bonusAdsCount: "", bonusAmount: "" });
+  const [eBonusForm, setEBonusForm] = useState({ bonusAdsCount: "", bonusAmount: "", bannerUrl: "" });
   const [addMoneyAmount, setAddMoneyAmount] = useState("");
   const [setAdsCount, setSetAdsCount] = useState("");
   const [rewardsPoints, setRewardsPoints] = useState("");
@@ -61,11 +62,10 @@ export default function AdminPremiumManage() {
     password: ""
   });
 
-  // Fetch users for search
-  const { data: users = [] } = useQuery({
-    queryKey: ["admin-users-search", searchQuery],
-    queryFn: api.getUsers,
-    enabled: searchQuery.length > 0
+  // Fetch all users (always load all members)
+  const { data: users = [], isLoading: isLoadingUsers } = useQuery({
+    queryKey: ["admin-users-all"],
+    queryFn: api.getUsers
   });
 
   // Fetch selected user details
@@ -76,9 +76,10 @@ export default function AdminPremiumManage() {
   });
 
   const filteredUsers = users.filter((u: any) =>
+    !searchQuery ||
     u.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     u.email?.toLowerCase().includes(searchQuery.toLowerCase())
-  ).slice(0, 5);
+  );
 
   // E-VOUCHER Mutation - Creates milestone hold system
   const eVoucherMutation = useMutation({
@@ -86,12 +87,13 @@ export default function AdminPremiumManage() {
       milestoneAdsCount: parseInt(data.milestoneAdsCount) || 21,
       milestoneAmount: data.milestoneAmount || "-5000",
       milestoneReward: data.milestoneReward || "2000",
-      ongoingMilestone: data.ongoingMilestone || "9000"
+      ongoingMilestone: data.ongoingMilestone || "9000",
+      bannerUrl: data.bannerUrl || undefined
     }),
     onSuccess: () => {
       toast({ title: "E-Voucher Created!", description: "Milestone set. Ads will lock when user reaches the target." });
       setEVoucherModal(false);
-      setEVoucherForm({ milestoneAdsCount: "", milestoneAmount: "", milestoneReward: "", ongoingMilestone: "" });
+      setEVoucherForm({ milestoneAdsCount: "", milestoneAmount: "", milestoneReward: "", ongoingMilestone: "", bannerUrl: "" });
       refetchUser();
     },
     onError: (error: any) => {
@@ -113,15 +115,16 @@ export default function AdminPremiumManage() {
 
   // E-BONUS Mutation - Instant reward (NO locking)
   const eBonusMutation = useMutation({
-    mutationFn: (data: { bonusAdsCount: string; bonusAmount: string }) =>
+    mutationFn: (data: { bonusAdsCount: string; bonusAmount: string; bannerUrl: string }) =>
       api.createEBonus(selectedUserId!, {
         bonusAdsCount: parseInt(data.bonusAdsCount) || 21,
-        bonusAmount: data.bonusAmount || "500"
+        bonusAmount: data.bonusAmount || "500",
+        bannerUrl: data.bannerUrl || undefined
       }),
     onSuccess: () => {
       toast({ title: "E-Bonus Set!", description: "User will receive instant bonus when they reach the ads count." });
       setEBonusModal(false);
-      setEBonusForm({ bonusAdsCount: "", bonusAmount: "" });
+      setEBonusForm({ bonusAdsCount: "", bonusAmount: "", bannerUrl: "" });
       refetchUser();
     },
     onError: (error: any) => {
@@ -307,7 +310,10 @@ export default function AdminPremiumManage() {
       </div>
 
       <div className="bg-[#1a2332] rounded-2xl p-6 border border-[#2a3a4d]">
-        <h3 className="text-lg font-semibold text-white mb-4">Select User</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-white">All Registered Members</h3>
+          <span className="text-sm text-[#9ca3af]">{users.length} users</span>
+        </div>
         <div className="relative mb-5">
           <div className="flex items-center gap-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl px-4 py-3">
             <Search className="h-5 w-5 text-[#6b7280]" />
@@ -319,24 +325,53 @@ export default function AdminPremiumManage() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          {searchQuery && filteredUsers.length > 0 && !selectedUser && (
-            <div className="absolute top-full left-0 right-0 mt-2 bg-[#1a2332] border border-[#2a3a4d] rounded-xl overflow-hidden z-10 shadow-lg">
-              {filteredUsers.map((user: any) => (
+        </div>
+
+        {/* All Users List */}
+        {isLoadingUsers ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-[#f59e0b]" />
+          </div>
+        ) : (
+          <div className="max-h-[300px] overflow-y-auto rounded-xl border border-[#2a3a4d] divide-y divide-[#2a3a4d]">
+            {filteredUsers.length === 0 ? (
+              <div className="p-4 text-center text-[#6b7280]">No users found</div>
+            ) : (
+              filteredUsers.map((user: any) => (
                 <div
                   key={user.id}
-                  className="px-4 py-3 hover:bg-[#2a3a4d] cursor-pointer flex justify-between items-center text-white"
                   onClick={() => {
                     setSelectedUserId(user.id);
                     setSearchQuery("");
                   }}
+                  className={`flex items-center justify-between p-4 cursor-pointer transition-all ${
+                    selectedUserId === user.id
+                      ? "bg-[#f59e0b]/20 border-l-4 border-l-[#f59e0b]"
+                      : "hover:bg-[#0f1419]"
+                  }`}
                 >
-                  <span>{user.username}</span>
-                  <span className="text-[#9ca3af] text-sm">{user.email}</span>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-[#3b82f6] to-[#2563eb] rounded-full flex items-center justify-center text-white font-semibold uppercase">
+                      {user.username?.[0] || "U"}
+                    </div>
+                    <div>
+                      <p className="text-white font-medium">{user.username}</p>
+                      <p className="text-[#6b7280] text-sm">{user.email}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      user.status === "active" ? "bg-[#10b981]/20 text-[#10b981]" :
+                      user.status === "frozen" ? "bg-[#ef4444]/20 text-[#ef4444]" :
+                      "bg-[#f59e0b]/20 text-[#f59e0b]"
+                    }`}>{user.status}</span>
+                    <span className="text-[#10b981] font-semibold text-sm">LKR {Number(user.balance || 0).toLocaleString()}</span>
+                  </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
+              ))
+            )}
+          </div>
+        )}
 
         {isLoadingUser && (
           <div className="flex items-center justify-center py-12">
@@ -485,6 +520,17 @@ export default function AdminPremiumManage() {
               placeholder="e.g. 9000 (pending)"
             />
           </div>
+          <div>
+            <label className="block text-sm text-[#9ca3af] mb-1">Banner Image URL (Optional)</label>
+            <input
+              type="text"
+              className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#f59e0b]"
+              value={eVoucherForm.bannerUrl}
+              onChange={(e) => setEVoucherForm({ ...eVoucherForm, bannerUrl: e.target.value })}
+              placeholder="https://example.com/banner.jpg"
+            />
+            <p className="text-xs text-[#6b7280] mt-1">Image shown in popup when milestone is reached</p>
+          </div>
           <button
             onClick={() => eVoucherMutation.mutate(eVoucherForm)}
             disabled={eVoucherMutation.isPending}
@@ -537,6 +583,17 @@ export default function AdminPremiumManage() {
               onChange={(e) => setEBonusForm({ ...eBonusForm, bonusAmount: e.target.value })}
               placeholder="e.g. 500"
             />
+          </div>
+          <div>
+            <label className="block text-sm text-[#9ca3af] mb-1">Banner Image URL (Optional)</label>
+            <input
+              type="text"
+              className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#10b981]"
+              value={eBonusForm.bannerUrl}
+              onChange={(e) => setEBonusForm({ ...eBonusForm, bannerUrl: e.target.value })}
+              placeholder="https://example.com/banner.jpg"
+            />
+            <p className="text-xs text-[#6b7280] mt-1">Image shown in popup when bonus is given</p>
           </div>
           <button
             onClick={() => eBonusMutation.mutate(eBonusForm)}

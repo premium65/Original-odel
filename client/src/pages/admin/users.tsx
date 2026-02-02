@@ -1,17 +1,41 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { Users, Search, Plus, Edit, Trash2, Eye, CheckCircle, X, Phone, Mail, CreditCard, Calendar, Wallet, Target, Award, TrendingUp, Building2 } from "lucide-react";
+import { Users, Search, Plus, Edit, Trash2, Eye, CheckCircle, X, Phone, Mail, CreditCard, Calendar, Wallet, Target, Award, TrendingUp, Building2, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AdminUsers() {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newUser, setNewUser] = useState({
+    username: "",
+    email: "",
+    password: "",
+    fullName: "",
+    phone: ""
+  });
+
   const { data: users, isLoading } = useQuery({ queryKey: ["users"], queryFn: api.getUsers });
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => api.deleteUser(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users"] }),
+  });
+
+  const createUserMutation = useMutation({
+    mutationFn: (data: typeof newUser) => api.createUser({ ...data, role: "user" }),
+    onSuccess: () => {
+      toast({ title: "User Created!", description: "New user has been added successfully." });
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      setShowAddModal(false);
+      setNewUser({ username: "", email: "", password: "", fullName: "", phone: "" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to create user", description: error.message, variant: "destructive" });
+    }
   });
 
   const filteredUsers = users?.filter((u: any) => 
@@ -26,7 +50,7 @@ export default function AdminUsers() {
           <div className="w-12 h-12 rounded-xl bg-[#10b981] flex items-center justify-center"><Users className="h-6 w-6 text-white" /></div>
           <div><h1 className="text-2xl font-bold text-white">All Users</h1><p className="text-[#9ca3af]">Manage all registered users</p></div>
         </div>
-        <button className="px-4 py-2 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-lg flex items-center gap-2"><Plus className="h-4 w-4" /> Add User</button>
+        <button onClick={() => setShowAddModal(true)} className="px-4 py-2 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-lg flex items-center gap-2"><Plus className="h-4 w-4" /> Add User</button>
       </div>
 
       <div className="bg-[#1a2332] rounded-2xl border border-[#2a3a4d]">
@@ -255,6 +279,85 @@ export default function AdminUsers() {
             <div className="p-6 border-t border-[#2a3a4d] flex justify-end gap-3">
               <button onClick={() => setSelectedUser(null)} className="px-4 py-2 bg-[#2a3a4d] hover:bg-[#374151] text-white rounded-lg">
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add User Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setShowAddModal(false)}>
+          <div className="bg-[#1a2332] max-w-md w-full rounded-2xl border border-[#2a3a4d]" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-6 border-b border-[#2a3a4d]">
+              <h2 className="text-xl font-bold text-white">Add New User</h2>
+              <button onClick={() => setShowAddModal(false)} className="w-8 h-8 bg-[#2a3a4d] hover:bg-[#374151] rounded-lg flex items-center justify-center text-[#9ca3af]">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm text-[#9ca3af] mb-2">Username</label>
+                <input
+                  type="text"
+                  value={newUser.username}
+                  onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
+                  className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#10b981]"
+                  placeholder="Enter username"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-[#9ca3af] mb-2">Full Name</label>
+                <input
+                  type="text"
+                  value={newUser.fullName}
+                  onChange={(e) => setNewUser({ ...newUser, fullName: e.target.value })}
+                  className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#10b981]"
+                  placeholder="Enter full name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-[#9ca3af] mb-2">Email</label>
+                <input
+                  type="email"
+                  value={newUser.email}
+                  onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                  className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#10b981]"
+                  placeholder="Enter email"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-[#9ca3af] mb-2">Phone</label>
+                <input
+                  type="tel"
+                  value={newUser.phone}
+                  onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })}
+                  className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#10b981]"
+                  placeholder="Enter phone number"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-[#9ca3af] mb-2">Password</label>
+                <input
+                  type="password"
+                  value={newUser.password}
+                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                  className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#10b981]"
+                  placeholder="Enter password"
+                />
+              </div>
+            </div>
+            <div className="p-6 border-t border-[#2a3a4d] flex justify-end gap-3">
+              <button onClick={() => setShowAddModal(false)} className="px-4 py-2 bg-[#2a3a4d] hover:bg-[#374151] text-white rounded-lg">
+                Cancel
+              </button>
+              <button
+                onClick={() => createUserMutation.mutate(newUser)}
+                disabled={createUserMutation.isPending || !newUser.username || !newUser.email || !newUser.password}
+                className="px-4 py-2 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-lg flex items-center gap-2 disabled:opacity-50"
+              >
+                {createUserMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                Create User
               </button>
             </div>
           </div>

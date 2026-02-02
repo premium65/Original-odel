@@ -1,12 +1,20 @@
 import { useState } from "react";
-import { PiggyBank, Search, CheckCircle, XCircle, Clock, Eye, Loader2 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { PiggyBank, Search, CheckCircle, XCircle, Clock, Eye, Loader2, Plus, X } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { format } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Deposits() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [showManualModal, setShowManualModal] = useState(false);
+  const [userSearch, setUserSearch] = useState("");
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [depositAmount, setDepositAmount] = useState("");
+  const [depositDescription, setDepositDescription] = useState("");
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const { data: deposits = [], isLoading } = useQuery({
     queryKey: ["admin-deposits"],
@@ -16,6 +24,35 @@ export default function Deposits() {
   const { data: stats } = useQuery({
     queryKey: ["admin-stats"],
     queryFn: api.getStats
+  });
+
+  const { data: users = [] } = useQuery({
+    queryKey: ["admin-users-for-deposit"],
+    queryFn: api.getUsers
+  });
+
+  const filteredUsersForModal = users.filter((u: any) =>
+    userSearch &&
+    (u.username?.toLowerCase().includes(userSearch.toLowerCase()) ||
+     u.email?.toLowerCase().includes(userSearch.toLowerCase()))
+  ).slice(0, 5);
+
+  const manualDepositMutation = useMutation({
+    mutationFn: (data: { userId: string; amount: string; description?: string }) =>
+      api.createManualDeposit(data),
+    onSuccess: () => {
+      toast({ title: "Deposit Added!", description: "Manual deposit has been added successfully." });
+      queryClient.invalidateQueries({ queryKey: ["admin-deposits"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      setShowManualModal(false);
+      setSelectedUser(null);
+      setDepositAmount("");
+      setDepositDescription("");
+      setUserSearch("");
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to add deposit", description: error.message, variant: "destructive" });
+    }
   });
 
   const getStatusBadge = (status: string) => {
@@ -76,6 +113,12 @@ export default function Deposits() {
             <p className="text-[#9ca3af]">View and manage user deposits</p>
           </div>
         </div>
+        <button
+          onClick={() => setShowManualModal(true)}
+          className="px-4 py-2 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-lg flex items-center gap-2"
+        >
+          <Plus className="h-4 w-4" /> Manual Deposit
+        </button>
       </div>
 
       {/* Stats */}
@@ -159,6 +202,121 @@ export default function Deposits() {
           </table>
         </div>
       </div>
+
+      {/* Manual Deposit Modal */}
+      {showManualModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setShowManualModal(false)}>
+          <div className="bg-[#1a2332] max-w-md w-full rounded-2xl border border-[#2a3a4d]" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-6 border-b border-[#2a3a4d]">
+              <h2 className="text-xl font-bold text-white">Add Manual Deposit</h2>
+              <button onClick={() => setShowManualModal(false)} className="w-8 h-8 bg-[#2a3a4d] hover:bg-[#374151] rounded-lg flex items-center justify-center text-[#9ca3af]">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              {/* User Selection */}
+              <div>
+                <label className="block text-sm text-[#9ca3af] mb-2">Select User</label>
+                {selectedUser ? (
+                  <div className="flex items-center justify-between p-3 bg-[#10b981]/10 border border-[#10b981]/30 rounded-xl">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-gradient-to-br from-[#3b82f6] to-[#2563eb] rounded-full flex items-center justify-center text-white font-semibold">
+                        {selectedUser.username?.[0]?.toUpperCase() || "U"}
+                      </div>
+                      <div>
+                        <p className="text-white font-medium">{selectedUser.username}</p>
+                        <p className="text-[#6b7280] text-sm">{selectedUser.email}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setSelectedUser(null)}
+                      className="text-[#ef4444] hover:text-[#f87171] text-sm"
+                    >
+                      Change
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <div className="flex items-center gap-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl px-4 py-3">
+                      <Search className="h-5 w-5 text-[#6b7280]" />
+                      <input
+                        type="text"
+                        placeholder="Search by username or email..."
+                        className="bg-transparent border-none outline-none text-white w-full placeholder:text-[#6b7280]"
+                        value={userSearch}
+                        onChange={(e) => setUserSearch(e.target.value)}
+                      />
+                    </div>
+                    {filteredUsersForModal.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 mt-2 bg-[#1a2332] border border-[#2a3a4d] rounded-xl overflow-hidden z-10 shadow-lg">
+                        {filteredUsersForModal.map((user: any) => (
+                          <div
+                            key={user.id}
+                            className="px-4 py-3 hover:bg-[#2a3a4d] cursor-pointer flex justify-between items-center"
+                            onClick={() => {
+                              setSelectedUser(user);
+                              setUserSearch("");
+                            }}
+                          >
+                            <span className="text-white">{user.username}</span>
+                            <span className="text-[#9ca3af] text-sm">{user.email}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Amount */}
+              <div>
+                <label className="block text-sm text-[#9ca3af] mb-2">Deposit Amount (LKR)</label>
+                <input
+                  type="number"
+                  value={depositAmount}
+                  onChange={(e) => setDepositAmount(e.target.value)}
+                  className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#10b981]"
+                  placeholder="Enter amount"
+                  min="0"
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm text-[#9ca3af] mb-2">Description (Optional)</label>
+                <input
+                  type="text"
+                  value={depositDescription}
+                  onChange={(e) => setDepositDescription(e.target.value)}
+                  className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#10b981]"
+                  placeholder="e.g., Bonus deposit"
+                />
+              </div>
+            </div>
+            <div className="p-6 border-t border-[#2a3a4d] flex justify-end gap-3">
+              <button onClick={() => setShowManualModal(false)} className="px-4 py-2 bg-[#2a3a4d] hover:bg-[#374151] text-white rounded-lg">
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (selectedUser && depositAmount) {
+                    manualDepositMutation.mutate({
+                      userId: selectedUser.id,
+                      amount: depositAmount,
+                      description: depositDescription || undefined
+                    });
+                  }
+                }}
+                disabled={manualDepositMutation.isPending || !selectedUser || !depositAmount}
+                className="px-4 py-2 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-lg flex items-center gap-2 disabled:opacity-50"
+              >
+                {manualDepositMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                Add Deposit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

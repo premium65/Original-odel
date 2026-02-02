@@ -21,6 +21,7 @@ import AdsHubPage from "@/pages/ads-hub";
 import ContactPage from "@/pages/contact";
 import EventsPage from "@/pages/events";
 import SettingsPage from "@/pages/settings";
+import RewardsPage from "@/pages/rewards";
 import NotFound from "@/pages/not-found";
 import PendingAccountPage from "@/pages/pending-account";
 import AdminLoginPage from "@/pages/admin-login";
@@ -203,6 +204,9 @@ function Router() {
       </Route>
       <Route path="/settings">
         {() => <ProtectedRoute component={SettingsPage} />}
+      </Route>
+      <Route path="/rewards">
+        {() => <ProtectedRoute component={RewardsPage} />}
       </Route>
 
       <Route path="/admin/login" component={AdminLoginPage} />

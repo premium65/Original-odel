@@ -106,6 +106,53 @@ router.put("/withdrawals/:id", async (req, res) => {
   }
 });
 
+// Create manual deposit
+router.post("/deposits/manual", async (req, res) => {
+  try {
+    const { userId, amount, description } = req.body;
+
+    if (!userId || !amount) {
+      return res.status(400).json({ error: "User ID and amount are required" });
+    }
+
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      return res.status(400).json({ error: "Invalid amount" });
+    }
+
+    // Create deposit record
+    const deposit = await db.insert(deposits).values({
+      userId,
+      amount: numAmount.toFixed(2),
+      type: "manual_add",
+      method: "admin_manual",
+      description: description || "Manual deposit by admin",
+      reference: `MANUAL-${Date.now()}`,
+      status: "approved"
+    }).returning();
+
+    // Add amount to user balance
+    await db.update(users).set({
+      balance: sql`${users.balance} + ${numAmount}::numeric`,
+      hasDeposit: true
+    }).where(eq(users.id, userId));
+
+    // Create transaction record
+    await db.insert(transactions).values({
+      userId,
+      type: "deposit",
+      amount: numAmount.toFixed(2),
+      status: "approved",
+      description: description || "Manual deposit by admin"
+    });
+
+    res.json({ success: true, deposit: deposit[0] });
+  } catch (error) {
+    console.error("Manual deposit error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 // Approve deposit
 router.put("/deposits/:id", async (req, res) => {
   try {

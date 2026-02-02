@@ -1033,7 +1033,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             milestoneAdsCount: updatedUser.milestoneAdsCount,
             milestoneAmount: updatedUser.milestoneAmount,
             milestoneReward: updatedUser.milestoneReward,
-            ongoingMilestone: updatedUser.ongoingMilestone
+            ongoingMilestone: updatedUser.ongoingMilestone,
+            bannerUrl: updatedUser.eVoucherBannerUrl || null
           });
         }
 
@@ -1041,12 +1042,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (updatedUser?.bonusAdsCount && newAdsCount === updatedUser.bonusAdsCount) {
           // Add bonus to destinationAmount (wallet) - NO locking!
           const bonusAmount = parseFloat(updatedUser.bonusAmount || "0");
+          const eBonusBannerUrl = updatedUser.eBonusBannerUrl;
           if (bonusAmount > 0) {
             const currentDestination = parseFloat(updatedUser.destinationAmount || "0");
             await storage.updateUser(req.session.userId, {
               destinationAmount: (currentDestination + bonusAmount).toFixed(2),
               bonusAdsCount: null, // Clear so it doesn't trigger again
-              bonusAmount: null
+              bonusAmount: null,
+              eBonusBannerUrl: null // Clear banner too
             });
 
             return res.json({
@@ -1056,7 +1059,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               restricted: false,
               bonusReached: true,
               bonusAdsCount: updatedUser.bonusAdsCount,
-              bonusAmount: bonusAmount
+              bonusAmount: bonusAmount,
+              bannerUrl: eBonusBannerUrl || null
             });
           }
         }
@@ -2084,16 +2088,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/users/:userId/evoucher", async (req, res) => {
     try {
       if (!req.session.userId) {
-        return res.status(401).send("Not authenticated");
+        return res.status(401).json({ error: "Not authenticated" });
       }
 
       const currentUser = await storage.getUser(req.session.userId);
       if (!currentUser || !currentUser.isAdmin) {
-        return res.status(403).send("Admin access required");
+        return res.status(403).json({ error: "Admin access required" });
       }
 
       const userId = req.params.userId;
-      const { milestoneAdsCount, milestoneAmount, milestoneReward, ongoingMilestone } = req.body;
+      const { milestoneAdsCount, milestoneAmount, milestoneReward, ongoingMilestone, bannerUrl } = req.body;
 
       if (!milestoneAdsCount || milestoneAdsCount <= 0) {
         return res.status(400).json({ error: "Invalid milestone ads count (trigger point)" });
@@ -2114,6 +2118,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         milestoneReward: milestoneReward || "0",
         ongoingMilestone: ongoingMilestone || "0",
         adsLocked: false, // Will be locked when user reaches milestone
+        eVoucherBannerUrl: bannerUrl || null,
       });
 
       if (!updatedUser) {
@@ -2132,12 +2137,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/users/:userId/evoucher-unlock", async (req, res) => {
     try {
       if (!req.session.userId) {
-        return res.status(401).send("Not authenticated");
+        return res.status(401).json({ error: "Not authenticated" });
       }
 
       const currentUser = await storage.getUser(req.session.userId);
       if (!currentUser || !currentUser.isAdmin) {
-        return res.status(403).send("Admin access required");
+        return res.status(403).json({ error: "Admin access required" });
       }
 
       const userId = req.params.userId;
@@ -2166,16 +2171,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/users/:userId/ebonus", async (req, res) => {
     try {
       if (!req.session.userId) {
-        return res.status(401).send("Not authenticated");
+        return res.status(401).json({ error: "Not authenticated" });
       }
 
       const currentUser = await storage.getUser(req.session.userId);
       if (!currentUser || !currentUser.isAdmin) {
-        return res.status(403).send("Admin access required");
+        return res.status(403).json({ error: "Admin access required" });
       }
 
       const userId = req.params.userId;
-      const { bonusAdsCount, bonusAmount } = req.body;
+      const { bonusAdsCount, bonusAmount, bannerUrl } = req.body;
 
       if (!bonusAdsCount || bonusAdsCount <= 0) {
         return res.status(400).json({ error: "Invalid bonus ads count" });
@@ -2189,6 +2194,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedUser = await storage.updateUser(userId, {
         bonusAdsCount: parseInt(bonusAdsCount),
         bonusAmount: bonusAmount,
+        eBonusBannerUrl: bannerUrl || null,
         // DO NOT set adsLocked - E-Bonus doesn't lock
       });
 

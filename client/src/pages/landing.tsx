@@ -269,11 +269,11 @@ export default function LandingPage() {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Username or Email</label>
-                    <input type="text" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder="Enter your username" className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500" />
+                    <input type="text" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder="Enter your username" className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 !text-gray-900 !bg-white" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                    <input type="password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="Enter your password" className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500" />
+                    <input type="password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="Enter your password" className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 !text-gray-900 !bg-white" />
                   </div>
                   <button onClick={handleLogin} disabled={loginMutation.isPending} className="w-full h-11 bg-gray-900 text-white rounded-full font-semibold hover:bg-gray-800 disabled:opacity-50">
                     {loginMutation.isPending ? 'Signing In...' : 'Sign In'}
@@ -284,23 +284,23 @@ export default function LandingPage() {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-                    <input type="text" value={regName} onChange={e => setRegName(e.target.value)} placeholder="Enter your full name" className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500" />
+                    <input type="text" value={regName} onChange={e => setRegName(e.target.value)} placeholder="Enter your full name" className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 !text-gray-900 !bg-white" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                    <input type="email" value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder="Enter your email" className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500" />
+                    <input type="email" value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder="Enter your email" className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 !text-gray-900 !bg-white" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-                    <input type="tel" value={regPhone} onChange={e => setRegPhone(e.target.value)} placeholder="Enter your phone number" className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500" />
+                    <input type="tel" value={regPhone} onChange={e => setRegPhone(e.target.value)} placeholder="Enter your phone number" className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 !text-gray-900 !bg-white" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                    <input type="password" value={regPassword} onChange={e => setRegPassword(e.target.value)} placeholder="Create a password" className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500" />
+                    <input type="password" value={regPassword} onChange={e => setRegPassword(e.target.value)} placeholder="Create a password" className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 !text-gray-900 !bg-white" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
-                    <input type="password" value={regConfirmPassword} onChange={e => setRegConfirmPassword(e.target.value)} placeholder="Confirm your password" className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500" />
+                    <input type="password" value={regConfirmPassword} onChange={e => setRegConfirmPassword(e.target.value)} placeholder="Confirm your password" className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 !text-gray-900 !bg-white" />
                   </div>
                   <label className="flex items-start gap-2 text-sm text-gray-600">
                     <input type="checkbox" checked={regTerms} onChange={e => setRegTerms(e.target.checked)} className="rounded border-gray-300 mt-1" />
