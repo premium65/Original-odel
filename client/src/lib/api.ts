@@ -98,4 +98,12 @@ export const api = {
   getStats: () => fetchAPI("/admin/dashboard/stats"),
   getRecent: () => fetchAPI("/admin/dashboard/recent"),
   getChart: () => fetchAPI("/admin/dashboard/chart"),
+
+  // Premium Plans
+  getPremiumPlans: () => fetchAPI("/admin/premium/plans"),
+  getPremiumPlan: (id: number) => fetchAPI(`/admin/premium/plans/${id}`),
+  createPremiumPlan: (data: any) => fetchAPI("/admin/premium/plans", { method: "POST", body: JSON.stringify(data) }),
+  updatePremiumPlan: (id: number, data: any) => fetchAPI(`/admin/premium/plans/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  deletePremiumPlan: (id: number) => fetchAPI(`/admin/premium/plans/${id}`, { method: "DELETE" }),
+  getPremiumPurchases: () => fetchAPI("/admin/premium/purchases"),
 };
