@@ -400,13 +400,24 @@ export default function AdminAds() {
                       <p className="text-[#6b7280] text-xs mt-1">PNG, JPG, GIF (max 5MB)</p>
                     </>
                   )}
-                  <input 
-                    type="file" 
-                    id="imageInput" 
-                    accept="image/*" 
+                  <input
+                    type="file"
+                    id="imageInput"
+                    accept="image/*"
                     onChange={handleImageUpload}
-                    className="hidden" 
+                    className="hidden"
                   />
+                </div>
+                <div className="mt-3">
+                  <label className="block text-xs text-[#9ca3af] mb-2">Or paste Image URL</label>
+                  <input
+                    type="text"
+                    value={formData.image.startsWith('data:') ? '' : formData.image}
+                    onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                    placeholder="https://example.com/image.jpg"
+                    className="w-full px-4 py-2.5 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white text-sm outline-none focus:border-[#3b82f6] transition-all"
+                  />
+                  <p className="text-[#6b7280] text-xs mt-1">Use URL for large images (recommended)</p>
                 </div>
               </div>
 
