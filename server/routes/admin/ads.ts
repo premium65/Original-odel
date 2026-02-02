@@ -39,8 +39,9 @@ router.get("/:id", async (req, res) => {
 // Create ad (JSON body)
 router.post("/", async (req, res) => {
   try {
-    const { title, description, type, url, reward, duration, imageUrl, targetUrl, price, currency, priceColor, features, buttonText, buttonIcon, showOnDashboard, displayOrder, isActive } = req.body;
+    const { title, description, type, url, reward, duration, imageUrl, targetUrl, price, isActive } = req.body;
 
+    // Use only basic fields that exist in the database
     const insertData: any = {
       title: title || "New Ad",
       description: description || "",
@@ -53,15 +54,6 @@ router.post("/", async (req, res) => {
       duration: duration ? Number(duration) : 30,
       isActive: isActive !== false
     };
-
-    // Only add extended fields if they have values (handles schema migration)
-    if (currency) insertData.currency = currency;
-    if (priceColor) insertData.priceColor = priceColor;
-    if (features) insertData.features = Array.isArray(features) ? JSON.stringify(features) : features;
-    if (buttonText) insertData.buttonText = buttonText;
-    if (buttonIcon) insertData.buttonIcon = buttonIcon;
-    if (typeof showOnDashboard === 'boolean') insertData.showOnDashboard = showOnDashboard;
-    if (displayOrder) insertData.displayOrder = Number(displayOrder);
 
     const newAd = await db.insert(ads).values(insertData).returning();
     res.json(newAd[0]);
@@ -90,11 +82,11 @@ router.post("/upload", upload.single("image"), async (req, res) => {
 // Update ad (JSON body)
 router.put("/:id", async (req, res) => {
   try {
-    const { title, description, type, url, reward, duration, isActive, imageUrl, targetUrl, price, currency, priceColor, features, buttonText, buttonIcon, showOnDashboard, displayOrder } = req.body;
+    const { title, description, type, url, reward, duration, isActive, imageUrl, targetUrl, price } = req.body;
 
     const updateData: any = {};
 
-    // Basic fields
+    // Basic fields only
     if (title !== undefined) updateData.title = title;
     if (description !== undefined) updateData.description = description;
     if (type !== undefined) updateData.type = type;
@@ -107,15 +99,6 @@ router.put("/:id", async (req, res) => {
     }
     if (duration !== undefined) updateData.duration = Number(duration);
     if (isActive !== undefined) updateData.isActive = typeof isActive === 'boolean' ? isActive : isActive === "true";
-
-    // Extended fields
-    if (currency !== undefined) updateData.currency = currency;
-    if (priceColor !== undefined) updateData.priceColor = priceColor;
-    if (features !== undefined) updateData.features = Array.isArray(features) ? JSON.stringify(features) : features;
-    if (buttonText !== undefined) updateData.buttonText = buttonText;
-    if (buttonIcon !== undefined) updateData.buttonIcon = buttonIcon;
-    if (showOnDashboard !== undefined) updateData.showOnDashboard = typeof showOnDashboard === 'boolean' ? showOnDashboard : showOnDashboard === "true";
-    if (displayOrder !== undefined) updateData.displayOrder = Number(displayOrder);
 
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({ error: "No update data provided" });
