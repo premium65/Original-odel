@@ -41,40 +41,6 @@ const defaultAd: Omit<Ad, 'id'> = {
   displayOrder: 1
 };
 
-const sampleAds: Ad[] = [
-  {
-    id: 1,
-    title: "Exclusive Survey Offer",
-    description: "Complete a simple survey to earn rewards.",
-    image: "",
-    currency: "LKR",
-    price: 7053.75,
-    priceColor: "#f59e0b",
-    features: ["Cash on Delivery", "Easy Exchange & Refund Policy", "Island Wide Delivery"],
-    buttonText: "Add to Cart",
-    buttonIcon: "shopping-cart",
-    buttonUrl: "",
-    isActive: true,
-    showOnDashboard: true,
-    displayOrder: 1
-  },
-  {
-    id: 2,
-    title: "Premium Membership",
-    description: "Get exclusive access to premium features.",
-    image: "",
-    currency: "LKR",
-    price: 4999.00,
-    priceColor: "#10b981",
-    features: ["Unlimited Access", "Priority Support", "Bonus Rewards"],
-    buttonText: "Subscribe Now",
-    buttonIcon: "arrow-right",
-    buttonUrl: "",
-    isActive: true,
-    showOnDashboard: true,
-    displayOrder: 2
-  }
-];
 
 const iconOptions = [
   { value: "shopping-cart", label: "🛒 Shopping Cart", icon: ShoppingCart },
@@ -114,7 +80,7 @@ export default function AdminAds() {
     isActive: ad.isActive ?? true,
     showOnDashboard: ad.showOnDashboard ?? true,
     displayOrder: ad.displayOrder || ad.id || 1
-  })) : sampleAds;
+  })) : [];
 
   useEffect(() => {
     if (ads.length > 0 && !currentAd && !isCreating) {

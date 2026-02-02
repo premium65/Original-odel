@@ -31,11 +31,7 @@ export default function AdsHub() {
     currency: "LKR",
   });
 
-  const [ads, setAds] = useState<ClickableAd[]>([
-    { id: 1, number: "01", duration: 10, reward: 85.50, url: "https://example.com/ad1", type: "link", enabled: true, order: 1 },
-    { id: 2, number: "02", duration: 15, reward: 120.00, url: "https://example.com/ad2", type: "link", enabled: true, order: 2 },
-    { id: 3, number: "03", duration: 20, reward: 150.00, url: "https://example.com/ad3", type: "video", enabled: true, order: 3 },
-  ]);
+  const [ads, setAds] = useState<ClickableAd[]>([]);
 
   const handleSave = () => alert("Ads Hub settings saved!");
 
