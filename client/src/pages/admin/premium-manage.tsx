@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Crown, Search, CheckCircle, RotateCcw, Star, Gem, Wallet, UserCog, AlertCircle, Loader2, X, Plus, Eye, EyeOff, Phone, Mail, Lock, Building2 } from "lucide-react";
+import { Crown, Search, RotateCcw, Star, Wallet, UserCog, Loader2, X, Eye, EyeOff, Phone, Lock, Building2, Gift, DollarSign, Target, Award, Snowflake, Trash2, CheckCircle } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -21,46 +21,45 @@ function Modal({ isOpen, onClose, title, children }: { isOpen: boolean; onClose:
   );
 }
 
-// Field mappings for reset/add operations
-const FIELD_MAPPINGS = {
-  booking: { field: "totalAdsCompleted", label: "Booking (Ads Count)", color: "#3b82f6" },
-  points: { field: "points", label: "Points (0-100)", color: "#8b5cf6" },
-  premiumTreasure: { field: "milestoneReward", label: "Premium Treasure (Total Earned)", color: "#10b981" },
-  normalTreasure: { field: "destinationAmount", label: "Normal Treasure (Bonus)", color: "#f59e0b" },
-  bookingValue: { field: "milestoneAmount", label: "Booking Value (Withdrawable)", color: "#ef4444" },
-};
-
 export default function AdminPremiumManage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  // Modal states
-  const [promotionModal, setPromotionModal] = useState(false);
-  const [resetModal, setResetModal] = useState<{ open: boolean; field: string; label: string }>({ open: false, field: "", label: "" });
-  const [addValueModal, setAddValueModal] = useState<{ open: boolean; field: string; label: string; isPoints?: boolean }>({ open: false, field: "", label: "" });
-  const [editUserModal, setEditUserModal] = useState(false);
-  const [editBankModal, setEditBankModal] = useState(false);
+  // Modal states for all 10 options
+  const [eVoucherModal, setEVoucherModal] = useState(false);
+  const [eBonusModal, setEBonusModal] = useState(false);
+  const [addMoneyModal, setAddMoneyModal] = useState(false);
+  const [setAdsModal, setSetAdsModal] = useState(false);
+  const [rewardsModal, setRewardsModal] = useState(false);
+  const [bankModal, setBankModal] = useState(false);
+  const [profileModal, setProfileModal] = useState(false);
+  const [deleteModal, setDeleteModal] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   // Form states
-  const [promotionForm, setPromotionForm] = useState({ adsLimit: "", deposit: "", commission: "", pendingAmount: "" });
-  const [addValueAmount, setAddValueAmount] = useState("");
-  const [userForm, setUserForm] = useState({
-    username: "",
-    email: "",
-    firstName: "",
-    lastName: "",
-    mobileNumber: "",
-    status: "active",
-    password: ""
+  const [eVoucherForm, setEVoucherForm] = useState({
+    totalAds: "",
+    triggerAds: "",
+    milestoneAmount: "",
+    milestoneReward: "",
+    ongoingMilestone: ""
   });
+  const [eBonusForm, setEBonusForm] = useState({ adsCount: "", amount: "" });
+  const [addMoneyAmount, setAddMoneyAmount] = useState("");
+  const [setAdsCount, setSetAdsCount] = useState("");
+  const [rewardsPoints, setRewardsPoints] = useState("");
   const [bankForm, setBankForm] = useState({
     bankName: "",
     accountNumber: "",
     accountHolderName: "",
     branchName: ""
+  });
+  const [profileForm, setProfileForm] = useState({
+    username: "",
+    mobileNumber: "",
+    password: ""
   });
 
   // Fetch users for search
@@ -82,74 +81,118 @@ export default function AdminPremiumManage() {
     u.email?.toLowerCase().includes(searchQuery.toLowerCase())
   ).slice(0, 5);
 
-  // Mutations
-  const createPromotionMutation = useMutation({
-    mutationFn: (data: { adsLimit: number; deposit: string; commission: string; pendingAmount: string }) =>
-      api.createPromotion(selectedUserId!, data),
+  // E-VOUCHER Mutation - Creates milestone system with lock
+  const eVoucherMutation = useMutation({
+    mutationFn: (data: any) => api.createPromotion(selectedUserId!, {
+      adsLimit: parseInt(data.totalAds) || 0,
+      deposit: data.milestoneAmount,
+      commission: "101.75",
+      pendingAmount: data.ongoingMilestone
+    }),
     onSuccess: () => {
-      toast({ title: "Promotion created successfully!" });
-      setPromotionModal(false);
-      setPromotionForm({ adsLimit: "", deposit: "", commission: "", pendingAmount: "" });
+      toast({ title: "E-Voucher Created!", description: "User's ads are now locked until deposit." });
+      setEVoucherModal(false);
+      setEVoucherForm({ totalAds: "", triggerAds: "", milestoneAmount: "", milestoneReward: "", ongoingMilestone: "" });
       refetchUser();
     },
     onError: (error: any) => {
-      toast({ title: "Failed to create promotion", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to create E-Voucher", description: error.message, variant: "destructive" });
     }
   });
 
-  const removePromotionMutation = useMutation({
-    mutationFn: () => api.removePromotion(selectedUserId!),
-    onSuccess: () => {
-      toast({ title: "Promotion removed successfully!" });
+  // E-BONUS Mutation - Instant bonus without locking
+  const eBonusMutation = useMutation({
+    mutationFn: async (data: { adsCount: string; amount: string }) => {
+      // Add to totalAdsCompleted and balance
+      await api.addUserValue(selectedUserId!, "totalAdsCompleted", data.adsCount);
+      await api.addUserValue(selectedUserId!, "balance", data.amount);
+      return data;
+    },
+    onSuccess: (data) => {
+      toast({ title: "E-Bonus Applied!", description: `Added ${data.adsCount} ads and LKR ${data.amount} to balance.` });
+      setEBonusModal(false);
+      setEBonusForm({ adsCount: "", amount: "" });
       refetchUser();
     },
     onError: (error: any) => {
-      toast({ title: "Failed to remove promotion", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to apply E-Bonus", description: error.message, variant: "destructive" });
     }
   });
 
-  const resetFieldMutation = useMutation({
-    mutationFn: (field: string) => api.resetUserField(selectedUserId!, field),
+  // AD RESET Mutation
+  const adResetMutation = useMutation({
+    mutationFn: () => api.resetUserField(selectedUserId!, "totalAdsCompleted"),
     onSuccess: () => {
-      toast({ title: "Field reset successfully!" });
-      setResetModal({ open: false, field: "", label: "" });
+      toast({ title: "Ads Reset!", description: "User's ad count is now 0." });
       refetchUser();
     },
     onError: (error: any) => {
-      toast({ title: "Failed to reset field", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to reset ads", description: error.message, variant: "destructive" });
     }
   });
 
-  const addValueMutation = useMutation({
-    mutationFn: ({ field, amount }: { field: string; amount: string }) => api.addUserValue(selectedUserId!, field, amount),
+  // ADD $ Mutation
+  const addMoneyMutation = useMutation({
+    mutationFn: (amount: string) => api.addUserValue(selectedUserId!, "balance", amount),
     onSuccess: () => {
-      toast({ title: "Value added successfully!" });
-      setAddValueModal({ open: false, field: "", label: "" });
-      setAddValueAmount("");
+      toast({ title: "Money Added!", description: `Added LKR ${addMoneyAmount} to balance.` });
+      setAddMoneyModal(false);
+      setAddMoneyAmount("");
       refetchUser();
     },
     onError: (error: any) => {
-      toast({ title: "Failed to add value", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to add money", description: error.message, variant: "destructive" });
     }
   });
 
-  const updateUserMutation = useMutation({
-    mutationFn: (data: any) => api.updateUserDetails(selectedUserId!, data),
-    onSuccess: () => {
-      toast({ title: "User details updated!" });
-      setEditUserModal(false);
+  // SET ADS Mutation
+  const setAdsMutation = useMutation({
+    mutationFn: async (count: string) => {
+      // First reset to 0, then add the count
+      await api.resetUserField(selectedUserId!, "totalAdsCompleted");
+      if (parseInt(count) > 0) {
+        await api.addUserValue(selectedUserId!, "totalAdsCompleted", count);
+      }
+      return count;
+    },
+    onSuccess: (count) => {
+      toast({ title: "Ads Set!", description: `User now has ${count} ads completed.` });
+      setSetAdsModal(false);
+      setSetAdsCount("");
       refetchUser();
     },
     onError: (error: any) => {
-      toast({ title: "Failed to update user", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to set ads", description: error.message, variant: "destructive" });
     }
   });
 
-  const updateBankMutation = useMutation({
+  // REWARDS Mutation
+  const rewardsMutation = useMutation({
+    mutationFn: async (points: string) => {
+      // Reset points first then add new value
+      await api.resetUserField(selectedUserId!, "points");
+      if (parseInt(points) > 0) {
+        await api.addUserValue(selectedUserId!, "points", points);
+      }
+      return points;
+    },
+    onSuccess: (points) => {
+      toast({ title: "Rewards Updated!", description: `User now has ${points} points.` });
+      setRewardsModal(false);
+      setRewardsPoints("");
+      refetchUser();
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to update rewards", description: error.message, variant: "destructive" });
+    }
+  });
+
+  // BANK Mutation
+  const bankMutation = useMutation({
     mutationFn: (data: any) => api.updateBankDetails(selectedUserId!, data),
     onSuccess: () => {
-      toast({ title: "Bank details updated!" });
-      setEditBankModal(false);
+      toast({ title: "Bank Details Updated!" });
+      setBankModal(false);
       refetchUser();
     },
     onError: (error: any) => {
@@ -157,23 +200,51 @@ export default function AdminPremiumManage() {
     }
   });
 
-  // Open edit modals with current data
-  const openEditUserModal = () => {
-    if (selectedUser) {
-      setUserForm({
-        username: selectedUser.username || "",
-        email: selectedUser.email || "",
-        firstName: selectedUser.firstName || "",
-        lastName: selectedUser.lastName || "",
-        mobileNumber: selectedUser.mobileNumber || "",
-        status: selectedUser.status || "active",
-        password: ""
-      });
-      setEditUserModal(true);
+  // PROFILE Mutation
+  const profileMutation = useMutation({
+    mutationFn: (data: any) => api.updateUserDetails(selectedUserId!, data),
+    onSuccess: () => {
+      toast({ title: "Profile Updated!" });
+      setProfileModal(false);
+      refetchUser();
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to update profile", description: error.message, variant: "destructive" });
     }
-  };
+  });
 
-  const openEditBankModal = () => {
+  // FREEZE/UNFREEZE Mutation
+  const freezeMutation = useMutation({
+    mutationFn: () => api.updateUserDetails(selectedUserId!, {
+      status: selectedUser?.status === "frozen" ? "active" : "frozen"
+    }),
+    onSuccess: () => {
+      const newStatus = selectedUser?.status === "frozen" ? "active" : "frozen";
+      toast({ title: newStatus === "frozen" ? "Account Frozen!" : "Account Unfrozen!" });
+      refetchUser();
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to update status", description: error.message, variant: "destructive" });
+    }
+  });
+
+  // DELETE Mutation
+  const deleteMutation = useMutation({
+    mutationFn: () => api.deleteUser(selectedUserId!),
+    onSuccess: () => {
+      toast({ title: "User Deleted!", description: "Account permanently removed." });
+      setDeleteModal(false);
+      setSelectedUserId(null);
+      setSearchQuery("");
+      queryClient.invalidateQueries({ queryKey: ["admin-users-search"] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to delete user", description: error.message, variant: "destructive" });
+    }
+  });
+
+  // Open modals with current data
+  const openBankModal = () => {
     if (selectedUser) {
       setBankForm({
         bankName: selectedUser.bankName || "",
@@ -181,33 +252,48 @@ export default function AdminPremiumManage() {
         accountHolderName: selectedUser.accountHolderName || "",
         branchName: selectedUser.branchName || ""
       });
-      setEditBankModal(true);
+      setBankModal(true);
     }
   };
 
-  // Stats displays with correct field mappings
-  const financialStats = selectedUser ? [
-    { label: "Booking (Ads)", value: selectedUser.totalAdsCompleted || 0, color: "#3b82f6", field: "totalAdsCompleted", isNumber: true },
-    { label: "Points", value: `${selectedUser.points || 0}/100`, color: "#8b5cf6", field: "points", isNumber: true },
-    { label: "Booking Value", value: `LKR ${parseFloat(selectedUser.milestoneAmount || 0).toLocaleString()}`, color: "#ef4444", field: "milestoneAmount", sub: "Withdrawable" },
-    { label: "Premium Treasure", value: `LKR ${parseFloat(selectedUser.milestoneReward || 0).toLocaleString()}`, color: "#10b981", field: "milestoneReward", sub: "Total Earned" },
-    { label: "Normal Treasure", value: `LKR ${parseFloat(selectedUser.destinationAmount || 0).toLocaleString()}`, color: "#f59e0b", field: "destinationAmount", sub: "Bonus" },
+  const openProfileModal = () => {
+    if (selectedUser) {
+      setProfileForm({
+        username: selectedUser.username || "",
+        mobileNumber: selectedUser.mobileNumber || "",
+        password: ""
+      });
+      setProfileModal(true);
+    }
+  };
+
+  // User stats display
+  const userStats = selectedUser ? [
+    { label: "Balance", value: `LKR ${parseFloat(selectedUser.balance || 0).toLocaleString()}`, color: "#3b82f6" },
+    { label: "Ads Completed", value: selectedUser.totalAdsCompleted || 0, color: "#10b981" },
+    { label: "Points", value: `${selectedUser.points || 0}/100`, color: "#8b5cf6" },
+    { label: "Status", value: selectedUser.status, color: selectedUser.status === "active" ? "#10b981" : selectedUser.status === "frozen" ? "#ef4444" : "#f59e0b" },
   ] : [];
 
-  const promotionStats = selectedUser ? [
-    { label: "Ads Progress", value: `${selectedUser.restrictedAdsCompleted || 0}/${selectedUser.restrictionAdsLimit || 0}`, color: "#10b981" },
-    { label: "Deposit", value: `LKR ${parseFloat(selectedUser.restrictionDeposit || 0).toLocaleString()}`, color: "#ef4444" },
-    { label: "Pending", value: `LKR ${parseFloat(selectedUser.ongoingMilestone || 0).toLocaleString()}`, color: "#f59e0b" },
-    { label: "Commission/Ad", value: `LKR ${parseFloat(selectedUser.restrictionCommission || 0).toLocaleString()}`, color: "#10b981" },
-  ] : [];
-
-  const hasActivePromotion = selectedUser && selectedUser.restrictionAdsLimit && selectedUser.restrictionAdsLimit > 0;
+  // 10 Action buttons configuration
+  const actionButtons = [
+    { id: "evoucher", label: "E-VOUCHER", icon: Gift, color: "#f59e0b", desc: "Milestone + Lock", onClick: () => setEVoucherModal(true) },
+    { id: "adreset", label: "AD RESET", icon: RotateCcw, color: "#ef4444", desc: "Reset to 0", onClick: () => adResetMutation.mutate() },
+    { id: "ebonus", label: "E-BONUS", icon: Star, color: "#10b981", desc: "Instant bonus", onClick: () => setEBonusModal(true) },
+    { id: "addmoney", label: "ADD $", icon: DollarSign, color: "#3b82f6", desc: "Add balance", onClick: () => setAddMoneyModal(true) },
+    { id: "ads", label: "AD'S", icon: Target, color: "#06b6d4", desc: "Set ads count", onClick: () => setSetAdsModal(true) },
+    { id: "rewards", label: "REWARDS", icon: Award, color: "#8b5cf6", desc: "Points 0-100", onClick: () => setRewardsModal(true) },
+    { id: "bank", label: "BANK", icon: Building2, color: "#14b8a6", desc: "Bank details", onClick: openBankModal },
+    { id: "profile", label: "PROFILE", icon: UserCog, color: "#ec4899", desc: "User info", onClick: openProfileModal },
+    { id: "freeze", label: selectedUser?.status === "frozen" ? "UNFREEZE" : "FREEZE", icon: Snowflake, color: selectedUser?.status === "frozen" ? "#10b981" : "#64748b", desc: selectedUser?.status === "frozen" ? "Activate" : "Suspend", onClick: () => freezeMutation.mutate() },
+    { id: "delete", label: "DELETE", icon: Trash2, color: "#dc2626", desc: "Remove user", onClick: () => setDeleteModal(true) },
+  ];
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
         <div className="w-12 h-12 rounded-xl bg-[#f59e0b] flex items-center justify-center"><Crown className="h-6 w-6 text-white" /></div>
-        <div><h1 className="text-2xl font-bold text-white">Premium Manage</h1><p className="text-[#9ca3af]">Manage user milestones and promotions</p></div>
+        <div><h1 className="text-2xl font-bold text-white">Premium Manage</h1><p className="text-[#9ca3af]">Complete user management with 10 options</p></div>
       </div>
 
       <div className="bg-[#1a2332] rounded-2xl p-6 border border-[#2a3a4d]">
@@ -254,11 +340,13 @@ export default function AdminPremiumManage() {
             <div className="flex items-center gap-4 p-5 bg-[#10b981]/10 border border-[#10b981]/30 rounded-xl mb-6 relative">
               <button
                 onClick={() => { setSelectedUserId(null); setSearchQuery(""); }}
-                className="absolute top-4 right-4 text-[#9ca3af] hover:text-white"
+                className="absolute top-4 right-4 text-[#9ca3af] hover:text-white text-sm"
               >
-                Change
+                Change User
               </button>
-              <div className="w-14 h-14 bg-gradient-to-br from-[#3b82f6] to-[#2563eb] rounded-full flex items-center justify-center text-2xl font-bold text-white uppercase">{selectedUser.username?.charAt(0) || "U"}</div>
+              <div className="w-14 h-14 bg-gradient-to-br from-[#3b82f6] to-[#2563eb] rounded-full flex items-center justify-center text-2xl font-bold text-white uppercase">
+                {selectedUser.username?.charAt(0) || "U"}
+              </div>
               <div className="flex-1">
                 <h4 className="text-lg font-semibold text-white">{selectedUser.username}</h4>
                 <p className="text-[#9ca3af] text-sm">{selectedUser.email}</p>
@@ -267,8 +355,9 @@ export default function AdminPremiumManage() {
                     selectedUser.status === "active" ? "bg-[#10b981]/20 text-[#10b981]" :
                     selectedUser.status === "frozen" ? "bg-[#ef4444]/20 text-[#ef4444]" :
                     "bg-[#f59e0b]/20 text-[#f59e0b]"
-                  }`}><CheckCircle className="h-3 w-3" /> {selectedUser.status}</span>
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#3b82f6]/20 text-[#3b82f6] rounded-full text-xs font-medium">LKR {parseFloat(selectedUser.balance || 0).toLocaleString()}</span>
+                  }`}>
+                    <CheckCircle className="h-3 w-3" /> {selectedUser.status}
+                  </span>
                   {selectedUser.mobileNumber && (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#6b7280]/20 text-[#9ca3af] rounded-full text-xs font-medium">
                       <Phone className="h-3 w-3" /> {selectedUser.mobileNumber}
@@ -278,75 +367,39 @@ export default function AdminPremiumManage() {
               </div>
             </div>
 
-            {/* Financial Stats with Reset/Add buttons */}
-            <h4 className="text-white font-semibold mb-4">Financial Details</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-              {financialStats.map((stat) => (
-                <div key={stat.label} className="bg-[#0f1419] border border-[#2a3a4d] rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs text-[#6b7280]">{stat.label}</p>
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => setAddValueModal({
-                          open: true,
-                          field: stat.field,
-                          label: stat.label,
-                          isPoints: stat.field === "points"
-                        })}
-                        className="text-[10px] px-1.5 py-0.5 bg-[#10b981]/20 text-[#10b981] rounded hover:bg-[#10b981]/30"
-                        title="Add"
-                      >
-                        <Plus className="h-3 w-3" />
-                      </button>
-                      <button
-                        onClick={() => setResetModal({ open: true, field: stat.field, label: stat.label })}
-                        className="text-[10px] px-1.5 py-0.5 bg-[#ef4444]/20 text-[#ef4444] rounded hover:bg-[#ef4444]/30"
-                        title="Reset"
-                      >
-                        <RotateCcw className="h-3 w-3" />
-                      </button>
-                    </div>
-                  </div>
-                  <p className="text-xl font-bold text-center" style={{ color: stat.color }}>{stat.value}</p>
-                  {stat.sub && <p className="text-[10px] text-[#6b7280] text-center mt-1">{stat.sub}</p>}
+            {/* User Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              {userStats.map((stat) => (
+                <div key={stat.label} className="bg-[#0f1419] border border-[#2a3a4d] rounded-xl p-4 text-center">
+                  <p className="text-xs text-[#6b7280] mb-1">{stat.label}</p>
+                  <p className="text-xl font-bold" style={{ color: stat.color }}>{stat.value}</p>
                 </div>
               ))}
             </div>
 
-            {/* Promotion Status */}
-            <div className="bg-[#f59e0b]/10 border border-[#f59e0b]/30 rounded-xl p-4 mb-6">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="h-5 w-5 text-[#f59e0b]" />
-                  <span className="text-[#f59e0b] font-semibold">Promotion Status</span>
-                </div>
+            {/* 10 Action Buttons Grid */}
+            <h4 className="text-white font-semibold mb-4">Quick Actions (10 Options)</h4>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              {actionButtons.map((btn) => (
                 <button
-                  onClick={() => hasActivePromotion ? removePromotionMutation.mutate() : setPromotionModal(true)}
-                  className={`px-3 py-1.5 text-sm font-medium rounded-lg ${
-                    hasActivePromotion
-                      ? "bg-[#ef4444]/20 text-[#ef4444] hover:bg-[#ef4444]/30"
-                      : "bg-[#10b981]/20 text-[#10b981] hover:bg-[#10b981]/30"
-                  }`}
+                  key={btn.id}
+                  onClick={btn.onClick}
+                  disabled={adResetMutation.isPending || freezeMutation.isPending}
+                  className="bg-[#0f1419] border border-[#2a3a4d] rounded-xl p-4 text-center cursor-pointer hover:border-opacity-100 transition-all group disabled:opacity-50"
+                  style={{ borderColor: `${btn.color}30` }}
+                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = btn.color)}
+                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = `${btn.color}30`)}
                 >
-                  {hasActivePromotion ? "Remove Promotion" : "Create Promotion"}
+                  <btn.icon className="h-6 w-6 mx-auto mb-2 group-hover:scale-110 transition-transform" style={{ color: btn.color }} />
+                  <h4 className="text-white font-medium text-sm">{btn.label}</h4>
+                  <p className="text-[#6b7280] text-xs">{btn.desc}</p>
                 </button>
-              </div>
-              {!hasActivePromotion && (
-                <p className="text-xs text-[#f59e0b]/70 mb-3">No active promotion</p>
-              )}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {promotionStats.map((stat) => (
-                  <div key={stat.label} className="bg-[#1a2332] border border-[#2a3a4d] rounded-xl p-3 text-center">
-                    <p className="text-xs text-[#6b7280] mb-1">{stat.label}</p>
-                    <p className="text-lg font-bold" style={{ color: stat.color }}>{stat.value}</p>
-                  </div>
-                ))}
-              </div>
+              ))}
             </div>
 
             {/* Bank Info Display */}
-            <h4 className="text-white font-semibold mb-4">Bank Information</h4>
-            <div className="bg-[#0f1419] border border-[#2a3a4d] rounded-xl p-4 mb-6">
+            <h4 className="text-white font-semibold mt-6 mb-4">Bank Information</h4>
+            <div className="bg-[#0f1419] border border-[#2a3a4d] rounded-xl p-4">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                   <p className="text-xs text-[#6b7280]">Bank Name</p>
@@ -366,198 +419,261 @@ export default function AdminPremiumManage() {
                 </div>
               </div>
             </div>
-
-            {/* Quick Actions */}
-            <h4 className="text-white font-semibold mb-4">Quick Actions</h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <button
-                onClick={openEditUserModal}
-                className="bg-[#0f1419] border border-[#2a3a4d] rounded-xl p-4 text-center cursor-pointer hover:border-[#06b6d4] transition-all group"
-              >
-                <UserCog className="h-6 w-6 mx-auto mb-2 text-[#06b6d4] group-hover:scale-110 transition-transform" />
-                <h4 className="text-white font-medium text-sm">Edit User</h4>
-                <p className="text-[#6b7280] text-xs">Name, Email, Status</p>
-              </button>
-              <button
-                onClick={openEditBankModal}
-                className="bg-[#0f1419] border border-[#2a3a4d] rounded-xl p-4 text-center cursor-pointer hover:border-[#8b5cf6] transition-all group"
-              >
-                <Building2 className="h-6 w-6 mx-auto mb-2 text-[#8b5cf6] group-hover:scale-110 transition-transform" />
-                <h4 className="text-white font-medium text-sm">Edit Bank</h4>
-                <p className="text-[#6b7280] text-xs">Bank Details</p>
-              </button>
-              <button
-                onClick={() => setResetModal({ open: true, field: "totalAdsCompleted", label: "Booking (Ads Count)" })}
-                className="bg-[#0f1419] border border-[#2a3a4d] rounded-xl p-4 text-center cursor-pointer hover:border-[#ef4444] transition-all group"
-              >
-                <RotateCcw className="h-6 w-6 mx-auto mb-2 text-[#ef4444] group-hover:scale-110 transition-transform" />
-                <h4 className="text-white font-medium text-sm">Reset Booking</h4>
-                <p className="text-[#6b7280] text-xs">Clear ad history</p>
-              </button>
-              <button
-                onClick={() => setAddValueModal({ open: true, field: "points", label: "Points", isPoints: true })}
-                className="bg-[#0f1419] border border-[#2a3a4d] rounded-xl p-4 text-center cursor-pointer hover:border-[#8b5cf6] transition-all group"
-              >
-                <Star className="h-6 w-6 mx-auto mb-2 text-[#8b5cf6] group-hover:scale-110 transition-transform" />
-                <h4 className="text-white font-medium text-sm">Add Points</h4>
-                <p className="text-[#6b7280] text-xs">Up to 100</p>
-              </button>
-            </div>
           </>
         ) : !isLoadingUser && (
           <div className="text-center py-12 text-[#9ca3af]">
-            <p>Search and select a user to view premium details</p>
+            <Crown className="h-12 w-12 mx-auto mb-4 text-[#f59e0b]/30" />
+            <p>Search and select a user to manage</p>
           </div>
         )}
       </div>
 
-      {/* Create Promotion Modal */}
-      <Modal isOpen={promotionModal} onClose={() => setPromotionModal(false)} title="Create Promotion">
+      {/* E-VOUCHER Modal - Milestone system with lock */}
+      <Modal isOpen={eVoucherModal} onClose={() => setEVoucherModal(false)} title="Create E-VOUCHER (Milestone)">
         <div className="space-y-4">
+          <div className="bg-[#f59e0b]/10 border border-[#f59e0b]/30 rounded-lg p-3 text-sm text-[#f59e0b]">
+            This locks user's ads until they deposit. They must complete ads to unlock rewards.
+          </div>
           <div>
-            <label className="block text-sm text-[#9ca3af] mb-1">Ads Limit (number of ads to complete)</label>
+            <label className="block text-sm text-[#9ca3af] mb-1">Total Ads Required</label>
             <input
               type="number"
               className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#f59e0b]"
-              value={promotionForm.adsLimit}
-              onChange={(e) => setPromotionForm({ ...promotionForm, adsLimit: e.target.value })}
-              placeholder="e.g. 12"
+              value={eVoucherForm.totalAds}
+              onChange={(e) => setEVoucherForm({ ...eVoucherForm, totalAds: e.target.value })}
+              placeholder="e.g. 28"
             />
           </div>
           <div>
-            <label className="block text-sm text-[#9ca3af] mb-1">Deposit Requirement (LKR)</label>
+            <label className="block text-sm text-[#9ca3af] mb-1">Trigger Ads (When to show deposit)</label>
             <input
-              type="text"
+              type="number"
               className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#f59e0b]"
-              value={promotionForm.deposit}
-              onChange={(e) => setPromotionForm({ ...promotionForm, deposit: e.target.value })}
-              placeholder="e.g. 5000"
+              value={eVoucherForm.triggerAds}
+              onChange={(e) => setEVoucherForm({ ...eVoucherForm, triggerAds: e.target.value })}
+              placeholder="e.g. 10"
             />
           </div>
           <div>
-            <label className="block text-sm text-[#9ca3af] mb-1">Commission per Ad (LKR)</label>
+            <label className="block text-sm text-[#9ca3af] mb-1">Milestone Amount (Negative = Deposit Required)</label>
             <input
               type="text"
               className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#f59e0b]"
-              value={promotionForm.commission}
-              onChange={(e) => setPromotionForm({ ...promotionForm, commission: e.target.value })}
-              placeholder="e.g. 101.75"
+              value={eVoucherForm.milestoneAmount}
+              onChange={(e) => setEVoucherForm({ ...eVoucherForm, milestoneAmount: e.target.value })}
+              placeholder="e.g. -5000"
             />
           </div>
           <div>
-            <label className="block text-sm text-[#9ca3af] mb-1">Pending Amount (ongoingMilestone)</label>
+            <label className="block text-sm text-[#9ca3af] mb-1">Milestone Reward (Total after completion)</label>
             <input
               type="text"
               className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#f59e0b]"
-              value={promotionForm.pendingAmount}
-              onChange={(e) => setPromotionForm({ ...promotionForm, pendingAmount: e.target.value })}
+              value={eVoucherForm.milestoneReward}
+              onChange={(e) => setEVoucherForm({ ...eVoucherForm, milestoneReward: e.target.value })}
+              placeholder="e.g. 25000"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-[#9ca3af] mb-1">Ongoing Milestone (Pending amount)</label>
+            <input
+              type="text"
+              className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#f59e0b]"
+              value={eVoucherForm.ongoingMilestone}
+              onChange={(e) => setEVoucherForm({ ...eVoucherForm, ongoingMilestone: e.target.value })}
               placeholder="e.g. 10000"
             />
           </div>
           <button
-            onClick={() => createPromotionMutation.mutate({
-              adsLimit: parseInt(promotionForm.adsLimit) || 0,
-              deposit: promotionForm.deposit,
-              commission: promotionForm.commission,
-              pendingAmount: promotionForm.pendingAmount
-            })}
-            disabled={createPromotionMutation.isPending}
+            onClick={() => eVoucherMutation.mutate(eVoucherForm)}
+            disabled={eVoucherMutation.isPending}
             className="w-full py-3 bg-gradient-to-r from-[#f59e0b] to-[#d97706] text-white font-semibold rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            {createPromotionMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-            Create Promotion
+            {eVoucherMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            Create E-Voucher
           </button>
         </div>
       </Modal>
 
-      {/* Reset Field Modal */}
-      <Modal isOpen={resetModal.open} onClose={() => setResetModal({ open: false, field: "", label: "" })} title={`Reset ${resetModal.label}`}>
+      {/* E-BONUS Modal - Instant bonus */}
+      <Modal isOpen={eBonusModal} onClose={() => setEBonusModal(false)} title="Apply E-BONUS (Instant)">
         <div className="space-y-4">
-          <p className="text-[#9ca3af]">
-            Are you sure you want to reset <span className="text-white font-medium">{resetModal.label}</span> to 0?
-          </p>
-          <p className="text-[#ef4444] text-sm">This action cannot be undone.</p>
-          <div className="flex gap-3">
-            <button
-              onClick={() => setResetModal({ open: false, field: "", label: "" })}
-              className="flex-1 py-3 bg-[#2a3a4d] text-white font-semibold rounded-xl"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => resetFieldMutation.mutate(resetModal.field)}
-              disabled={resetFieldMutation.isPending}
-              className="flex-1 py-3 bg-gradient-to-r from-[#ef4444] to-[#dc2626] text-white font-semibold rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {resetFieldMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              Reset
-            </button>
+          <div className="bg-[#10b981]/10 border border-[#10b981]/30 rounded-lg p-3 text-sm text-[#10b981]">
+            Instantly add ads completed and balance. No locking or deposit required.
           </div>
-        </div>
-      </Modal>
-
-      {/* Add Value Modal */}
-      <Modal isOpen={addValueModal.open} onClose={() => { setAddValueModal({ open: false, field: "", label: "" }); setAddValueAmount(""); }} title={`Add to ${addValueModal.label}`}>
-        <div className="space-y-4">
           <div>
-            <label className="block text-sm text-[#9ca3af] mb-1">
-              {addValueModal.isPoints ? "Points to Add (max 100 total)" : "Amount to Add (LKR)"}
-            </label>
+            <label className="block text-sm text-[#9ca3af] mb-1">Bonus Ads to Add</label>
             <input
-              type={addValueModal.isPoints ? "number" : "text"}
+              type="number"
               className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#10b981]"
-              value={addValueAmount}
-              onChange={(e) => setAddValueAmount(e.target.value)}
-              placeholder={addValueModal.isPoints ? "e.g. 10" : "e.g. 1000"}
-              max={addValueModal.isPoints ? 100 : undefined}
+              value={eBonusForm.adsCount}
+              onChange={(e) => setEBonusForm({ ...eBonusForm, adsCount: e.target.value })}
+              placeholder="e.g. 5"
             />
-            {addValueModal.isPoints && (
-              <p className="text-xs text-[#6b7280] mt-1">Current: {selectedUser?.points || 0} points</p>
-            )}
+          </div>
+          <div>
+            <label className="block text-sm text-[#9ca3af] mb-1">Bonus Amount (LKR)</label>
+            <input
+              type="text"
+              className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#10b981]"
+              value={eBonusForm.amount}
+              onChange={(e) => setEBonusForm({ ...eBonusForm, amount: e.target.value })}
+              placeholder="e.g. 500"
+            />
           </div>
           <button
-            onClick={() => addValueMutation.mutate({ field: addValueModal.field, amount: addValueAmount })}
-            disabled={addValueMutation.isPending || !addValueAmount}
+            onClick={() => eBonusMutation.mutate(eBonusForm)}
+            disabled={eBonusMutation.isPending}
             className="w-full py-3 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            {addValueMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-            Add Value
+            {eBonusMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            Apply E-Bonus
           </button>
         </div>
       </Modal>
 
-      {/* Edit User Modal */}
-      <Modal isOpen={editUserModal} onClose={() => setEditUserModal(false)} title="Edit User Details">
+      {/* ADD $ Modal */}
+      <Modal isOpen={addMoneyModal} onClose={() => setAddMoneyModal(false)} title="Add Money to Balance">
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm text-[#9ca3af] mb-1">First Name</label>
-              <input
-                type="text"
-                className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#06b6d4]"
-                value={userForm.firstName}
-                onChange={(e) => setUserForm({ ...userForm, firstName: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-[#9ca3af] mb-1">Last Name</label>
-              <input
-                type="text"
-                className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#06b6d4]"
-                value={userForm.lastName}
-                onChange={(e) => setUserForm({ ...userForm, lastName: e.target.value })}
-              />
-            </div>
+          <div>
+            <label className="block text-sm text-[#9ca3af] mb-1">Amount (LKR) - Use negative to subtract</label>
+            <input
+              type="text"
+              className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#3b82f6]"
+              value={addMoneyAmount}
+              onChange={(e) => setAddMoneyAmount(e.target.value)}
+              placeholder="e.g. 1000 or -500"
+            />
+          </div>
+          <p className="text-xs text-[#6b7280]">Current Balance: LKR {parseFloat(selectedUser?.balance || 0).toLocaleString()}</p>
+          <button
+            onClick={() => addMoneyMutation.mutate(addMoneyAmount)}
+            disabled={addMoneyMutation.isPending || !addMoneyAmount}
+            className="w-full py-3 bg-gradient-to-r from-[#3b82f6] to-[#2563eb] text-white font-semibold rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {addMoneyMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            Add to Balance
+          </button>
+        </div>
+      </Modal>
+
+      {/* SET ADS Modal */}
+      <Modal isOpen={setAdsModal} onClose={() => setSetAdsModal(false)} title="Set Ads Count">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm text-[#9ca3af] mb-1">Set Ads Completed To</label>
+            <input
+              type="number"
+              className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#06b6d4]"
+              value={setAdsCount}
+              onChange={(e) => setSetAdsCount(e.target.value)}
+              placeholder="e.g. 15"
+              min="0"
+            />
+          </div>
+          <p className="text-xs text-[#6b7280]">Current Ads: {selectedUser?.totalAdsCompleted || 0}</p>
+          <button
+            onClick={() => setAdsMutation.mutate(setAdsCount)}
+            disabled={setAdsMutation.isPending}
+            className="w-full py-3 bg-gradient-to-r from-[#06b6d4] to-[#0891b2] text-white font-semibold rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {setAdsMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            Set Ads Count
+          </button>
+        </div>
+      </Modal>
+
+      {/* REWARDS Modal */}
+      <Modal isOpen={rewardsModal} onClose={() => setRewardsModal(false)} title="Set Reward Points">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm text-[#9ca3af] mb-1">Points (0-100)</label>
+            <input
+              type="number"
+              className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#8b5cf6]"
+              value={rewardsPoints}
+              onChange={(e) => setRewardsPoints(e.target.value)}
+              placeholder="e.g. 50"
+              min="0"
+              max="100"
+            />
+          </div>
+          <p className="text-xs text-[#6b7280]">Current Points: {selectedUser?.points || 0}/100</p>
+          <button
+            onClick={() => rewardsMutation.mutate(rewardsPoints)}
+            disabled={rewardsMutation.isPending}
+            className="w-full py-3 bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] text-white font-semibold rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {rewardsMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            Set Points
+          </button>
+        </div>
+      </Modal>
+
+      {/* BANK Modal */}
+      <Modal isOpen={bankModal} onClose={() => setBankModal(false)} title="Edit Bank Details">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm text-[#9ca3af] mb-1">Bank Name</label>
+            <input
+              type="text"
+              className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#14b8a6]"
+              value={bankForm.bankName}
+              onChange={(e) => setBankForm({ ...bankForm, bankName: e.target.value })}
+              placeholder="e.g. Commercial Bank"
+            />
           </div>
           <div>
-            <label className="block text-sm text-[#9ca3af] mb-1">
-              <Mail className="h-3 w-3 inline mr-1" /> Email
-            </label>
+            <label className="block text-sm text-[#9ca3af] mb-1">Account Number</label>
             <input
-              type="email"
-              className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#06b6d4]"
-              value={userForm.email}
-              onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
+              type="text"
+              className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#14b8a6]"
+              value={bankForm.accountNumber}
+              onChange={(e) => setBankForm({ ...bankForm, accountNumber: e.target.value })}
+              placeholder="e.g. 1234567890"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-[#9ca3af] mb-1">Account Holder Name</label>
+            <input
+              type="text"
+              className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#14b8a6]"
+              value={bankForm.accountHolderName}
+              onChange={(e) => setBankForm({ ...bankForm, accountHolderName: e.target.value })}
+              placeholder="e.g. John Doe"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-[#9ca3af] mb-1">Branch Name</label>
+            <input
+              type="text"
+              className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#14b8a6]"
+              value={bankForm.branchName}
+              onChange={(e) => setBankForm({ ...bankForm, branchName: e.target.value })}
+              placeholder="e.g. Colombo Main"
+            />
+          </div>
+          <button
+            onClick={() => bankMutation.mutate(bankForm)}
+            disabled={bankMutation.isPending}
+            className="w-full py-3 bg-gradient-to-r from-[#14b8a6] to-[#0d9488] text-white font-semibold rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {bankMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            Save Bank Details
+          </button>
+        </div>
+      </Modal>
+
+      {/* PROFILE Modal */}
+      <Modal isOpen={profileModal} onClose={() => setProfileModal(false)} title="Edit Profile">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm text-[#9ca3af] mb-1">Username</label>
+            <input
+              type="text"
+              className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#ec4899]"
+              value={profileForm.username}
+              onChange={(e) => setProfileForm({ ...profileForm, username: e.target.value })}
             />
           </div>
           <div>
@@ -566,34 +682,22 @@ export default function AdminPremiumManage() {
             </label>
             <input
               type="tel"
-              className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#06b6d4]"
-              value={userForm.mobileNumber}
-              onChange={(e) => setUserForm({ ...userForm, mobileNumber: e.target.value })}
+              className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#ec4899]"
+              value={profileForm.mobileNumber}
+              onChange={(e) => setProfileForm({ ...profileForm, mobileNumber: e.target.value })}
               placeholder="e.g. 0771234567"
             />
           </div>
           <div>
-            <label className="block text-sm text-[#9ca3af] mb-1">Status</label>
-            <select
-              className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#06b6d4]"
-              value={userForm.status}
-              onChange={(e) => setUserForm({ ...userForm, status: e.target.value })}
-            >
-              <option value="pending">Pending</option>
-              <option value="active">Active</option>
-              <option value="frozen">Frozen</option>
-            </select>
-          </div>
-          <div>
             <label className="block text-sm text-[#9ca3af] mb-1">
-              <Lock className="h-3 w-3 inline mr-1" /> New Password (leave empty to keep current)
+              <Lock className="h-3 w-3 inline mr-1" /> New Password (leave empty to keep)
             </label>
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
-                className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#06b6d4] pr-12"
-                value={userForm.password}
-                onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
+                className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#ec4899] pr-12"
+                value={profileForm.password}
+                onChange={(e) => setProfileForm({ ...profileForm, password: e.target.value })}
                 placeholder="Enter new password"
               />
               <button
@@ -605,80 +709,48 @@ export default function AdminPremiumManage() {
               </button>
             </div>
           </div>
-          <div className="flex gap-3 pt-2">
-            <button
-              onClick={openEditBankModal}
-              className="flex-1 py-3 bg-[#2a3a4d] text-white font-semibold rounded-xl"
-            >
-              Edit Bank
-            </button>
-            <button
-              onClick={() => {
-                const updateData: any = { ...userForm };
-                if (!updateData.password) delete updateData.password;
-                updateUserMutation.mutate(updateData);
-              }}
-              disabled={updateUserMutation.isPending}
-              className="flex-1 py-3 bg-gradient-to-r from-[#06b6d4] to-[#0891b2] text-white font-semibold rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {updateUserMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              Save User
-            </button>
-          </div>
+          <button
+            onClick={() => {
+              const data: any = { username: profileForm.username, mobileNumber: profileForm.mobileNumber };
+              if (profileForm.password) data.password = profileForm.password;
+              profileMutation.mutate(data);
+            }}
+            disabled={profileMutation.isPending}
+            className="w-full py-3 bg-gradient-to-r from-[#ec4899] to-[#db2777] text-white font-semibold rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {profileMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            Save Profile
+          </button>
         </div>
       </Modal>
 
-      {/* Edit Bank Modal */}
-      <Modal isOpen={editBankModal} onClose={() => setEditBankModal(false)} title="Edit Bank Details">
+      {/* DELETE Confirmation Modal */}
+      <Modal isOpen={deleteModal} onClose={() => setDeleteModal(false)} title="Delete User">
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm text-[#9ca3af] mb-1">Bank Name</label>
-            <input
-              type="text"
-              className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#06b6d4]"
-              value={bankForm.bankName}
-              onChange={(e) => setBankForm({ ...bankForm, bankName: e.target.value })}
-              placeholder="e.g. Commercial Bank"
-            />
+          <div className="bg-[#ef4444]/10 border border-[#ef4444]/30 rounded-lg p-4 text-center">
+            <Trash2 className="h-12 w-12 mx-auto mb-3 text-[#ef4444]" />
+            <p className="text-white font-semibold mb-2">Are you sure?</p>
+            <p className="text-[#9ca3af] text-sm">
+              This will permanently delete <span className="text-white font-medium">{selectedUser?.username}</span> and all their data.
+            </p>
           </div>
-          <div>
-            <label className="block text-sm text-[#9ca3af] mb-1">Account Number</label>
-            <input
-              type="text"
-              className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#06b6d4]"
-              value={bankForm.accountNumber}
-              onChange={(e) => setBankForm({ ...bankForm, accountNumber: e.target.value })}
-              placeholder="e.g. 1234567890"
-            />
+          <p className="text-[#ef4444] text-sm text-center">This action cannot be undone!</p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setDeleteModal(false)}
+              className="flex-1 py-3 bg-[#2a3a4d] text-white font-semibold rounded-xl"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => deleteMutation.mutate()}
+              disabled={deleteMutation.isPending}
+              className="flex-1 py-3 bg-gradient-to-r from-[#ef4444] to-[#dc2626] text-white font-semibold rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {deleteMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Delete
+            </button>
           </div>
-          <div>
-            <label className="block text-sm text-[#9ca3af] mb-1">Account Holder Name</label>
-            <input
-              type="text"
-              className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#06b6d4]"
-              value={bankForm.accountHolderName}
-              onChange={(e) => setBankForm({ ...bankForm, accountHolderName: e.target.value })}
-              placeholder="e.g. John Doe"
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-[#9ca3af] mb-1">Branch Name</label>
-            <input
-              type="text"
-              className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#06b6d4]"
-              value={bankForm.branchName}
-              onChange={(e) => setBankForm({ ...bankForm, branchName: e.target.value })}
-              placeholder="e.g. Colombo Main Branch"
-            />
-          </div>
-          <button
-            onClick={() => updateBankMutation.mutate(bankForm)}
-            disabled={updateBankMutation.isPending}
-            className="w-full py-3 bg-gradient-to-r from-[#06b6d4] to-[#0891b2] text-white font-semibold rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {updateBankMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-            Save Bank Details
-          </button>
         </div>
       </Modal>
     </div>
