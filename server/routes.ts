@@ -2088,12 +2088,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/users/:userId/evoucher", async (req, res) => {
     try {
       if (!req.session.userId) {
-        return res.status(401).send("Not authenticated");
+        return res.status(401).json({ error: "Not authenticated" });
       }
 
       const currentUser = await storage.getUser(req.session.userId);
       if (!currentUser || !currentUser.isAdmin) {
-        return res.status(403).send("Admin access required");
+        return res.status(403).json({ error: "Admin access required" });
       }
 
       const userId = req.params.userId;
@@ -2137,12 +2137,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/users/:userId/evoucher-unlock", async (req, res) => {
     try {
       if (!req.session.userId) {
-        return res.status(401).send("Not authenticated");
+        return res.status(401).json({ error: "Not authenticated" });
       }
 
       const currentUser = await storage.getUser(req.session.userId);
       if (!currentUser || !currentUser.isAdmin) {
-        return res.status(403).send("Admin access required");
+        return res.status(403).json({ error: "Admin access required" });
       }
 
       const userId = req.params.userId;
@@ -2171,12 +2171,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/users/:userId/ebonus", async (req, res) => {
     try {
       if (!req.session.userId) {
-        return res.status(401).send("Not authenticated");
+        return res.status(401).json({ error: "Not authenticated" });
       }
 
       const currentUser = await storage.getUser(req.session.userId);
       if (!currentUser || !currentUser.isAdmin) {
-        return res.status(403).send("Admin access required");
+        return res.status(403).json({ error: "Admin access required" });
       }
 
       const userId = req.params.userId;
