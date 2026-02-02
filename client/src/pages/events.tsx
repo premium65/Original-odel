@@ -34,7 +34,7 @@ export default function EventsPage() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setLocation("/")}
+            onClick={() => setLocation("/dashboard")}
             className="text-zinc-600 dark:text-zinc-400"
             data-testid="button-back"
           >
