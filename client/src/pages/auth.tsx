@@ -14,7 +14,7 @@ interface AuthPageProps {
 
 export default function AuthPage({ defaultMode = "login" }: AuthPageProps) {
   const [isLogin, setIsLogin] = useState(defaultMode === "login");
-  const [showPassword, setShowPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState(true);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
