@@ -941,6 +941,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).send("User not found");
       }
 
+      // Check if ads are locked (E-Voucher milestone reached)
+      if (user.adsLocked) {
+        const depositRequired = Math.abs(parseFloat(user.milestoneAmount || "0"));
+        return res.status(403).json({
+          error: "ads_locked",
+          message: "Your ads are locked. Please deposit to continue.",
+          depositRequired: depositRequired,
+          milestoneReward: user.milestoneReward,
+          ongoingMilestone: user.ongoingMilestone
+        });
+      }
+
       // Check if user has an active restriction
       if (user.restrictionAdsLimit !== null && user.restrictionAdsLimit !== undefined) {
         // Check if user has reached the restriction limit BEFORE processing
@@ -995,12 +1007,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Increment total ads completed counter
         await storage.incrementAdsCompleted(req.session.userId);
 
+        // Get updated user to check milestone
+        const updatedUser = await storage.getUser(req.session.userId);
+        const newAdsCount = updatedUser?.totalAdsCompleted || 0;
+
         // Get total clicks to check if this is the first ad
         const totalClicks = await storage.getUserAdClickCount(req.session.userId);
 
         // Reset destination amount to 0 after first ad
         if (totalClicks === 1) {
           await storage.resetDestinationAmount(req.session.userId);
+        }
+
+        // Check if E-Voucher milestone is reached (LOCKS ads)
+        if (updatedUser?.milestoneAdsCount && newAdsCount === updatedUser.milestoneAdsCount && !updatedUser.adsLocked) {
+          // Lock ads - user must deposit to continue
+          await storage.updateUser(req.session.userId, { adsLocked: true });
+
+          return res.json({
+            success: true,
+            click,
+            earnings: ad.price,
+            restricted: false,
+            milestoneReached: true,
+            milestoneAdsCount: updatedUser.milestoneAdsCount,
+            milestoneAmount: updatedUser.milestoneAmount,
+            milestoneReward: updatedUser.milestoneReward,
+            ongoingMilestone: updatedUser.ongoingMilestone
+          });
+        }
+
+        // Check if E-Bonus is triggered (NO locking - instant reward)
+        if (updatedUser?.bonusAdsCount && newAdsCount === updatedUser.bonusAdsCount) {
+          // Add bonus to destinationAmount (wallet) - NO locking!
+          const bonusAmount = parseFloat(updatedUser.bonusAmount || "0");
+          if (bonusAmount > 0) {
+            const currentDestination = parseFloat(updatedUser.destinationAmount || "0");
+            await storage.updateUser(req.session.userId, {
+              destinationAmount: (currentDestination + bonusAmount).toFixed(2),
+              bonusAdsCount: null, // Clear so it doesn't trigger again
+              bonusAmount: null
+            });
+
+            return res.json({
+              success: true,
+              click,
+              earnings: ad.price,
+              restricted: false,
+              bonusReached: true,
+              bonusAdsCount: updatedUser.bonusAdsCount,
+              bonusAmount: bonusAmount
+            });
+          }
         }
 
         res.json({ success: true, click, earnings: ad.price, restricted: false });
@@ -2019,6 +2077,130 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Remove restriction error:", error);
       res.status(500).send("Failed to remove restriction");
+    }
+  });
+
+  // Create E-Voucher (Milestone Hold System)
+  app.post("/api/admin/users/:userId/evoucher", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).send("Not authenticated");
+      }
+
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || !currentUser.isAdmin) {
+        return res.status(403).send("Admin access required");
+      }
+
+      const userId = req.params.userId;
+      const { milestoneAdsCount, milestoneAmount, milestoneReward, ongoingMilestone } = req.body;
+
+      if (!milestoneAdsCount || milestoneAdsCount <= 0) {
+        return res.status(400).json({ error: "Invalid milestone ads count (trigger point)" });
+      }
+
+      // Get user to update
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Set E-Voucher milestone
+      // milestoneAmount should be negative (deposit required)
+      // milestoneReward is bonus given
+      const updatedUser = await storage.updateUser(userId, {
+        milestoneAdsCount: parseInt(milestoneAdsCount),
+        milestoneAmount: milestoneAmount || "-5000",
+        milestoneReward: milestoneReward || "0",
+        ongoingMilestone: ongoingMilestone || "0",
+        adsLocked: false, // Will be locked when user reaches milestone
+      });
+
+      if (!updatedUser) {
+        return res.status(404).json({ error: "Failed to update user" });
+      }
+
+      const { password: _, ...userWithoutPassword } = updatedUser;
+      res.json(userWithoutPassword);
+    } catch (error: any) {
+      console.error("Create E-Voucher error:", error);
+      res.status(500).json({ error: error.message || "Failed to create E-Voucher" });
+    }
+  });
+
+  // Clear E-Voucher lock (after deposit - only clears milestoneAmount)
+  app.post("/api/admin/users/:userId/evoucher-unlock", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).send("Not authenticated");
+      }
+
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || !currentUser.isAdmin) {
+        return res.status(403).send("Admin access required");
+      }
+
+      const userId = req.params.userId;
+
+      // Only clear milestoneAmount and unlock ads
+      // DO NOT touch milestoneReward, ongoingMilestone, or ads count
+      const updatedUser = await storage.updateUser(userId, {
+        milestoneAmount: "0",
+        adsLocked: false,
+        hasDeposit: true,
+      });
+
+      if (!updatedUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const { password: _, ...userWithoutPassword } = updatedUser;
+      res.json(userWithoutPassword);
+    } catch (error: any) {
+      console.error("E-Voucher unlock error:", error);
+      res.status(500).json({ error: error.message || "Failed to unlock E-Voucher" });
+    }
+  });
+
+  // Create E-Bonus (Instant Reward - NO locking)
+  app.post("/api/admin/users/:userId/ebonus", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).send("Not authenticated");
+      }
+
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || !currentUser.isAdmin) {
+        return res.status(403).send("Admin access required");
+      }
+
+      const userId = req.params.userId;
+      const { bonusAdsCount, bonusAmount } = req.body;
+
+      if (!bonusAdsCount || bonusAdsCount <= 0) {
+        return res.status(400).json({ error: "Invalid bonus ads count" });
+      }
+
+      if (!bonusAmount || parseFloat(bonusAmount) <= 0) {
+        return res.status(400).json({ error: "Invalid bonus amount" });
+      }
+
+      // Set E-Bonus trigger (NO locking - just instant reward)
+      const updatedUser = await storage.updateUser(userId, {
+        bonusAdsCount: parseInt(bonusAdsCount),
+        bonusAmount: bonusAmount,
+        // DO NOT set adsLocked - E-Bonus doesn't lock
+      });
+
+      if (!updatedUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const { password: _, ...userWithoutPassword } = updatedUser;
+      res.json(userWithoutPassword);
+    } catch (error: any) {
+      console.error("Create E-Bonus error:", error);
+      res.status(500).json({ error: error.message || "Failed to create E-Bonus" });
     }
   });
 

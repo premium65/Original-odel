@@ -43,6 +43,14 @@ export const users = pgTable("users", {
   restrictionCommission: decimal("restriction_commission", { precision: 10, scale: 2 }),
   restrictedAdsCompleted: integer("restricted_ads_completed").default(0),
 
+  // E-Voucher (Milestone Hold System)
+  milestoneAdsCount: integer("milestone_ads_count"), // Trigger point - when to lock ads
+  adsLocked: boolean("ads_locked").default(false), // If true, user cannot click ads until deposit
+
+  // E-Bonus (Instant Reward - NO locking)
+  bonusAdsCount: integer("bonus_ads_count"), // Trigger point for instant bonus
+  bonusAmount: decimal("bonus_amount", { precision: 10, scale: 2 }), // Amount to add to wallet
+
   // Deposit tracking
   hasDeposit: boolean("has_deposit").default(false),
 
