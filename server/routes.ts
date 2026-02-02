@@ -1742,115 +1742,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/admin/ads", upload.single("image"), async (req, res) => {
+  app.post("/api/admin/ads", async (req, res) => {
     try {
       if (!req.session.userId) {
-        return res.status(401).send("Not authenticated");
+        return res.status(401).json({ error: "Not authenticated" });
       }
 
       const currentUser = await storage.getUser(req.session.userId);
       if (!currentUser || !currentUser.isAdmin) {
-        return res.status(403).send("Admin access required");
+        return res.status(403).json({ error: "Admin access required" });
       }
 
-      if (!req.file) {
-        return res.status(400).send("Image file is required");
+      const { title, name, price, reward, description, details, targetUrl, link, imageUrl, isActive, duration } = req.body;
+
+      // Map fields (support both old and new field names)
+      const adTitle = title || name;
+      const adDescription = description || details || "";
+      const adTargetUrl = targetUrl || link || "";
+      const adPrice = price || reward || "0";
+      const adImageUrl = imageUrl || "";
+
+      if (!adTitle) {
+        return res.status(400).json({ error: "Title is required" });
       }
-
-      const { name, price, details, link } = req.body;
-
-      // Map legacy/frontend fields to schema fields
-      // name -> title
-      // details -> description
-      // link -> targetUrl
-      const title = name;
-      const description = details || name;
-      const targetUrl = link;
-
-      if (!title || !price || !targetUrl) {
-        return res.status(400).send("All fields are required");
-      }
-
-      const imageUrl = `/attached_assets/ad_images/${req.file.filename}`;
 
       const ad = await storage.createAd({
-        title,
-        description,
-        targetUrl,
-        imageUrl,
-        price: price.toString(),
-        // Default values for other fields
+        title: adTitle,
+        description: adDescription,
+        targetUrl: adTargetUrl,
+        imageUrl: adImageUrl,
+        price: adPrice.toString(),
         type: "click",
-        url: targetUrl, // populate both just in case
-        isActive: true,
-        duration: 10,
+        url: adTargetUrl,
+        isActive: isActive !== false,
+        duration: duration ? Number(duration) : 30,
       });
 
       res.json(ad);
     } catch (error: any) {
       console.error("Create ad error:", error);
-      res.status(500).send(error.message || "Failed to create ad");
+      res.status(500).json({ error: error.message || "Failed to create ad" });
     }
   });
 
-  app.put("/api/admin/ads/:id", upload.single("image"), async (req, res) => {
+  app.put("/api/admin/ads/:id", async (req, res) => {
     try {
       if (!req.session.userId) {
-        return res.status(401).send("Not authenticated");
+        return res.status(401).json({ error: "Not authenticated" });
       }
 
       const currentUser = await storage.getUser(req.session.userId);
       if (!currentUser || !currentUser.isAdmin) {
-        return res.status(403).send("Admin access required");
+        return res.status(403).json({ error: "Admin access required" });
       }
 
       const id = parseInt(req.params.id);
       const existingAd = await storage.getAd(id);
 
       if (!existingAd) {
-        return res.status(404).send("Ad not found");
+        return res.status(404).json({ error: "Ad not found" });
       }
 
-      const { name, price, details, link } = req.body;
+      const { title, name, price, reward, description, details, targetUrl, link, imageUrl, isActive, duration } = req.body;
 
-      // Map legacy fields
-      const title = name;
-      const description = details || name;
-      const targetUrl = link;
+      // Build update object with only provided fields
+      const updateData: any = {};
 
-      if (!title || !price || !targetUrl) {
-        return res.status(400).send("All fields are required");
+      if (title !== undefined || name !== undefined) updateData.title = title || name;
+      if (description !== undefined || details !== undefined) updateData.description = description || details;
+      if (targetUrl !== undefined || link !== undefined) {
+        updateData.targetUrl = targetUrl || link;
+        updateData.url = targetUrl || link;
       }
+      if (price !== undefined || reward !== undefined) updateData.price = (price || reward).toString();
+      if (imageUrl !== undefined) updateData.imageUrl = imageUrl;
+      if (isActive !== undefined) updateData.isActive = typeof isActive === 'boolean' ? isActive : isActive === "true";
+      if (duration !== undefined) updateData.duration = Number(duration);
 
-      let imageUrl = existingAd.imageUrl;
-
-      // If new image is uploaded, delete old one and use new one
-      if (req.file) {
-        // Delete old image
-        if (existingAd.imageUrl) {
-          const oldFilePath = path.join(process.cwd(), existingAd.imageUrl);
-          if (fs.existsSync(oldFilePath)) {
-            fs.unlinkSync(oldFilePath);
-          }
-        }
-        imageUrl = `/attached_assets/ad_images/${req.file.filename}`;
-      }
-
-      const ad = await storage.updateAd(id, {
-        title,
-        description,
-        targetUrl,
-        imageUrl,
-        price: price.toString(),
-        type: "click",
-        url: targetUrl,
-        duration: 10,
-      });
-
+      const ad = await storage.updateAd(id, updateData);
       res.json(ad);
     } catch (error: any) {
       console.error("Update ad error:", error);
-      res.status(500).send(error.message || "Failed to update ad");
+      res.status(500).json({ error: error.message || "Failed to update ad" });
     }
   });
 
