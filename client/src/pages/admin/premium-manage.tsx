@@ -40,8 +40,7 @@ export default function AdminPremiumManage() {
 
   // Form states
   const [eVoucherForm, setEVoucherForm] = useState({
-    totalAds: "",
-    triggerAds: "",
+    milestoneAdsCount: "",
     milestoneAmount: "",
     milestoneReward: "",
     ongoingMilestone: ""
@@ -81,22 +80,34 @@ export default function AdminPremiumManage() {
     u.email?.toLowerCase().includes(searchQuery.toLowerCase())
   ).slice(0, 5);
 
-  // E-VOUCHER Mutation - Creates milestone system with lock
+  // E-VOUCHER Mutation - Creates milestone hold system
   const eVoucherMutation = useMutation({
-    mutationFn: (data: any) => api.createPromotion(selectedUserId!, {
-      adsLimit: parseInt(data.totalAds) || 0,
-      deposit: data.milestoneAmount,
-      commission: "101.75",
-      pendingAmount: data.ongoingMilestone
+    mutationFn: (data: any) => api.createEVoucher(selectedUserId!, {
+      milestoneAdsCount: parseInt(data.milestoneAdsCount) || 21,
+      milestoneAmount: data.milestoneAmount || "-5000",
+      milestoneReward: data.milestoneReward || "2000",
+      ongoingMilestone: data.ongoingMilestone || "9000"
     }),
     onSuccess: () => {
-      toast({ title: "E-Voucher Created!", description: "User's ads are now locked until deposit." });
+      toast({ title: "E-Voucher Created!", description: "Milestone set. Ads will lock when user reaches the target." });
       setEVoucherModal(false);
-      setEVoucherForm({ totalAds: "", triggerAds: "", milestoneAmount: "", milestoneReward: "", ongoingMilestone: "" });
+      setEVoucherForm({ milestoneAdsCount: "", milestoneAmount: "", milestoneReward: "", ongoingMilestone: "" });
       refetchUser();
     },
     onError: (error: any) => {
       toast({ title: "Failed to create E-Voucher", description: error.message, variant: "destructive" });
+    }
+  });
+
+  // Unlock E-Voucher (after deposit)
+  const unlockEVoucherMutation = useMutation({
+    mutationFn: () => api.unlockEVoucher(selectedUserId!),
+    onSuccess: () => {
+      toast({ title: "E-Voucher Unlocked!", description: "User can now continue clicking ads." });
+      refetchUser();
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to unlock", description: error.message, variant: "destructive" });
     }
   });
 
@@ -428,31 +439,22 @@ export default function AdminPremiumManage() {
         )}
       </div>
 
-      {/* E-VOUCHER Modal - Milestone system with lock */}
-      <Modal isOpen={eVoucherModal} onClose={() => setEVoucherModal(false)} title="Create E-VOUCHER (Milestone)">
+      {/* E-VOUCHER Modal - Milestone Hold System */}
+      <Modal isOpen={eVoucherModal} onClose={() => setEVoucherModal(false)} title="Create E-VOUCHER (Milestone Hold)">
         <div className="space-y-4">
           <div className="bg-[#f59e0b]/10 border border-[#f59e0b]/30 rounded-lg p-3 text-sm text-[#f59e0b]">
-            This locks user's ads until they deposit. They must complete ads to unlock rewards.
+            When user reaches the milestone ads count, ads will lock. User must deposit to continue. After deposit, only the hold clears - ads continue from same count.
           </div>
           <div>
-            <label className="block text-sm text-[#9ca3af] mb-1">Total Ads Required</label>
+            <label className="block text-sm text-[#9ca3af] mb-1">Milestone Ads Count (Trigger Point)</label>
             <input
               type="number"
               className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#f59e0b]"
-              value={eVoucherForm.totalAds}
-              onChange={(e) => setEVoucherForm({ ...eVoucherForm, totalAds: e.target.value })}
-              placeholder="e.g. 28"
+              value={eVoucherForm.milestoneAdsCount}
+              onChange={(e) => setEVoucherForm({ ...eVoucherForm, milestoneAdsCount: e.target.value })}
+              placeholder="e.g. 21 (when to lock ads)"
             />
-          </div>
-          <div>
-            <label className="block text-sm text-[#9ca3af] mb-1">Trigger Ads (When to show deposit)</label>
-            <input
-              type="number"
-              className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#f59e0b]"
-              value={eVoucherForm.triggerAds}
-              onChange={(e) => setEVoucherForm({ ...eVoucherForm, triggerAds: e.target.value })}
-              placeholder="e.g. 10"
-            />
+            <p className="text-xs text-[#6b7280] mt-1">Current ads: {selectedUser?.totalAdsCompleted || 0}</p>
           </div>
           <div>
             <label className="block text-sm text-[#9ca3af] mb-1">Milestone Amount (Negative = Deposit Required)</label>
@@ -461,17 +463,17 @@ export default function AdminPremiumManage() {
               className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#f59e0b]"
               value={eVoucherForm.milestoneAmount}
               onChange={(e) => setEVoucherForm({ ...eVoucherForm, milestoneAmount: e.target.value })}
-              placeholder="e.g. -5000"
+              placeholder="e.g. -5000 (deposit to unlock)"
             />
           </div>
           <div>
-            <label className="block text-sm text-[#9ca3af] mb-1">Milestone Reward (Total after completion)</label>
+            <label className="block text-sm text-[#9ca3af] mb-1">Milestone Reward (Bonus given at milestone)</label>
             <input
               type="text"
               className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#f59e0b]"
               value={eVoucherForm.milestoneReward}
               onChange={(e) => setEVoucherForm({ ...eVoucherForm, milestoneReward: e.target.value })}
-              placeholder="e.g. 25000"
+              placeholder="e.g. 2000 (bonus)"
             />
           </div>
           <div>
@@ -481,7 +483,7 @@ export default function AdminPremiumManage() {
               className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#f59e0b]"
               value={eVoucherForm.ongoingMilestone}
               onChange={(e) => setEVoucherForm({ ...eVoucherForm, ongoingMilestone: e.target.value })}
-              placeholder="e.g. 10000"
+              placeholder="e.g. 9000 (pending)"
             />
           </div>
           <button
@@ -492,6 +494,21 @@ export default function AdminPremiumManage() {
             {eVoucherMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
             Create E-Voucher
           </button>
+
+          {/* Show unlock button if ads are locked */}
+          {selectedUser?.adsLocked && (
+            <div className="mt-4 pt-4 border-t border-[#2a3a4d]">
+              <p className="text-sm text-[#ef4444] mb-3">User's ads are currently locked!</p>
+              <button
+                onClick={() => unlockEVoucherMutation.mutate()}
+                disabled={unlockEVoucherMutation.isPending}
+                className="w-full py-3 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {unlockEVoucherMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                Unlock (After Deposit)
+              </button>
+            </div>
+          )}
         </div>
       </Modal>
 

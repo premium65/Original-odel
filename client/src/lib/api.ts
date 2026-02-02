@@ -44,6 +44,11 @@ export const api = {
   updateUserDetails: (id: number | string, data: any) => fetchAPI(`/admin/users/${id}/details`, { method: "PATCH", body: JSON.stringify(data) }),
   updateBankDetails: (id: number | string, data: any) => fetchAPI(`/admin/users/${id}/bank`, { method: "PATCH", body: JSON.stringify(data) }),
 
+  // E-Voucher (Milestone Hold System)
+  createEVoucher: (id: number | string, data: { milestoneAdsCount: number; milestoneAmount: string; milestoneReward: string; ongoingMilestone: string }) =>
+    fetchAPI(`/admin/users/${id}/evoucher`, { method: "POST", body: JSON.stringify(data) }),
+  unlockEVoucher: (id: number | string) => fetchAPI(`/admin/users/${id}/evoucher-unlock`, { method: "POST" }),
+
   // Transactions
   getTransactions: () => fetchAPI("/admin/transactions"),
   getWithdrawals: () => fetchAPI("/admin/transactions/withdrawals"),

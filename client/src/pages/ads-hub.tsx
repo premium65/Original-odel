@@ -1,7 +1,7 @@
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Eye, Target, CheckCircle, Check, ShoppingCart, X } from "lucide-react";
+import { ArrowLeft, Eye, Target, CheckCircle, Check, ShoppingCart, X, Gift, Lock, MessageCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
@@ -18,6 +18,8 @@ export default function AdsHubPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [adState, setAdState] = useState<AdState>("ready");
+  const [showEVoucherPopup, setShowEVoucherPopup] = useState(false);
+  const [eVoucherData, setEVoucherData] = useState<any>(null);
 
   const { data: ads = [], isLoading: adsLoading } = useQuery<Ad[]>({
     queryKey: ["/api/ads"],
@@ -30,18 +32,39 @@ export default function AdsHubPage() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      toast({
-        title: "Ad Completed!",
-        description: `You earned LKR ${data.earned?.toFixed(2) || "0.00"}`,
-      });
+
+      // Check if milestone was reached
+      if (data.milestoneReached) {
+        setEVoucherData({
+          milestoneReward: data.milestoneReward,
+          milestoneAmount: data.milestoneAmount,
+          ongoingMilestone: data.ongoingMilestone
+        });
+        setShowEVoucherPopup(true);
+      } else {
+        toast({
+          title: "Ad Completed!",
+          description: `You earned LKR ${data.earnings?.toFixed(2) || "0.00"}`,
+        });
+      }
       setAdState("ready");
     },
     onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to process ad click",
-        variant: "destructive",
-      });
+      // Check if ads are locked
+      if (error.message?.includes("locked") || error.message?.includes("deposit")) {
+        setEVoucherData({
+          milestoneReward: (user as any)?.milestoneReward || "0",
+          milestoneAmount: (user as any)?.milestoneAmount || "0",
+          adsLocked: true
+        });
+        setShowEVoucherPopup(true);
+      } else {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to process ad click",
+          variant: "destructive",
+        });
+      }
       setAdState("ready");
     },
   });
@@ -54,6 +77,19 @@ export default function AdsHubPage() {
       return () => clearTimeout(timer);
     }
   }, [adState]);
+
+  // Check if ads are locked on page load
+  useEffect(() => {
+    const userData = user as any;
+    if (userData?.adsLocked) {
+      setEVoucherData({
+        milestoneReward: userData.milestoneReward || "0",
+        milestoneAmount: userData.milestoneAmount || "0",
+        adsLocked: true
+      });
+      setShowEVoucherPopup(true);
+    }
+  }, [user]);
 
   if (authLoading || adsLoading) {
     return (
@@ -377,6 +413,105 @@ export default function AdsHubPage() {
                   Add to Cart
                 </Button>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* E-Voucher Popup */}
+      <AnimatePresence>
+        {showEVoucherPopup && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-gradient-to-b from-amber-50 to-orange-100 dark:from-zinc-900 dark:to-zinc-800 rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl border-2 border-orange-400"
+            >
+              {/* Header */}
+              <div className="mb-4">
+                <h2 className="text-2xl font-bold text-orange-600 dark:text-orange-400">ODEL-AD'S</h2>
+              </div>
+
+              {/* Celebration Icon */}
+              <div className="mb-4">
+                <div className="w-20 h-20 mx-auto bg-gradient-to-br from-orange-400 to-amber-500 rounded-full flex items-center justify-center shadow-lg">
+                  <Gift className="w-10 h-10 text-white" />
+                </div>
+              </div>
+
+              {/* Congratulations */}
+              <h3 className="text-2xl font-bold text-zinc-800 dark:text-white mb-2">
+                Congratulations!
+              </h3>
+
+              {/* Message */}
+              <div className="bg-white dark:bg-zinc-800 rounded-xl p-4 mb-4 shadow-inner">
+                <div className="flex items-center justify-center gap-2 text-green-600 dark:text-green-400 mb-2">
+                  <CheckCircle className="w-5 h-5" />
+                  <span className="font-semibold">You received an E-Voucher reward</span>
+                </div>
+
+                <div className="space-y-2 text-left">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-zinc-600 dark:text-zinc-400">Bonus:</span>
+                    <span className="font-bold text-green-600 dark:text-green-400">
+                      +LKR {parseFloat(eVoucherData?.milestoneReward || "0").toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-zinc-600 dark:text-zinc-400">Need top-up:</span>
+                    <span className="font-bold text-red-500">
+                      LKR {Math.abs(parseFloat(eVoucherData?.milestoneAmount || "0")).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Lock Notice */}
+              <div className="flex items-center justify-center gap-2 text-amber-600 dark:text-amber-400 mb-4">
+                <Lock className="w-4 h-4" />
+                <span className="text-sm font-medium">
+                  To continue working, please top-up LKR {Math.abs(parseFloat(eVoucherData?.milestoneAmount || "0")).toLocaleString()}
+                </span>
+              </div>
+
+              {/* Contact Info */}
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
+                Contact customer service if you need help.
+              </p>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3">
+                <Button
+                  onClick={() => window.open("https://wa.me/", "_blank")}
+                  className="flex-1 bg-green-500 hover:bg-green-600 text-white"
+                >
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                  WhatsApp
+                </Button>
+                <Button
+                  onClick={() => window.open("https://t.me/", "_blank")}
+                  className="flex-1 bg-blue-500 hover:bg-blue-600 text-white"
+                >
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                  Telegram
+                </Button>
+              </div>
+
+              {/* Close Button */}
+              <Button
+                onClick={() => setShowEVoucherPopup(false)}
+                variant="ghost"
+                className="w-full mt-4 text-zinc-500 hover:text-zinc-700"
+              >
+                Close
+              </Button>
             </motion.div>
           </motion.div>
         )}
