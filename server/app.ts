@@ -25,6 +25,9 @@ export function log(message: string, source = "express") {
 
 export const app = express();
 
+// Log body parser limit for debugging
+console.log("[APP] Setting body parser limit to 50mb");
+
 declare module 'http' {
   interface IncomingMessage {
     rawBody: unknown
