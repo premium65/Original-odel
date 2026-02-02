@@ -52,8 +52,44 @@ router.post("/", upload.single("image"), async (req, res) => {
   }
 });
 
-// Update ad
-router.put("/:id", upload.single("image"), async (req, res) => {
+// Update ad (JSON body)
+router.put("/:id", async (req, res) => {
+  try {
+    const { title, description, type, url, reward, duration, isActive, imageUrl, targetUrl, price, currency, priceColor, features, buttonText, buttonIcon, showOnDashboard, displayOrder } = req.body;
+
+    const updateData: any = {
+      title,
+      description,
+      type,
+      url: url || targetUrl,
+      reward: reward || price,
+      duration: duration ? Number(duration) : undefined,
+      isActive: typeof isActive === 'boolean' ? isActive : isActive === "true",
+      imageUrl,
+      targetUrl,
+      currency,
+      priceColor,
+      features: features ? JSON.stringify(features) : undefined,
+      buttonText,
+      buttonIcon,
+      showOnDashboard: typeof showOnDashboard === 'boolean' ? showOnDashboard : showOnDashboard === "true",
+      displayOrder: displayOrder ? Number(displayOrder) : undefined
+    };
+
+    // Remove undefined values
+    Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
+
+    const updated = await db.update(ads).set(updateData).where(eq(ads.id, Number(req.params.id))).returning();
+    if (!updated.length) return res.status(404).json({ error: "Ad not found" });
+    res.json(updated[0]);
+  } catch (error) {
+    console.error("Update ad error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Update ad with image (multipart/form-data)
+router.put("/:id/upload", upload.single("image"), async (req, res) => {
   try {
     const { title, description, type, url, reward, duration, isActive } = req.body;
     const updateData: any = { title, description, type, url, reward, duration: Number(duration), isActive: isActive === "true" };

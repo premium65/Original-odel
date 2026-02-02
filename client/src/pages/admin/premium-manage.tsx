@@ -69,11 +69,18 @@ export default function AdminPremiumManage() {
   });
 
   // Fetch selected user details
-  const { data: selectedUser, isLoading: isLoadingUser, refetch: refetchUser } = useQuery({
+  const { data: selectedUser, isLoading: isLoadingUser, isError: isUserError, refetch: refetchUser } = useQuery({
     queryKey: ["admin-user-details", selectedUserId],
-    queryFn: () => api.getUser(selectedUserId!),
-    enabled: !!selectedUserId
+    queryFn: async () => {
+      const response = await api.getUser(selectedUserId!);
+      return response;
+    },
+    enabled: !!selectedUserId,
+    retry: 1
   });
+
+  // When user is selected from list but detail fetch fails, show data from list
+  const displayUser = selectedUser || (selectedUserId ? users.find((u: any) => u.id === selectedUserId) : null);
 
   const filteredUsers = users.filter((u: any) =>
     !searchQuery ||
@@ -260,10 +267,10 @@ export default function AdminPremiumManage() {
   const openBankModal = () => {
     if (selectedUser) {
       setBankForm({
-        bankName: selectedUser.bankName || "",
-        accountNumber: selectedUser.accountNumber || "",
-        accountHolderName: selectedUser.accountHolderName || "",
-        branchName: selectedUser.branchName || ""
+        bankName: displayUser.bankName || "",
+        accountNumber: displayUser.accountNumber || "",
+        accountHolderName: displayUser.accountHolderName || "",
+        branchName: displayUser.branchName || ""
       });
       setBankModal(true);
     }
@@ -272,8 +279,8 @@ export default function AdminPremiumManage() {
   const openProfileModal = () => {
     if (selectedUser) {
       setProfileForm({
-        username: selectedUser.username || "",
-        mobileNumber: selectedUser.mobileNumber || "",
+        username: displayUser.username || "",
+        mobileNumber: displayUser.mobileNumber || "",
         password: ""
       });
       setProfileModal(true);
@@ -282,10 +289,10 @@ export default function AdminPremiumManage() {
 
   // User stats display
   const userStats = selectedUser ? [
-    { label: "Balance", value: `LKR ${parseFloat(selectedUser.balance || 0).toLocaleString()}`, color: "#3b82f6" },
-    { label: "Ads Completed", value: selectedUser.totalAdsCompleted || 0, color: "#10b981" },
-    { label: "Points", value: `${selectedUser.points || 0}/100`, color: "#8b5cf6" },
-    { label: "Status", value: selectedUser.status, color: selectedUser.status === "active" ? "#10b981" : selectedUser.status === "frozen" ? "#ef4444" : "#f59e0b" },
+    { label: "Balance", value: `LKR ${parseFloat(displayUser.balance || 0).toLocaleString()}`, color: "#3b82f6" },
+    { label: "Ads Completed", value: displayUser.totalAdsCompleted || 0, color: "#10b981" },
+    { label: "Points", value: `${displayUser.points || 0}/100`, color: "#8b5cf6" },
+    { label: "Status", value: displayUser.status, color: displayUser.status === "active" ? "#10b981" : displayUser.status === "frozen" ? "#ef4444" : "#f59e0b" },
   ] : [];
 
   // 10 Action buttons configuration
@@ -379,7 +386,7 @@ export default function AdminPremiumManage() {
           </div>
         )}
 
-        {selectedUser && !isLoadingUser ? (
+        {displayUser && !isLoadingUser ? (
           <>
             {/* User Info Header */}
             <div className="flex items-center gap-4 p-5 bg-[#10b981]/10 border border-[#10b981]/30 rounded-xl mb-6 relative">
@@ -390,22 +397,22 @@ export default function AdminPremiumManage() {
                 Change User
               </button>
               <div className="w-14 h-14 bg-gradient-to-br from-[#3b82f6] to-[#2563eb] rounded-full flex items-center justify-center text-2xl font-bold text-white uppercase">
-                {selectedUser.username?.charAt(0) || "U"}
+                {displayUser.username?.charAt(0) || "U"}
               </div>
               <div className="flex-1">
-                <h4 className="text-lg font-semibold text-white">{selectedUser.username}</h4>
-                <p className="text-[#9ca3af] text-sm">{selectedUser.email}</p>
+                <h4 className="text-lg font-semibold text-white">{displayUser.username}</h4>
+                <p className="text-[#9ca3af] text-sm">{displayUser.email}</p>
                 <div className="flex flex-wrap gap-2 mt-2">
                   <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
-                    selectedUser.status === "active" ? "bg-[#10b981]/20 text-[#10b981]" :
-                    selectedUser.status === "frozen" ? "bg-[#ef4444]/20 text-[#ef4444]" :
+                    displayUser.status === "active" ? "bg-[#10b981]/20 text-[#10b981]" :
+                    displayUser.status === "frozen" ? "bg-[#ef4444]/20 text-[#ef4444]" :
                     "bg-[#f59e0b]/20 text-[#f59e0b]"
                   }`}>
-                    <CheckCircle className="h-3 w-3" /> {selectedUser.status}
+                    <CheckCircle className="h-3 w-3" /> {displayUser.status}
                   </span>
-                  {selectedUser.mobileNumber && (
+                  {displayUser.mobileNumber && (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#6b7280]/20 text-[#9ca3af] rounded-full text-xs font-medium">
-                      <Phone className="h-3 w-3" /> {selectedUser.mobileNumber}
+                      <Phone className="h-3 w-3" /> {displayUser.mobileNumber}
                     </span>
                   )}
                 </div>
@@ -448,19 +455,19 @@ export default function AdminPremiumManage() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                   <p className="text-xs text-[#6b7280]">Bank Name</p>
-                  <p className="text-white font-medium">{selectedUser.bankName || "-"}</p>
+                  <p className="text-white font-medium">{displayUser.bankName || "-"}</p>
                 </div>
                 <div>
                   <p className="text-xs text-[#6b7280]">Account Number</p>
-                  <p className="text-white font-medium">{selectedUser.accountNumber || "-"}</p>
+                  <p className="text-white font-medium">{displayUser.accountNumber || "-"}</p>
                 </div>
                 <div>
                   <p className="text-xs text-[#6b7280]">Account Holder</p>
-                  <p className="text-white font-medium">{selectedUser.accountHolderName || "-"}</p>
+                  <p className="text-white font-medium">{displayUser.accountHolderName || "-"}</p>
                 </div>
                 <div>
                   <p className="text-xs text-[#6b7280]">Branch</p>
-                  <p className="text-white font-medium">{selectedUser.branchName || "-"}</p>
+                  <p className="text-white font-medium">{displayUser.branchName || "-"}</p>
                 </div>
               </div>
             </div>

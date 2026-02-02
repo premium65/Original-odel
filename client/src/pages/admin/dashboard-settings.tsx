@@ -17,6 +17,7 @@ export default function DashboardSettings() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const [settings, setSettings] = useState({
     welcomeText: "Hi",
@@ -45,6 +46,28 @@ export default function DashboardSettings() {
     showCoinsStat: true,
     showLightningStat: true,
   });
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const response = await fetch('/api/admin/settings/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(settings)
+      });
+
+      if (!response.ok) {
+        throw new Error('Save failed');
+      }
+
+      toast({ title: "Settings Saved!", description: "Dashboard settings have been updated." });
+    } catch (error) {
+      toast({ title: "Save Failed", description: "Could not save dashboard settings", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleVideoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -103,9 +126,6 @@ export default function DashboardSettings() {
     { id: 4, name: "Premium", color: "#8b5cf6", enabled: true },
   ]);
 
-  const handleSave = () => {
-    alert("Dashboard settings saved successfully!");
-  };
 
   return (
     <div className="space-y-6">
@@ -120,8 +140,8 @@ export default function DashboardSettings() {
             <p className="text-[#9ca3af]">Configure user dashboard appearance</p>
           </div>
         </div>
-        <button onClick={handleSave} className="px-5 py-2.5 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90">
-          <Save className="h-5 w-5" /> Save Changes
+        <button onClick={handleSave} disabled={saving} className="px-5 py-2.5 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90 disabled:opacity-50">
+          {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />} {saving ? "Saving..." : "Save Changes"}
         </button>
       </div>
 
