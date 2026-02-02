@@ -2,13 +2,14 @@
 
 ## Project Overview
 
-**ODEL ADS** (Rating-Ads Platform) is a full-stack web application where users earn money by clicking/watching ads (101.75 LKR per click). It features a comprehensive admin panel for user management, ad management, and financial operations.
+**ODEL ADS** (Rating-Ads Platform) is a full-stack web application where users earn money by clicking/watching ads (101.75 LKR per click). It features a comprehensive admin panel for user management, ad management, financial operations, and CMS capabilities.
 
 ### Quick Facts
 - **Type**: Full-stack monorepo (React + Express.js + PostgreSQL)
 - **Currency**: Sri Lankan Rupee (LKR)
 - **Reward Per Ad**: 101.75 LKR
 - **Platform**: Designed for Replit deployment, supports Windows/Docker
+- **Database Support**: PostgreSQL (primary), MongoDB (fallback), In-memory (development)
 
 ---
 
@@ -27,6 +28,7 @@
 | Lucide React | Icons |
 | Framer Motion | Animations |
 | React Hook Form + Zod | Form validation |
+| Recharts | Dashboard charts |
 
 ### Backend
 | Technology | Purpose |
@@ -34,10 +36,12 @@
 | Express.js 4.21 | Web framework |
 | Drizzle ORM 0.39 | Type-safe database queries |
 | PostgreSQL (Neon) | Primary database |
-| bcrypt | Password hashing |
+| MongoDB (Mongoose 9) | Fallback database |
+| bcrypt 6 | Password hashing |
 | express-session | Session management |
-| Multer | File uploads |
+| Multer 2 | File uploads |
 | node-cron | Scheduled tasks |
+| connect-pg-simple | PostgreSQL session store |
 
 ---
 
@@ -47,45 +51,73 @@
 Original-odel/
 ├── client/                   # Frontend React application
 │   ├── src/
-│   │   ├── App.tsx          # Main app with routing
+│   │   ├── App.tsx          # Main app with routing (60+ routes)
 │   │   ├── main.tsx         # React entry point
 │   │   ├── index.css        # Global styles
 │   │   ├── lib/             # Utilities
-│   │   │   ├── api.ts       # API client
+│   │   │   ├── api.ts       # API client with typed methods
+│   │   │   ├── auth-utils.ts # Authentication utilities
 │   │   │   ├── queryClient.ts
 │   │   │   └── utils.ts
 │   │   ├── hooks/           # Custom React hooks
-│   │   │   ├── use-auth.ts
-│   │   │   ├── use-admin-auth.ts
-│   │   │   ├── use-ads.ts
-│   │   │   └── use-*.ts
+│   │   │   ├── use-auth.ts      # User authentication
+│   │   │   ├── use-admin-auth.ts # Admin authentication
+│   │   │   ├── use-ads.ts       # Ad operations
+│   │   │   ├── use-users.ts     # User management
+│   │   │   ├── use-withdrawals.ts
+│   │   │   └── use-toast.ts
 │   │   ├── components/      # Reusable components
 │   │   │   ├── ui/          # 50+ shadcn/ui components
 │   │   │   ├── admin-layout.tsx
-│   │   │   └── admin-sidebar.tsx
+│   │   │   ├── admin-sidebar.tsx
+│   │   │   ├── layout-shell.tsx
+│   │   │   └── stats-card.tsx
 │   │   └── pages/           # Route pages
-│   │       ├── dashboard.tsx
-│   │       ├── ads-hub.tsx
-│   │       ├── withdraw.tsx
-│   │       └── admin/       # 34 admin pages
+│   │       ├── dashboard.tsx    # User dashboard
+│   │       ├── ads-hub.tsx      # Ad clicking interface
+│   │       ├── withdraw.tsx     # Withdrawal requests
+│   │       ├── rewards.tsx      # VIP rewards system
+│   │       ├── events.tsx       # Promotional events
+│   │       ├── settings.tsx     # User settings
+│   │       ├── landing.tsx      # Home page
+│   │       ├── auth.tsx         # Login/Register
+│   │       └── admin/           # 34 admin pages
+│   │           ├── dashboard.tsx
+│   │           ├── users.tsx
+│   │           ├── pending-users.tsx
+│   │           ├── admins.tsx
+│   │           ├── ads.tsx
+│   │           ├── withdrawals.tsx
+│   │           ├── deposits.tsx
+│   │           ├── premium.tsx
+│   │           ├── premium-manage.tsx
+│   │           └── ... (30+ more)
 │   └── index.html
 │
 ├── server/                   # Backend Express application
 │   ├── index-dev.ts         # Development entry (with Vite)
 │   ├── index-prod.ts        # Production entry
 │   ├── app.ts               # Express app setup
-│   ├── routes.ts            # Main API routes (84KB)
-│   ├── db.ts                # Database connection
-│   ├── storage.ts           # Data access layer (18KB)
+│   ├── routes.ts            # Main API routes
+│   ├── db.ts                # PostgreSQL connection
+│   ├── storage.ts           # Data access layer
+│   ├── memStorage.ts        # In-memory storage (fallback)
+│   ├── mongoStorage.ts      # MongoDB storage adapter
+│   ├── mongoConnection.ts   # MongoDB connection manager
+│   ├── premiumRoutes.ts     # Premium plan routes
 │   └── routes/admin/        # Modular admin routes
-│       ├── index.ts
-│       ├── auth.ts
-│       ├── users.ts
-│       ├── ads.ts
-│       └── *.ts
+│       ├── index.ts         # Route registration
+│       ├── auth.ts          # Admin authentication
+│       ├── users.ts         # User management (CRUD, approve, freeze)
+│       ├── ads.ts           # Ad management
+│       ├── dashboard.ts     # Dashboard stats
+│       ├── transactions.ts  # Transaction history
+│       ├── settings.ts      # Site settings
+│       └── premium.ts       # Premium plans
 │
 ├── shared/                   # Shared code between client/server
-│   ├── schema.ts            # Drizzle ORM schema + Zod schemas
+│   ├── schema.ts            # Drizzle ORM schema + Zod schemas (40+ tables)
+│   ├── routes.ts            # Shared route definitions
 │   └── models/
 │       └── auth.ts          # User & session tables
 │
@@ -154,17 +186,51 @@ import { users } from "@shared/schema";
   username: text,
   password: text (bcrypt hashed),
   firstName, lastName: varchar,
+  profileImageUrl: varchar,
+  mobileNumber: text,
+
+  // Role & Status
   isAdmin: boolean (default: false),
   status: text ("pending" | "active" | "frozen"),
+
+  // Balance Fields
   balance: decimal (default: "0.00"),
-
-  // Milestone tracking
-  milestoneAmount, milestoneReward: decimal,
-  destinationAmount, ongoingMilestone: decimal,
+  milestoneAmount: decimal,      // Withdrawable balance
+  milestoneReward: decimal,      // Total earnings ever
+  destinationAmount: decimal,    // 25,000 LKR first-day bonus
+  ongoingMilestone: decimal,
+  pendingAmount: decimal,
   totalAdsCompleted: integer,
+  points: integer (0-100),       // VIP tier points
 
-  // Bank details
-  bankName, accountNumber, accountHolderName: text
+  // Restriction/Promotion Fields (E-Voucher system)
+  restrictionAdsLimit: integer,
+  restrictionDeposit: decimal,
+  restrictionCommission: decimal,
+  restrictedAdsCompleted: integer,
+
+  // E-Voucher (Milestone Hold System)
+  milestoneAdsCount: integer,    // Trigger point - when to lock ads
+  adsLocked: boolean,            // If true, user cannot click ads until deposit
+  eVoucherBannerUrl: text,       // Banner image for E-Voucher popup
+
+  // E-Bonus (Instant Reward - NO locking)
+  bonusAdsCount: integer,        // Trigger point for instant bonus
+  bonusAmount: decimal,          // Amount to add to wallet
+  eBonusBannerUrl: text,         // Banner image for E-Bonus popup
+
+  // Deposit tracking
+  hasDeposit: boolean,
+
+  // Preferences
+  notificationsEnabled: boolean,
+  language: text,
+  theme: text,
+
+  // Bank Details
+  bankName, accountNumber, accountHolderName, branchName: text,
+
+  createdAt, updatedAt: timestamp
 }
 ```
 
@@ -175,9 +241,12 @@ import { users } from "@shared/schema";
   title, description: text,
   imageUrl, targetUrl: text,
   price, reward: decimal,
+  type: text ("click" default),
+  url: text,
   duration: integer (default: 30),
+  totalViews: integer,
   isActive: boolean,
-  totalViews: integer
+  createdAt: timestamp
 }
 ```
 
@@ -188,9 +257,13 @@ import { users } from "@shared/schema";
   userId: varchar (FK -> users),
   amount: decimal,
   method: text,
+  accountDetails: text,
   bankName, bankAccount: text,
+  processedBy: varchar (admin ID),
+  processedAt: timestamp,
   status: text ("pending" | "approved" | "rejected"),
-  reason: text (rejection reason)
+  reason: text (rejection reason),
+  createdAt: timestamp
 }
 ```
 
@@ -205,14 +278,61 @@ import { users } from "@shared/schema";
 }
 ```
 
+### VIP & Premium Tables
+
+**premiumPlans** (shared/schema.ts:241)
+```typescript
+{
+  id: serial,
+  name, description: text,
+  price: decimal,
+  currency: text (default: "LKR"),
+  totalAds: integer (default: 28),
+  rewardPerAd, totalReward: decimal,
+  commission: decimal,
+  welcomeBonus: decimal (default: "25000.00"),
+  features: jsonb,
+  isActive: boolean,
+  sortOrder: integer,
+  createdAt: timestamp
+}
+```
+
+**premiumPurchases** (shared/schema.ts:258)
+```typescript
+{
+  id: serial,
+  userId: varchar (FK -> users),
+  planId: integer (FK -> premiumPlans),
+  amount: decimal,
+  status: text ("pending" | "approved" | "rejected"),
+  paymentMethod, paymentReference: text,
+  processedBy: varchar,
+  processedAt, createdAt: timestamp
+}
+```
+
 ### CMS Tables
-- `slides` / `slideshow` - Home page carousel
-- `siteSettings` / `settings` - Key-value config
-- `contactInfo` / `contacts` - Contact details
-- `infoPages` - About, Terms, Privacy pages
-- `premiumPlans`, `premiumPurchases` - Premium tiers
-- `events` - Promotional events
-- `branding`, `themeSettings` - UI customization
+| Table | Purpose |
+|-------|---------|
+| `slides` / `slideshow` | Home page carousel |
+| `siteSettings` / `settings` | Key-value config |
+| `contactInfo` / `contacts` | Contact details |
+| `infoPages` | About, Terms, Privacy pages |
+| `events` | Promotional events |
+| `branding` | Site name, logo, favicon |
+| `themeSettings` | Color customization |
+| `textLabels` | Customizable text labels |
+| `footerLinks` | Footer navigation |
+| `socialLinks` | Social media links |
+| `dashboardVideo` | Dashboard video settings |
+| `homePageContent` | Home page sections |
+| `marqueeText` | Scrolling announcements |
+| `navbarItems` | Navigation items |
+| `featuresCards` | Feature display cards |
+| `statusCards` | Status display cards |
+| `clickableAds` | Clickable ad definitions |
+| `paymentMethods` | Payment method options |
 
 ---
 
@@ -228,13 +348,27 @@ GET  /api/auth/me        - Current user
 
 ### Admin Routes (require isAdmin: true)
 ```
+# Dashboard
+GET  /api/admin/dashboard/stats    - Statistics
+GET  /api/admin/dashboard/recent   - Recent activity
+
 # Users
-GET    /api/admin/users          - List all users
-GET    /api/admin/users/pending  - Pending approvals
-GET    /api/admin/users/:id      - Get user details
-PUT    /api/admin/users/:id      - Update user
-POST   /api/admin/users/:id/approve - Approve user
-POST   /api/admin/users/:id/balance - Update balance
+GET    /api/admin/users            - List all users
+GET    /api/admin/users/pending    - Pending approvals
+GET    /api/admin/users/admins     - List admin users
+GET    /api/admin/users/:id        - Get user details
+POST   /api/admin/users            - Create user/admin
+PUT    /api/admin/users/:id        - Update user
+DELETE /api/admin/users/:id        - Delete user
+POST   /api/admin/users/:id/approve    - Approve user
+POST   /api/admin/users/:id/reject     - Reject user
+POST   /api/admin/users/:id/freeze     - Freeze user
+POST   /api/admin/users/:id/balance    - Update balance
+POST   /api/admin/users/:id/restriction - Set user restriction
+DELETE /api/admin/users/:id/restriction - Remove restriction
+POST   /api/admin/users/:id/reset      - Reset user field
+POST   /api/admin/users/:id/add-value  - Add value to field
+POST   /api/admin/users/:id/milestone  - Create milestone
 
 # Ads
 GET    /api/admin/ads            - List ads
@@ -248,9 +382,17 @@ PUT    /api/admin/withdrawals/:id - Process withdrawal
 GET    /api/admin/deposits       - List deposits
 GET    /api/admin/transactions   - All transactions
 
-# Dashboard
-GET    /api/admin/dashboard/stats  - Statistics
-GET    /api/admin/dashboard/recent - Recent activity
+# Premium
+GET    /api/admin/premium/plans       - List plans
+POST   /api/admin/premium/plans       - Create plan
+PUT    /api/admin/premium/plans/:id   - Update plan
+DELETE /api/admin/premium/plans/:id   - Delete plan
+GET    /api/admin/premium/purchases   - List purchases
+PUT    /api/admin/premium/purchases/:id - Process purchase
+
+# Settings & CMS
+GET/PUT  /api/admin/settings/...  - Site settings
+POST     /api/admin/settings/upload - File upload
 ```
 
 ### User Routes
@@ -260,6 +402,9 @@ POST /api/ads/:id/click      - Record ad click
 GET  /api/withdrawals        - User's withdrawals
 POST /api/withdrawals        - Request withdrawal
 GET  /api/user/stats         - User statistics
+GET  /api/events             - Active events
+GET  /api/premium/plans      - Available plans
+POST /api/premium/purchase   - Purchase premium
 ```
 
 ---
@@ -282,6 +427,22 @@ if (user?.isAdmin) { /* admin access */ }
 
 ---
 
+## VIP Rewards System
+
+Users earn points (0-100) that unlock VIP tiers with commission bonuses:
+
+| Tier | Points | Commission Bonus |
+|------|--------|------------------|
+| Bronze | 0-19 | 1% |
+| Silver | 20-39 | 2% |
+| Gold | 40-59 | 5% |
+| Platinum | 60-79 | 8% |
+| Diamond | 80-100 | 10% |
+
+Points are managed by admins via `/api/admin/users/:id/add-value` with `field: 'points'`.
+
+---
+
 ## Component Conventions
 
 ### UI Components
@@ -294,6 +455,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 ```
 
 ### Page Structure Pattern
@@ -316,11 +479,13 @@ export default function PageName() {
 Admin pages are wrapped in `AdminLayout`:
 ```typescript
 // In App.tsx routing
-<AdminProtectedRoute component={() =>
-  <AdminLayout>
-    <AdminPageComponent />
-  </AdminLayout>
-} />
+<Route path="/admin/users">
+  {() => <AdminProtectedRoute component={() =>
+    <AdminLayout>
+      <AdminUsers />
+    </AdminLayout>
+  } />}
+</Route>
 ```
 
 ---
@@ -329,10 +494,12 @@ Admin pages are wrapped in `AdminLayout`:
 
 ### Tailwind Classes
 - **Dark theme**: Always enabled (`document.documentElement.classList.add("dark")`)
-- **Background**: `bg-[#0f1419]`, `bg-[#1a1f2e]`
-- **Text**: `text-white`, `text-[#9ca3af]`
+- **Background**: `bg-[#0f1419]`, `bg-[#1a1f2e]`, `bg-[#1a2332]`
+- **Text**: `text-white`, `text-[#9ca3af]`, `text-[#6b7280]`
 - **Accent**: `text-[#f59e0b]` (orange/amber)
-- **Borders**: `border-[#374151]`
+- **Borders**: `border-[#374151]`, `border-[#2a3a4d]`
+- **Success**: `text-[#10b981]`, `bg-[#10b981]`
+- **Error**: `text-[#ef4444]`, `bg-[#ef4444]`
 
 ### Common Patterns
 ```typescript
@@ -346,6 +513,9 @@ Admin pages are wrapped in `AdminLayout`:
 <Badge variant="success">Active</Badge>
 <Badge variant="destructive">Rejected</Badge>
 <Badge variant="warning">Pending</Badge>
+
+// Gradient backgrounds
+<div className="bg-gradient-to-br from-[#f59e0b] to-[#d97706]">
 ```
 
 ---
@@ -367,6 +537,9 @@ await api.put(`/api/admin/users/${id}`, userData);
 
 // DELETE requests
 await api.delete(`/api/admin/ads/${id}`);
+
+// Auth helper
+const me = await api.getMe();
 ```
 
 ### React Query Patterns
@@ -402,7 +575,29 @@ const mutation = useMutation({
 pending -> active (admin approval)
 active -> frozen (admin action)
 frozen -> active (admin reactivation)
+pending -> (rejected/deleted)
 ```
+
+### Balance Fields Explained
+| Field | Purpose |
+|-------|---------|
+| `balance` | Main balance field |
+| `milestoneAmount` | Withdrawable balance |
+| `milestoneReward` | Total earnings (premium treasure) |
+| `destinationAmount` | First-day bonus (normal treasure) |
+| `ongoingMilestone` | Current milestone progress |
+| `pendingAmount` | Pending deposits/earnings |
+
+### E-Voucher System (Milestone Hold)
+- Admin sets `milestoneAdsCount` on user
+- When user reaches that ad count, `adsLocked` becomes true
+- User must deposit to unlock ads
+- `eVoucherBannerUrl` shows custom popup image
+
+### E-Bonus System (Instant Reward)
+- Admin sets `bonusAdsCount` and `bonusAmount` on user
+- When user reaches that ad count, bonus is instantly credited
+- `eBonusBannerUrl` shows custom celebration popup
 
 ### Withdrawal Process
 1. User requests withdrawal (minimum balance required)
@@ -422,9 +617,10 @@ NODE_ENV=development|production
 PORT=5000
 ```
 
-Optional PostgreSQL variables:
+Optional:
 ```
 PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE
+MONGODB_URI=mongodb://...         # For MongoDB fallback
 ```
 
 ---
@@ -440,7 +636,7 @@ PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE
 ### Adding a New API Endpoint
 
 1. Add route in `server/routes.ts` or create modular route in `server/routes/admin/`
-2. Implement handler using `storage.ts` methods
+2. Implement handler using `db` queries or `storage.ts` methods
 3. Add types if needed in `shared/schema.ts`
 
 ### Adding a Database Table
@@ -453,10 +649,20 @@ PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE
 ### Modifying User Balance
 
 ```typescript
-// In storage.ts pattern
+// Via admin API
+POST /api/admin/users/:id/balance
+{ amount: "1000", type: "add" | "subtract" | "set" }
+
+// Direct in storage.ts
 await db.update(users)
   .set({ balance: newBalance })
   .where(eq(users.id, userId));
+```
+
+### Adding Points to User (VIP)
+```typescript
+POST /api/admin/users/:id/add-value
+{ field: "points", amount: 50 }  // Max 100
 ```
 
 ---
@@ -467,7 +673,7 @@ await db.update(users)
 |------|-------|
 | Database schema | `shared/schema.ts`, `shared/models/auth.ts` |
 | API routes | `server/routes.ts`, `server/routes/admin/` |
-| Data access | `server/storage.ts` |
+| Data access | `server/storage.ts`, `server/memStorage.ts` |
 | React hooks | `client/src/hooks/` |
 | UI components | `client/src/components/ui/` |
 | Page components | `client/src/pages/` |
@@ -493,12 +699,21 @@ npm run check  # Runs tsc without emit
 ### Database Debugging
 Check `server/db.ts` for connection setup. PostgreSQL connection uses Neon's serverless driver with WebSocket support.
 
+### Multi-Storage Support
+The application supports multiple storage backends:
+1. **PostgreSQL** (primary) - via Drizzle ORM
+2. **MongoDB** (fallback) - via `mongoStorage.ts`
+3. **In-Memory** (development) - via `memStorage.ts`
+
+User routes automatically check all storage backends for data.
+
 ### Common Issues
 
 1. **"DATABASE_URL not set"**: Ensure `.env` has valid PostgreSQL URL
 2. **Session issues**: Check `SESSION_SECRET` is set
 3. **CORS errors**: Backend serves frontend in production; check `server/app.ts`
 4. **Build errors**: Run `npm run check` to identify type issues
+5. **MongoDB fallback**: Check `MONGODB_URI` if PostgreSQL fails
 
 ---
 
@@ -510,6 +725,46 @@ Check `server/db.ts` for connection setup. PostgreSQL connection uses Neon's ser
 4. **Forms**: Use React Hook Form + Zod for validation
 5. **Styling**: Use Tailwind utilities, avoid inline styles
 6. **State**: Server state via TanStack Query, local state via useState
+7. **Passwords**: Never log or expose passwords, always hash with bcrypt
+
+---
+
+## Admin Features Summary
+
+### User Management
+- View all users with pagination
+- Approve/reject pending users
+- Freeze/unfreeze accounts
+- Create new users and admins
+- Manual balance adjustments
+- Set user restrictions (E-Voucher)
+- Configure E-Bonus rewards
+- Reset user fields
+- Add VIP points
+
+### Transaction Management
+- View all withdrawals
+- Approve/reject with reasons
+- View deposit history
+- Transaction logs
+- Commission tracking
+
+### Content Management
+- Home page slideshow
+- Dashboard video settings
+- Events management
+- Info pages (About, Terms, Privacy)
+- Contact information
+- Branding (logo, site name)
+- Theme colors
+- Text labels
+- Footer/social links
+
+### Ad Management
+- Create/edit/delete ads
+- Set rewards and duration
+- Toggle active status
+- View statistics
 
 ---
 
@@ -527,3 +782,16 @@ npm start        # Runs production server
 
 ### Docker/Windows
 See `WINDOWS_SETUP_COMPLETE.md` and `COMPLETE_WINDOWS_SETUP.md` for alternative deployment guides.
+
+---
+
+## Recent Features (as of commit history)
+
+1. **VIP Rewards System**: Points-based tier system (Bronze to Diamond) with commission bonuses
+2. **Dashboard Video Upload**: Admin can configure video display on user dashboard
+3. **Manual Deposit**: Admin can manually add deposits to user accounts
+4. **Create User/Admin**: Admin can create new users and admin accounts directly
+5. **Premium Manage All Users**: Enhanced premium plan management for all users
+6. **E-Voucher System**: Lock ads at milestone, require deposit to unlock
+7. **E-Bonus System**: Instant rewards at ad count milestones
+8. **Multi-Storage Support**: PostgreSQL + MongoDB + In-Memory fallback
