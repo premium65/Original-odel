@@ -14,32 +14,43 @@ router.get("/", async (req, res) => {
     // Try PostgreSQL
     if (db) {
       try {
-        const { limit = 50, offset = 0 } = req.query;
-        allUsers = await db.select().from(users).orderBy(desc(users.createdAt)).limit(Number(limit)).offset(Number(offset));
+        // Remove limit to get ALL users
+        allUsers = await db.select().from(users).orderBy(desc(users.createdAt));
+        console.log(`[ADMIN/USERS] Found ${allUsers.length} PostgreSQL users`);
       } catch (dbErr) {
         console.error("PostgreSQL error:", dbErr);
       }
     }
 
     // Add in-memory users
-    const { inMemoryUsers } = await import("../../memStorage");
-    allUsers = [...allUsers, ...inMemoryUsers];
+    try {
+      const { inMemoryUsers } = await import("../../memStorage");
+      if (inMemoryUsers && inMemoryUsers.length > 0) {
+        allUsers = [...allUsers, ...inMemoryUsers];
+        console.log(`[ADMIN/USERS] Added ${inMemoryUsers.length} in-memory users`);
+      }
+    } catch (e) {
+      // Ignore if memStorage not available
+    }
 
     // Add MongoDB users if connected
-    const { isMongoConnected } = await import("../../mongoConnection");
-    const { mongoStorage } = await import("../../mongoStorage");
-    if (isMongoConnected()) {
-      try {
+    try {
+      const { isMongoConnected } = await import("../../mongoConnection");
+      const { mongoStorage } = await import("../../mongoStorage");
+      if (isMongoConnected()) {
         const mongoUsers = await mongoStorage.getAllUsers();
         allUsers = [...allUsers, ...mongoUsers];
-      } catch (err) {
-        console.error("MongoDB error:", err);
+        console.log(`[ADMIN/USERS] Added ${mongoUsers.length} MongoDB users`);
       }
+    } catch (err) {
+      // Ignore if MongoDB not available
     }
 
     // Deduplicate by username
     const uniqueUsers = Array.from(new Map(allUsers.map(item => [item.username, item])).values());
     const usersWithoutPassword = uniqueUsers.map(({ password, ...user }: any) => user);
+
+    console.log(`[ADMIN/USERS] Returning ${usersWithoutPassword.length} total users`);
     res.json(usersWithoutPassword);
   } catch (error) {
     console.error("Get users error:", error);
