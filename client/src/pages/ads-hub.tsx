@@ -39,7 +39,8 @@ export default function AdsHubPage() {
       if (data.bonusReached) {
         setEBonusData({
           bonusAdsCount: data.bonusAdsCount,
-          bonusAmount: data.bonusAmount
+          bonusAmount: data.bonusAmount,
+          bannerUrl: data.bannerUrl
         });
         setShowEBonusPopup(true);
       }
@@ -48,7 +49,8 @@ export default function AdsHubPage() {
         setEVoucherData({
           milestoneReward: data.milestoneReward,
           milestoneAmount: data.milestoneAmount,
-          ongoingMilestone: data.ongoingMilestone
+          ongoingMilestone: data.ongoingMilestone,
+          bannerUrl: data.bannerUrl
         });
         setShowEVoucherPopup(true);
       } else {
@@ -448,11 +450,19 @@ export default function AdsHubPage() {
                 <h2 className="text-2xl font-bold text-orange-600 dark:text-orange-400">ODEL-AD'S</h2>
               </div>
 
-              {/* Celebration Icon */}
+              {/* Banner Image or Celebration Icon */}
               <div className="mb-4">
-                <div className="w-20 h-20 mx-auto bg-gradient-to-br from-orange-400 to-amber-500 rounded-full flex items-center justify-center shadow-lg">
-                  <Gift className="w-10 h-10 text-white" />
-                </div>
+                {eVoucherData?.bannerUrl ? (
+                  <img
+                    src={eVoucherData.bannerUrl}
+                    alt="E-Voucher Banner"
+                    className="w-full h-40 object-cover rounded-xl shadow-lg"
+                  />
+                ) : (
+                  <div className="w-20 h-20 mx-auto bg-gradient-to-br from-orange-400 to-amber-500 rounded-full flex items-center justify-center shadow-lg">
+                    <Gift className="w-10 h-10 text-white" />
+                  </div>
+                )}
               </div>
 
               {/* Congratulations */}
@@ -547,11 +557,19 @@ export default function AdsHubPage() {
                 <h2 className="text-2xl font-bold text-green-600 dark:text-green-400">🎉 CONGRATULATIONS! 🎉</h2>
               </div>
 
-              {/* Celebration Icon */}
+              {/* Banner Image or Celebration Icon */}
               <div className="mb-4">
-                <div className="w-20 h-20 mx-auto bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center shadow-lg animate-bounce">
-                  <Gift className="w-10 h-10 text-white" />
-                </div>
+                {eBonusData?.bannerUrl ? (
+                  <img
+                    src={eBonusData.bannerUrl}
+                    alt="E-Bonus Banner"
+                    className="w-full h-40 object-cover rounded-xl shadow-lg"
+                  />
+                ) : (
+                  <div className="w-20 h-20 mx-auto bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center shadow-lg animate-bounce">
+                    <Gift className="w-10 h-10 text-white" />
+                  </div>
+                )}
               </div>
 
               {/* Success Message */}

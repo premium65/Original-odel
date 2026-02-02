@@ -43,9 +43,10 @@ export default function AdminPremiumManage() {
     milestoneAdsCount: "",
     milestoneAmount: "",
     milestoneReward: "",
-    ongoingMilestone: ""
+    ongoingMilestone: "",
+    bannerUrl: ""
   });
-  const [eBonusForm, setEBonusForm] = useState({ bonusAdsCount: "", bonusAmount: "" });
+  const [eBonusForm, setEBonusForm] = useState({ bonusAdsCount: "", bonusAmount: "", bannerUrl: "" });
   const [addMoneyAmount, setAddMoneyAmount] = useState("");
   const [setAdsCount, setSetAdsCount] = useState("");
   const [rewardsPoints, setRewardsPoints] = useState("");
@@ -86,12 +87,13 @@ export default function AdminPremiumManage() {
       milestoneAdsCount: parseInt(data.milestoneAdsCount) || 21,
       milestoneAmount: data.milestoneAmount || "-5000",
       milestoneReward: data.milestoneReward || "2000",
-      ongoingMilestone: data.ongoingMilestone || "9000"
+      ongoingMilestone: data.ongoingMilestone || "9000",
+      bannerUrl: data.bannerUrl || undefined
     }),
     onSuccess: () => {
       toast({ title: "E-Voucher Created!", description: "Milestone set. Ads will lock when user reaches the target." });
       setEVoucherModal(false);
-      setEVoucherForm({ milestoneAdsCount: "", milestoneAmount: "", milestoneReward: "", ongoingMilestone: "" });
+      setEVoucherForm({ milestoneAdsCount: "", milestoneAmount: "", milestoneReward: "", ongoingMilestone: "", bannerUrl: "" });
       refetchUser();
     },
     onError: (error: any) => {
@@ -113,15 +115,16 @@ export default function AdminPremiumManage() {
 
   // E-BONUS Mutation - Instant reward (NO locking)
   const eBonusMutation = useMutation({
-    mutationFn: (data: { bonusAdsCount: string; bonusAmount: string }) =>
+    mutationFn: (data: { bonusAdsCount: string; bonusAmount: string; bannerUrl: string }) =>
       api.createEBonus(selectedUserId!, {
         bonusAdsCount: parseInt(data.bonusAdsCount) || 21,
-        bonusAmount: data.bonusAmount || "500"
+        bonusAmount: data.bonusAmount || "500",
+        bannerUrl: data.bannerUrl || undefined
       }),
     onSuccess: () => {
       toast({ title: "E-Bonus Set!", description: "User will receive instant bonus when they reach the ads count." });
       setEBonusModal(false);
-      setEBonusForm({ bonusAdsCount: "", bonusAmount: "" });
+      setEBonusForm({ bonusAdsCount: "", bonusAmount: "", bannerUrl: "" });
       refetchUser();
     },
     onError: (error: any) => {
@@ -485,6 +488,17 @@ export default function AdminPremiumManage() {
               placeholder="e.g. 9000 (pending)"
             />
           </div>
+          <div>
+            <label className="block text-sm text-[#9ca3af] mb-1">Banner Image URL (Optional)</label>
+            <input
+              type="text"
+              className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#f59e0b]"
+              value={eVoucherForm.bannerUrl}
+              onChange={(e) => setEVoucherForm({ ...eVoucherForm, bannerUrl: e.target.value })}
+              placeholder="https://example.com/banner.jpg"
+            />
+            <p className="text-xs text-[#6b7280] mt-1">Image shown in popup when milestone is reached</p>
+          </div>
           <button
             onClick={() => eVoucherMutation.mutate(eVoucherForm)}
             disabled={eVoucherMutation.isPending}
@@ -537,6 +551,17 @@ export default function AdminPremiumManage() {
               onChange={(e) => setEBonusForm({ ...eBonusForm, bonusAmount: e.target.value })}
               placeholder="e.g. 500"
             />
+          </div>
+          <div>
+            <label className="block text-sm text-[#9ca3af] mb-1">Banner Image URL (Optional)</label>
+            <input
+              type="text"
+              className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#10b981]"
+              value={eBonusForm.bannerUrl}
+              onChange={(e) => setEBonusForm({ ...eBonusForm, bannerUrl: e.target.value })}
+              placeholder="https://example.com/banner.jpg"
+            />
+            <p className="text-xs text-[#6b7280] mt-1">Image shown in popup when bonus is given</p>
           </div>
           <button
             onClick={() => eBonusMutation.mutate(eBonusForm)}
