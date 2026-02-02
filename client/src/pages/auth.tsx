@@ -189,7 +189,7 @@ export default function AuthPage({ defaultMode = "login" }: AuthPageProps) {
                       placeholder="Choose a username"
                       value={formData.username}
                       onChange={(e) => handleInputChange("username", e.target.value)}
-                      className="h-11 border-gray-300 focus:border-gray-900 text-sm text-gray-900 bg-white"
+                      className="h-11 border-gray-300 focus:border-gray-900 text-sm !text-gray-900 !bg-white"
                       data-testid="input-username"
                     />
                   </div>
@@ -200,7 +200,7 @@ export default function AuthPage({ defaultMode = "login" }: AuthPageProps) {
                         placeholder="John"
                         value={formData.firstName}
                         onChange={(e) => handleInputChange("firstName", e.target.value)}
-                        className="h-11 border-gray-300 focus:border-gray-900 text-sm text-gray-900 bg-white"
+                        className="h-11 border-gray-300 focus:border-gray-900 text-sm !text-gray-900 !bg-white"
                         data-testid="input-first-name"
                       />
                     </div>
@@ -210,7 +210,7 @@ export default function AuthPage({ defaultMode = "login" }: AuthPageProps) {
                         placeholder="Last Name"
                         value={formData.lastName}
                         onChange={(e) => handleInputChange("lastName", e.target.value)}
-                        className="h-11 border-gray-300 focus:border-gray-900 text-sm text-gray-900 bg-white"
+                        className="h-11 border-gray-300 focus:border-gray-900 text-sm !text-gray-900 !bg-white"
                         data-testid="input-last-name"
                       />
                     </div>
@@ -225,7 +225,7 @@ export default function AuthPage({ defaultMode = "login" }: AuthPageProps) {
                   placeholder="Email Address"
                   value={formData.email}
                   onChange={(e) => handleInputChange("email", e.target.value)}
-                  className="h-11 border-gray-300 focus:border-gray-900 text-sm text-gray-900 bg-white"
+                  className="h-11 border-gray-300 focus:border-gray-900 text-sm !text-gray-900 !bg-white"
                   data-testid="input-email"
                 />
               </div>
@@ -238,7 +238,7 @@ export default function AuthPage({ defaultMode = "login" }: AuthPageProps) {
                     placeholder="Password"
                     value={formData.password}
                     onChange={(e) => handleInputChange("password", e.target.value)}
-                    className="h-11 border-gray-300 focus:border-gray-900 text-sm pr-10 text-gray-900 bg-white"
+                    className="h-11 border-gray-300 focus:border-gray-900 text-sm pr-10 !text-gray-900 !bg-white"
                     data-testid="input-password"
                   />
                   <button
