@@ -1,9 +1,10 @@
-import { useState } from "react";
-import { 
-  LayoutDashboard, Save, Upload, Video, Type, Target, 
-  Sparkles, Monitor, DollarSign, Coins, Zap, Plus, 
-  Trash2, GripVertical, Eye
+import { useState, useRef } from "react";
+import {
+  LayoutDashboard, Save, Upload, Video, Type, Target,
+  Sparkles, Monitor, DollarSign, Coins, Zap, Plus,
+  Trash2, GripVertical, Eye, Loader2
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface TabItem {
   id: string;
@@ -13,6 +14,10 @@ interface TabItem {
 }
 
 export default function DashboardSettings() {
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
   const [settings, setSettings] = useState({
     welcomeText: "Hi",
     showUserName: true,
@@ -40,6 +45,47 @@ export default function DashboardSettings() {
     showCoinsStat: true,
     showLightningStat: true,
   });
+
+  const handleVideoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Check file type
+    if (!file.type.startsWith('video/')) {
+      toast({ title: "Invalid file type", description: "Please select a video file", variant: "destructive" });
+      return;
+    }
+
+    // Check file size (max 100MB)
+    if (file.size > 100 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Maximum file size is 100MB", variant: "destructive" });
+      return;
+    }
+
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('video', file);
+
+    try {
+      const response = await fetch('/api/admin/settings/upload-video', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error('Upload failed');
+      }
+
+      const data = await response.json();
+      setSettings({ ...settings, videoUrl: data.videoUrl });
+      toast({ title: "Video Uploaded!", description: "Dashboard video has been updated." });
+    } catch (error) {
+      toast({ title: "Upload Failed", description: "Could not upload video", variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const [tabs, setTabs] = useState<TabItem[]>([
     { id: "exclusives", name: "Exclusives", enabled: true, order: 1 },
@@ -225,8 +271,59 @@ export default function DashboardSettings() {
                   <div className="w-11 h-6 bg-[#2a3a4d] peer-checked:bg-[#10b981] rounded-full peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
                 </label>
               </div>
+              {/* Video Upload */}
               <div>
-                <label className="block text-sm text-[#9ca3af] mb-2">Video URL</label>
+                <label className="block text-sm text-[#9ca3af] mb-2">Upload Video</label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="video/*"
+                  onChange={handleVideoUpload}
+                  className="hidden"
+                />
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className="flex-1 px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] border-dashed rounded-xl text-white flex items-center justify-center gap-2 hover:border-[#ef4444] transition-colors disabled:opacity-50"
+                  >
+                    {uploading ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <span>Uploading...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-5 w-5 text-[#ef4444]" />
+                        <span>Upload Video File</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                <p className="text-xs text-[#6b7280] mt-2">Max file size: 100MB. Supported formats: MP4, WebM, MOV</p>
+              </div>
+
+              {/* Current Video Preview */}
+              {settings.videoUrl && (
+                <div className="bg-[#0f1419] rounded-xl p-4 border border-[#2a3a4d]">
+                  <p className="text-[#6b7280] text-xs mb-2">Current Video:</p>
+                  <video
+                    src={settings.videoUrl}
+                    className="w-full h-32 object-cover rounded-lg"
+                    controls
+                  />
+                  <button
+                    onClick={() => setSettings({...settings, videoUrl: ""})}
+                    className="mt-2 text-xs text-[#ef4444] hover:underline"
+                  >
+                    Remove Video
+                  </button>
+                </div>
+              )}
+
+              {/* Or use URL */}
+              <div>
+                <label className="block text-sm text-[#9ca3af] mb-2">Or enter Video URL</label>
                 <input type="url" value={settings.videoUrl} onChange={(e) => setSettings({...settings, videoUrl: e.target.value})} placeholder="https://youtube.com/watch?v=..." className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#ef4444]" />
               </div>
               <div className="grid grid-cols-2 gap-4">

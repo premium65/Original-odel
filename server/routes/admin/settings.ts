@@ -39,6 +39,26 @@ router.put("/config", async (req, res) => {
   }
 });
 
+// Upload dashboard video
+router.post("/upload-video", upload.single("video"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No video file provided" });
+    }
+
+    const videoUrl = `/uploads/${req.file.filename}`;
+
+    // Save video URL to settings
+    await db.insert(settings).values({ key: "dashboardVideoUrl", value: videoUrl })
+      .onConflictDoUpdate({ target: settings.key, set: { value: videoUrl, updatedAt: new Date() } });
+
+    res.json({ success: true, videoUrl });
+  } catch (error) {
+    console.error("Video upload error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 // ===== SITE CONTENT =====
 router.get("/content/:page", async (req, res) => {
   try {
