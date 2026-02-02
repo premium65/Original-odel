@@ -1873,7 +1873,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.params.userId;
       const { field, amount } = req.body;
 
-      if (!amount || parseFloat(amount) <= 0) {
+      if (!amount || isNaN(parseFloat(amount))) {
         return res.status(400).send("Invalid amount");
       }
 
