@@ -45,7 +45,7 @@ export default function AdminPremiumManage() {
     milestoneReward: "",
     ongoingMilestone: ""
   });
-  const [eBonusForm, setEBonusForm] = useState({ adsCount: "", amount: "" });
+  const [eBonusForm, setEBonusForm] = useState({ bonusAdsCount: "", bonusAmount: "" });
   const [addMoneyAmount, setAddMoneyAmount] = useState("");
   const [setAdsCount, setSetAdsCount] = useState("");
   const [rewardsPoints, setRewardsPoints] = useState("");
@@ -111,22 +111,21 @@ export default function AdminPremiumManage() {
     }
   });
 
-  // E-BONUS Mutation - Instant bonus without locking
+  // E-BONUS Mutation - Instant reward (NO locking)
   const eBonusMutation = useMutation({
-    mutationFn: async (data: { adsCount: string; amount: string }) => {
-      // Add to totalAdsCompleted and balance
-      await api.addUserValue(selectedUserId!, "totalAdsCompleted", data.adsCount);
-      await api.addUserValue(selectedUserId!, "balance", data.amount);
-      return data;
-    },
-    onSuccess: (data) => {
-      toast({ title: "E-Bonus Applied!", description: `Added ${data.adsCount} ads and LKR ${data.amount} to balance.` });
+    mutationFn: (data: { bonusAdsCount: string; bonusAmount: string }) =>
+      api.createEBonus(selectedUserId!, {
+        bonusAdsCount: parseInt(data.bonusAdsCount) || 21,
+        bonusAmount: data.bonusAmount || "500"
+      }),
+    onSuccess: () => {
+      toast({ title: "E-Bonus Set!", description: "User will receive instant bonus when they reach the ads count." });
       setEBonusModal(false);
-      setEBonusForm({ adsCount: "", amount: "" });
+      setEBonusForm({ bonusAdsCount: "", bonusAmount: "" });
       refetchUser();
     },
     onError: (error: any) => {
-      toast({ title: "Failed to apply E-Bonus", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to set E-Bonus", description: error.message, variant: "destructive" });
     }
   });
 
@@ -512,29 +511,30 @@ export default function AdminPremiumManage() {
         </div>
       </Modal>
 
-      {/* E-BONUS Modal - Instant bonus */}
-      <Modal isOpen={eBonusModal} onClose={() => setEBonusModal(false)} title="Apply E-BONUS (Instant)">
+      {/* E-BONUS Modal - Instant Reward (NO locking) */}
+      <Modal isOpen={eBonusModal} onClose={() => setEBonusModal(false)} title="Set E-BONUS (Instant Reward)">
         <div className="space-y-4">
           <div className="bg-[#10b981]/10 border border-[#10b981]/30 rounded-lg p-3 text-sm text-[#10b981]">
-            Instantly add ads completed and balance. No locking or deposit required.
+            When user reaches the specified ads count, they receive an instant bonus added to their wallet. NO locking, NO deposit required - just a reward!
           </div>
           <div>
-            <label className="block text-sm text-[#9ca3af] mb-1">Bonus Ads to Add</label>
+            <label className="block text-sm text-[#9ca3af] mb-1">Trigger at Ads Count</label>
             <input
               type="number"
               className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#10b981]"
-              value={eBonusForm.adsCount}
-              onChange={(e) => setEBonusForm({ ...eBonusForm, adsCount: e.target.value })}
-              placeholder="e.g. 5"
+              value={eBonusForm.bonusAdsCount}
+              onChange={(e) => setEBonusForm({ ...eBonusForm, bonusAdsCount: e.target.value })}
+              placeholder="e.g. 21 (when to give bonus)"
             />
+            <p className="text-xs text-[#6b7280] mt-1">Current ads: {selectedUser?.totalAdsCompleted || 0}</p>
           </div>
           <div>
             <label className="block text-sm text-[#9ca3af] mb-1">Bonus Amount (LKR)</label>
             <input
               type="text"
               className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#10b981]"
-              value={eBonusForm.amount}
-              onChange={(e) => setEBonusForm({ ...eBonusForm, amount: e.target.value })}
+              value={eBonusForm.bonusAmount}
+              onChange={(e) => setEBonusForm({ ...eBonusForm, bonusAmount: e.target.value })}
               placeholder="e.g. 500"
             />
           </div>
@@ -544,7 +544,7 @@ export default function AdminPremiumManage() {
             className="w-full py-3 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {eBonusMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-            Apply E-Bonus
+            Set E-Bonus
           </button>
         </div>
       </Modal>

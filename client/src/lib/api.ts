@@ -49,6 +49,10 @@ export const api = {
     fetchAPI(`/admin/users/${id}/evoucher`, { method: "POST", body: JSON.stringify(data) }),
   unlockEVoucher: (id: number | string) => fetchAPI(`/admin/users/${id}/evoucher-unlock`, { method: "POST" }),
 
+  // E-Bonus (Instant Reward - NO locking)
+  createEBonus: (id: number | string, data: { bonusAdsCount: number; bonusAmount: string }) =>
+    fetchAPI(`/admin/users/${id}/ebonus`, { method: "POST", body: JSON.stringify(data) }),
+
   // Transactions
   getTransactions: () => fetchAPI("/admin/transactions"),
   getWithdrawals: () => fetchAPI("/admin/transactions/withdrawals"),

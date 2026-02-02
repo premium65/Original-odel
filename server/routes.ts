@@ -1019,7 +1019,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.resetDestinationAmount(req.session.userId);
         }
 
-        // Check if E-Voucher milestone is reached
+        // Check if E-Voucher milestone is reached (LOCKS ads)
         if (updatedUser?.milestoneAdsCount && newAdsCount === updatedUser.milestoneAdsCount && !updatedUser.adsLocked) {
           // Lock ads - user must deposit to continue
           await storage.updateUser(req.session.userId, { adsLocked: true });
@@ -1035,6 +1035,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
             milestoneReward: updatedUser.milestoneReward,
             ongoingMilestone: updatedUser.ongoingMilestone
           });
+        }
+
+        // Check if E-Bonus is triggered (NO locking - instant reward)
+        if (updatedUser?.bonusAdsCount && newAdsCount === updatedUser.bonusAdsCount) {
+          // Add bonus to destinationAmount (wallet) - NO locking!
+          const bonusAmount = parseFloat(updatedUser.bonusAmount || "0");
+          if (bonusAmount > 0) {
+            const currentDestination = parseFloat(updatedUser.destinationAmount || "0");
+            await storage.updateUser(req.session.userId, {
+              destinationAmount: (currentDestination + bonusAmount).toFixed(2),
+              bonusAdsCount: null, // Clear so it doesn't trigger again
+              bonusAmount: null
+            });
+
+            return res.json({
+              success: true,
+              click,
+              earnings: ad.price,
+              restricted: false,
+              bonusReached: true,
+              bonusAdsCount: updatedUser.bonusAdsCount,
+              bonusAmount: bonusAmount
+            });
+          }
         }
 
         res.json({ success: true, click, earnings: ad.price, restricted: false });
@@ -2135,6 +2159,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("E-Voucher unlock error:", error);
       res.status(500).json({ error: error.message || "Failed to unlock E-Voucher" });
+    }
+  });
+
+  // Create E-Bonus (Instant Reward - NO locking)
+  app.post("/api/admin/users/:userId/ebonus", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).send("Not authenticated");
+      }
+
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || !currentUser.isAdmin) {
+        return res.status(403).send("Admin access required");
+      }
+
+      const userId = req.params.userId;
+      const { bonusAdsCount, bonusAmount } = req.body;
+
+      if (!bonusAdsCount || bonusAdsCount <= 0) {
+        return res.status(400).json({ error: "Invalid bonus ads count" });
+      }
+
+      if (!bonusAmount || parseFloat(bonusAmount) <= 0) {
+        return res.status(400).json({ error: "Invalid bonus amount" });
+      }
+
+      // Set E-Bonus trigger (NO locking - just instant reward)
+      const updatedUser = await storage.updateUser(userId, {
+        bonusAdsCount: parseInt(bonusAdsCount),
+        bonusAmount: bonusAmount,
+        // DO NOT set adsLocked - E-Bonus doesn't lock
+      });
+
+      if (!updatedUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const { password: _, ...userWithoutPassword } = updatedUser;
+      res.json(userWithoutPassword);
+    } catch (error: any) {
+      console.error("Create E-Bonus error:", error);
+      res.status(500).json({ error: error.message || "Failed to create E-Bonus" });
     }
   });
 

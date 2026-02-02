@@ -20,6 +20,8 @@ export default function AdsHubPage() {
   const [adState, setAdState] = useState<AdState>("ready");
   const [showEVoucherPopup, setShowEVoucherPopup] = useState(false);
   const [eVoucherData, setEVoucherData] = useState<any>(null);
+  const [showEBonusPopup, setShowEBonusPopup] = useState(false);
+  const [eBonusData, setEBonusData] = useState<any>(null);
 
   const { data: ads = [], isLoading: adsLoading } = useQuery<Ad[]>({
     queryKey: ["/api/ads"],
@@ -33,8 +35,16 @@ export default function AdsHubPage() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
 
-      // Check if milestone was reached
-      if (data.milestoneReached) {
+      // Check if E-Bonus was reached (instant reward - NO locking)
+      if (data.bonusReached) {
+        setEBonusData({
+          bonusAdsCount: data.bonusAdsCount,
+          bonusAmount: data.bonusAmount
+        });
+        setShowEBonusPopup(true);
+      }
+      // Check if E-Voucher milestone was reached (ads will be locked)
+      else if (data.milestoneReached) {
         setEVoucherData({
           milestoneReward: data.milestoneReward,
           milestoneAmount: data.milestoneAmount,
@@ -511,6 +521,73 @@ export default function AdsHubPage() {
                 className="w-full mt-4 text-zinc-500 hover:text-zinc-700"
               >
                 Close
+              </Button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* E-Bonus Celebration Popup (Instant Reward - NO locking) */}
+      <AnimatePresence>
+        {showEBonusPopup && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-gradient-to-b from-green-50 to-emerald-100 dark:from-zinc-900 dark:to-zinc-800 rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl border-2 border-green-400"
+            >
+              {/* Header */}
+              <div className="mb-4">
+                <h2 className="text-2xl font-bold text-green-600 dark:text-green-400">🎉 CONGRATULATIONS! 🎉</h2>
+              </div>
+
+              {/* Celebration Icon */}
+              <div className="mb-4">
+                <div className="w-20 h-20 mx-auto bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center shadow-lg animate-bounce">
+                  <Gift className="w-10 h-10 text-white" />
+                </div>
+              </div>
+
+              {/* Success Message */}
+              <h3 className="text-xl font-bold text-zinc-800 dark:text-white mb-2">
+                You completed {eBonusData?.bonusAdsCount || 0} ads successfully!
+              </h3>
+
+              {/* Bonus Amount */}
+              <div className="bg-white dark:bg-zinc-800 rounded-xl p-4 mb-4 shadow-inner">
+                <div className="flex items-center justify-center gap-2 text-green-600 dark:text-green-400 mb-2">
+                  <CheckCircle className="w-5 h-5" />
+                  <span className="font-semibold">E-Bonus Reward</span>
+                </div>
+
+                <div className="text-center">
+                  <p className="text-3xl font-bold text-green-600 dark:text-green-400">
+                    +LKR {parseFloat(eBonusData?.bonusAmount || "0").toLocaleString()}
+                  </p>
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+                    Added to your wallet!
+                  </p>
+                </div>
+              </div>
+
+              {/* Continue Message */}
+              <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
+                Keep clicking ads to earn more rewards! 💰
+              </p>
+
+              {/* Close Button */}
+              <Button
+                onClick={() => setShowEBonusPopup(false)}
+                className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
+              >
+                <CheckCircle className="w-4 h-4 mr-2" />
+                Continue Earning
               </Button>
             </motion.div>
           </motion.div>
