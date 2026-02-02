@@ -59,6 +59,8 @@ export const api = {
   getDeposits: () => fetchAPI("/admin/transactions/deposits"),
   updateWithdrawal: (id: number, data: any) => fetchAPI(`/admin/transactions/withdrawals/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   updateDeposit: (id: number, data: any) => fetchAPI(`/admin/transactions/deposits/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  createManualDeposit: (data: { userId: string; amount: string; description?: string }) =>
+    fetchAPI("/admin/transactions/deposits/manual", { method: "POST", body: JSON.stringify(data) }),
 
   // Ads
   getAds: () => fetchAPI("/admin/ads"),
