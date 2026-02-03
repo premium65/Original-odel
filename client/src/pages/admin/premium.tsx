@@ -1,7 +1,13 @@
-import { useState } from "react";
-import { Gem, Save, Plus, Trash2, Crown, Star, Zap } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Gem, Save, Plus, Trash2, Crown, Star, Zap, Loader2 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Premium() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
   const [plans, setPlans] = useState([
     { id: 1, name: "Bronze", price: 1000, duration: 30, benefits: ["2x Ad Rewards", "Priority Support"], color: "#cd7f32", enabled: true },
     { id: 2, name: "Silver", price: 2500, duration: 30, benefits: ["3x Ad Rewards", "Priority Support", "Exclusive Ads"], color: "#c0c0c0", enabled: true },
@@ -15,11 +21,57 @@ export default function Premium() {
     showBadges: true,
   });
 
-  const handleSave = () => alert("Premium settings saved!");
+  const { data: contentData, isLoading } = useQuery({
+    queryKey: ["admin-content", "premium-settings"],
+    queryFn: () => api.getContent("premium-settings"),
+  });
+
+  useEffect(() => {
+    if (contentData && contentData.length > 0) {
+      try {
+        const content = contentData[0];
+        if (content.metadata) {
+          const parsed = typeof content.metadata === 'string' ? JSON.parse(content.metadata) : content.metadata;
+          if (parsed.settings) setSettings(prev => ({ ...prev, ...parsed.settings }));
+          if (parsed.plans) setPlans(parsed.plans);
+        }
+      } catch (e) {
+        console.error("Failed to parse premium settings:", e);
+      }
+    }
+  }, [contentData]);
+
+  const mutation = useMutation({
+    mutationFn: (data: any) => api.updateContent("premium-settings", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-content", "premium-settings"] });
+      toast({ title: "Premium settings saved!" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save premium settings", variant: "destructive" });
+    },
+  });
+
+  const handleSave = () => {
+    mutation.mutate({
+      section: "main",
+      title: "Premium Settings",
+      content: "",
+      metadata: JSON.stringify({ settings, plans }),
+    });
+  };
 
   const addPlan = () => {
     setPlans([...plans, { id: Date.now(), name: "New Plan", price: 1000, duration: 30, benefits: ["Benefit 1"], color: "#6b7280", enabled: true }]);
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-[#f59e0b]" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -37,8 +89,8 @@ export default function Premium() {
           <button onClick={addPlan} className="px-5 py-2.5 bg-[#3b82f6] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90">
             <Plus className="h-5 w-5" /> Add Plan
           </button>
-          <button onClick={handleSave} className="px-5 py-2.5 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90">
-            <Save className="h-5 w-5" /> Save
+          <button onClick={handleSave} disabled={mutation.isPending} className="px-5 py-2.5 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90 disabled:opacity-50">
+            {mutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />} Save
           </button>
         </div>
       </div>

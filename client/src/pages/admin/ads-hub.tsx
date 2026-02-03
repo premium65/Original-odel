@@ -1,5 +1,8 @@
-import { useState } from "react";
-import { MousePointerClick, Save, Plus, Trash2, Edit, Eye, Clock, DollarSign, Link, GripVertical, Target, Zap, ExternalLink, Play } from "lucide-react";
+import { useState, useEffect } from "react";
+import { MousePointerClick, Save, Plus, Trash2, Edit, Eye, Clock, DollarSign, Link, GripVertical, Target, Zap, ExternalLink, Play, Loader2 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 interface ClickableAd {
   id: number;
@@ -13,6 +16,9 @@ interface ClickableAd {
 }
 
 export default function AdsHub() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
   const [pageSettings, setPageSettings] = useState({
     title: "Ad's Hub",
     headerTitle: "Click Ads to Earn Money",
@@ -33,7 +39,45 @@ export default function AdsHub() {
 
   const [ads, setAds] = useState<ClickableAd[]>([]);
 
-  const handleSave = () => alert("Ads Hub settings saved!");
+  const { data: contentData, isLoading } = useQuery({
+    queryKey: ["admin-content", "ads-hub-settings"],
+    queryFn: () => api.getContent("ads-hub-settings"),
+  });
+
+  useEffect(() => {
+    if (contentData && contentData.length > 0) {
+      try {
+        const content = contentData[0];
+        if (content.metadata) {
+          const parsed = typeof content.metadata === 'string' ? JSON.parse(content.metadata) : content.metadata;
+          if (parsed.pageSettings) setPageSettings(prev => ({ ...prev, ...parsed.pageSettings }));
+          if (parsed.ads) setAds(parsed.ads);
+        }
+      } catch (e) {
+        console.error("Failed to parse ads hub settings:", e);
+      }
+    }
+  }, [contentData]);
+
+  const mutation = useMutation({
+    mutationFn: (data: any) => api.updateContent("ads-hub-settings", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-content", "ads-hub-settings"] });
+      toast({ title: "Ads Hub settings saved!" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save settings", variant: "destructive" });
+    },
+  });
+
+  const handleSave = () => {
+    mutation.mutate({
+      section: "main",
+      title: "Ads Hub Settings",
+      content: "",
+      metadata: JSON.stringify({ pageSettings, ads }),
+    });
+  };
 
   const addAd = () => {
     const newOrder = ads.length + 1;
@@ -50,6 +94,14 @@ export default function AdsHub() {
   };
 
   const enabledAds = ads.filter(ad => ad.enabled);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-[#f97316]" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -68,8 +120,8 @@ export default function AdsHub() {
           <button onClick={addAd} className="px-5 py-2.5 bg-[#3b82f6] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90">
             <Plus className="h-5 w-5" /> Add Ad
           </button>
-          <button onClick={handleSave} className="px-5 py-2.5 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90">
-            <Save className="h-5 w-5" /> Save Changes
+          <button onClick={handleSave} disabled={mutation.isPending} className="px-5 py-2.5 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90 disabled:opacity-50">
+            {mutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />} Save Changes
           </button>
         </div>
       </div>

@@ -1,10 +1,16 @@
-import { useState } from "react";
-import { 
+import { useState, useEffect } from "react";
+import {
   BarChart3, Save, DollarSign, Target, Gift, Clock, CheckCircle, Lock,
-  TrendingUp, Wallet
+  TrendingUp, Wallet, Loader2
 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AdminFeaturesPage() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
   // Feature Cards Configuration
   const [cards, setCards] = useState({
     destinationAmount: {
@@ -62,6 +68,47 @@ export default function AdminFeaturesPage() {
     currency: "LKR"
   });
 
+  const { data: contentData, isLoading } = useQuery({
+    queryKey: ["admin-content", "features-page"],
+    queryFn: () => api.getContent("features-page"),
+  });
+
+  useEffect(() => {
+    if (contentData && contentData.length > 0) {
+      try {
+        const content = contentData[0];
+        if (content.metadata) {
+          const parsed = typeof content.metadata === 'string' ? JSON.parse(content.metadata) : content.metadata;
+          if (parsed.cards) setCards(prev => ({ ...prev, ...parsed.cards }));
+          if (parsed.withdrawal) setWithdrawal(prev => ({ ...prev, ...parsed.withdrawal }));
+          if (parsed.firstDayBonus) setFirstDayBonus(prev => ({ ...prev, ...parsed.firstDayBonus }));
+        }
+      } catch (e) {
+        console.error("Failed to parse features page settings:", e);
+      }
+    }
+  }, [contentData]);
+
+  const mutation = useMutation({
+    mutationFn: (data: any) => api.updateContent("features-page", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-content", "features-page"] });
+      toast({ title: "Features page settings saved!" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save settings", variant: "destructive" });
+    },
+  });
+
+  const handleSave = () => {
+    mutation.mutate({
+      section: "main",
+      title: "Features Page Settings",
+      content: "",
+      metadata: JSON.stringify({ cards, withdrawal, firstDayBonus }),
+    });
+  };
+
   const updateCard = (cardKey: string, field: string, value: any) => {
     setCards({
       ...cards,
@@ -71,6 +118,14 @@ export default function AdminFeaturesPage() {
       }
     });
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-[#ec4899]" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -85,8 +140,8 @@ export default function AdminFeaturesPage() {
             <p className="text-[#9ca3af]">Configure the user features/balances page</p>
           </div>
         </div>
-        <button className="px-5 py-2.5 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90">
-          <Save className="h-5 w-5" /> Save Changes
+        <button onClick={handleSave} disabled={mutation.isPending} className="px-5 py-2.5 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90 disabled:opacity-50">
+          {mutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />} Save Changes
         </button>
       </div>
 

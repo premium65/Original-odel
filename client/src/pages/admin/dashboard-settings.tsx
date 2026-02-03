@@ -1,10 +1,12 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   LayoutDashboard, Save, Upload, Video, Type, Target,
   Sparkles, Monitor, DollarSign, Coins, Zap, Plus,
   Trash2, GripVertical, Eye, Loader2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
 
 interface TabItem {
   id: string;
@@ -15,6 +17,7 @@ interface TabItem {
 
 export default function DashboardSettings() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -103,9 +106,54 @@ export default function DashboardSettings() {
     { id: 4, name: "Premium", color: "#8b5cf6", enabled: true },
   ]);
 
+  const { data: contentData, isLoading } = useQuery({
+    queryKey: ["admin-content", "dashboard-settings"],
+    queryFn: () => api.getContent("dashboard-settings"),
+  });
+
+  useEffect(() => {
+    if (contentData && contentData.length > 0) {
+      try {
+        const content = contentData[0];
+        if (content.metadata) {
+          const parsed = typeof content.metadata === 'string' ? JSON.parse(content.metadata) : content.metadata;
+          if (parsed.settings) setSettings(prev => ({ ...prev, ...parsed.settings }));
+          if (parsed.tabs) setTabs(parsed.tabs);
+          if (parsed.badges) setBadges(parsed.badges);
+        }
+      } catch (e) {
+        console.error("Failed to parse dashboard settings:", e);
+      }
+    }
+  }, [contentData]);
+
+  const mutation = useMutation({
+    mutationFn: (data: any) => api.updateContent("dashboard-settings", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-content", "dashboard-settings"] });
+      toast({ title: "Dashboard settings saved!" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save settings", variant: "destructive" });
+    },
+  });
+
   const handleSave = () => {
-    alert("Dashboard settings saved successfully!");
+    mutation.mutate({
+      section: "main",
+      title: "Dashboard Settings",
+      content: "",
+      metadata: JSON.stringify({ settings, tabs, badges }),
+    });
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-[#f59e0b]" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -120,8 +168,8 @@ export default function DashboardSettings() {
             <p className="text-[#9ca3af]">Configure user dashboard appearance</p>
           </div>
         </div>
-        <button onClick={handleSave} className="px-5 py-2.5 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90">
-          <Save className="h-5 w-5" /> Save Changes
+        <button onClick={handleSave} disabled={mutation.isPending} className="px-5 py-2.5 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90 disabled:opacity-50">
+          {mutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />} Save Changes
         </button>
       </div>
 
