@@ -995,14 +995,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } else {
         // Normal ad click (no restriction)
+        // Use reward if available, otherwise fall back to price
+        const earnings = ad.reward || ad.price;
+
         // Record click
-        const click = await storage.recordAdClick(req.session.userId, adId, ad.price);
+        const click = await storage.recordAdClick(req.session.userId, adId, earnings);
 
         // Add commission to milestone reward (total ad earnings tracker)
-        await storage.addMilestoneReward(req.session.userId, ad.price);
+        await storage.addMilestoneReward(req.session.userId, earnings);
 
         // Add commission to milestone amount (withdrawable balance)
-        await storage.addMilestoneAmount(req.session.userId, ad.price);
+        await storage.addMilestoneAmount(req.session.userId, earnings);
 
         // Increment total ads completed counter
         await storage.incrementAdsCompleted(req.session.userId);
@@ -1027,7 +1030,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.json({
             success: true,
             click,
-            earnings: ad.price,
+            earnings,
             restricted: false,
             milestoneReached: true,
             milestoneAdsCount: updatedUser.milestoneAdsCount,
@@ -1055,7 +1058,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return res.json({
               success: true,
               click,
-              earnings: ad.price,
+              earnings,
               restricted: false,
               bonusReached: true,
               bonusAdsCount: updatedUser.bonusAdsCount,
@@ -1065,7 +1068,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
-        res.json({ success: true, click, earnings: ad.price, restricted: false });
+        res.json({ success: true, click, earnings, restricted: false });
       }
     } catch (error) {
       console.error("Record ad click error:", error);
@@ -1184,14 +1187,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } else {
         // Normal ad click (no restriction)
+        // Use reward if available, otherwise fall back to price
+        const earnings = ad.reward || ad.price;
+
         // Record click
-        const click = await storage.recordAdClick(req.session.userId, parseInt(adId), ad.price);
+        const click = await storage.recordAdClick(req.session.userId, parseInt(adId), earnings);
 
         // Add commission to milestone reward (total ad earnings tracker)
-        await storage.addMilestoneReward(req.session.userId, ad.price);
+        await storage.addMilestoneReward(req.session.userId, earnings);
 
         // Add commission to milestone amount (withdrawable balance)
-        await storage.addMilestoneAmount(req.session.userId, ad.price);
+        await storage.addMilestoneAmount(req.session.userId, earnings);
 
         // Increment total ads completed counter
         await storage.incrementAdsCompleted(req.session.userId);
@@ -1204,7 +1210,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.resetDestinationAmount(req.session.userId);
         }
 
-        res.json({ success: true, click, earnings: ad.price, restricted: false });
+        res.json({ success: true, click, earnings, restricted: false });
       }
     } catch (error) {
       console.error("Record ad click error:", error);
