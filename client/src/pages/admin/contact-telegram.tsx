@@ -19,7 +19,7 @@ export default function ContactTelegram() {
 
   const { data: contacts, isLoading } = useQuery({
     queryKey: ["admin-contacts"],
-    queryFn: api.getContacts,
+    queryFn: () => api.getContacts(),
   });
 
   useEffect(() => {

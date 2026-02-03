@@ -98,4 +98,7 @@ export const api = {
   getStats: () => fetchAPI("/admin/dashboard/stats"),
   getRecent: () => fetchAPI("/admin/dashboard/recent"),
   getChart: () => fetchAPI("/admin/dashboard/chart"),
+
+  // Premium
+  getPremiumPurchases: () => fetchAPI("/admin/premium/purchases"),
 };
