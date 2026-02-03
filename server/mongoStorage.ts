@@ -70,7 +70,7 @@ export class MongoStorage {
   async updateAd(id: number, ad: any): Promise<Ad | undefined> { return undefined; }
   async deleteAd(id: number): Promise<boolean> { return false; }
 
-  async recordAdClick(userId: string, adId: number): Promise<AdClick> { throw new Error("Not implemented"); }
+  async recordAdClick(userId: string, adId: number, earnedAmount: string): Promise<AdClick> { throw new Error("Not implemented"); }
   async getUserAdClicks(userId: string): Promise<AdClick[]> { return []; }
   async getAllAdClicks(): Promise<AdClick[]> { return []; }
 
