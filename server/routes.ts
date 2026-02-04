@@ -612,7 +612,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
-        const commission = user.restrictionCommission || ad.price;
+        const commission = parseFloat(String(user.restrictionCommission || ad.price || "0")).toFixed(2);
         const click = await storage.recordAdClick(req.session.userId, adId, commission);
         await storage.incrementRestrictedAds(req.session.userId);
         await storage.addMilestoneReward(req.session.userId, commission);
@@ -637,9 +637,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } else {
         // Normal ad click (no restriction)
-        const click = await storage.recordAdClick(req.session.userId, adId, ad.price);
-        await storage.addMilestoneReward(req.session.userId, ad.price);
-        await storage.addMilestoneAmount(req.session.userId, ad.price);
+        const priceStr = parseFloat(String(ad.price || "0")).toFixed(2);
+        const click = await storage.recordAdClick(req.session.userId, adId, priceStr);
+        await storage.addMilestoneReward(req.session.userId, priceStr);
+        await storage.addMilestoneAmount(req.session.userId, priceStr);
         await storage.incrementAdsCompleted(req.session.userId);
 
         const updatedUser = await storage.getUser(req.session.userId);
