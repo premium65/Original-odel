@@ -5,7 +5,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertUserSchema, insertRatingSchema, insertAdSchema, contacts, infoPages, branding, themeSettings, slideshow } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import session from "express-session";
 import { z } from "zod";
 import bcrypt from "bcrypt";
@@ -878,23 +878,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/ads/:adId/click", async (req, res) => {
+  // Diagnostic endpoint to test ad_clicks table
+  app.get("/api/ads/debug-click", async (req, res) => {
+    const results: Record<string, string> = {};
     try {
+      results.dbExists = db ? "yes" : "no";
+
+      // Test basic query
+      try {
+        await db.execute(sql`SELECT 1 as test`);
+        results.dbConnection = "ok";
+      } catch (e: any) {
+        results.dbConnection = `FAIL: ${e.message}`;
+      }
+
+      // Check if ad_clicks table exists
+      try {
+        const r = await db.execute(sql`SELECT COUNT(*) as cnt FROM ad_clicks LIMIT 1`);
+        const row = (r as any).rows?.[0] || (r as any)[0];
+        results.adClicksTable = `ok (${row?.cnt || 0} rows)`;
+      } catch (e: any) {
+        results.adClicksTable = `FAIL: ${e.message}`;
+      }
+
+      // Check ads table
+      try {
+        const r = await db.execute(sql`SELECT COUNT(*) as cnt FROM ads LIMIT 1`);
+        const row = (r as any).rows?.[0] || (r as any)[0];
+        results.adsTable = `ok (${row?.cnt || 0} rows)`;
+      } catch (e: any) {
+        results.adsTable = `FAIL: ${e.message}`;
+      }
+
+      // Check users table
+      try {
+        const r = await db.execute(sql`SELECT COUNT(*) as cnt FROM users LIMIT 1`);
+        const row = (r as any).rows?.[0] || (r as any)[0];
+        results.usersTable = `ok (${row?.cnt || 0} rows)`;
+      } catch (e: any) {
+        results.usersTable = `FAIL: ${e.message}`;
+      }
+
+      // Check ad_clicks columns
+      try {
+        const r = await db.execute(sql`SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'ad_clicks' ORDER BY ordinal_position`);
+        const rows = (r as any).rows || r;
+        results.adClicksColumns = JSON.stringify(rows.map((r: any) => `${r.column_name}:${r.data_type}`));
+      } catch (e: any) {
+        results.adClicksColumns = `FAIL: ${e.message}`;
+      }
+
+      // Test session
+      results.sessionUserId = req.session?.userId || "none";
+
+      res.json(results);
+    } catch (e: any) {
+      res.json({ ...results, error: e.message });
+    }
+  });
+
+  app.post("/api/ads/:adId/click", async (req, res) => {
+    let step = "init";
+    try {
+      step = "auth_check";
       if (!req.session.userId) {
         return res.status(401).send("Not authenticated");
       }
 
+      step = "parse_adId";
       const adId = parseInt(req.params.adId) || (req.body.adId ? parseInt(req.body.adId) : 0);
       if (!adId) {
         return res.status(400).send("Ad ID is required");
       }
 
+      step = "get_ad";
       const ad = await storage.getAd(adId);
       if (!ad) {
         return res.status(404).send("Ad not found");
       }
 
-      // Get user to check for restrictions
+      step = "get_user";
       const user = await storage.getUser(req.session.userId);
       if (!user) {
         return res.status(404).send("User not found");
@@ -924,9 +987,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      step = "calc_earnings";
       const earnings = isRestricted ? (user.restrictionCommission || ad.price) : ad.price;
+      console.log(`[AD_CLICK] userId=${req.session.userId} adId=${adId} earnings=${earnings} type=${typeof earnings} restricted=${isRestricted}`);
 
       // Record the click - this is the critical operation
+      step = "record_click";
       const click = await storage.recordAdClick(req.session.userId, adId, earnings);
 
       // Post-click operations: wrapped so failures don't return 500 after click is recorded
@@ -937,36 +1003,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       try {
         if (isRestricted) {
+          step = "restricted_increment";
           await storage.incrementRestrictedAds(req.session.userId);
+          step = "restricted_milestone_reward";
           await storage.addMilestoneReward(req.session.userId, earnings);
 
           // Update ongoing milestone (reduce pending amount)
           const currentOngoing = parseFloat(user.ongoingMilestone || "0");
           const commissionValue = parseFloat(earnings);
           const newOngoing = Math.max(0, currentOngoing - commissionValue);
+          step = "restricted_reset_ongoing";
           await storage.resetUserField(req.session.userId, "ongoingMilestone");
           if (newOngoing > 0) {
+            step = "restricted_set_ongoing";
             await storage.addUserFieldValue(req.session.userId, "ongoingMilestone", newOngoing.toFixed(2));
           }
 
+          step = "restricted_increment_completed";
           await storage.incrementAdsCompleted(req.session.userId);
         } else {
-          // Normal flow: update all balances
+          step = "normal_milestone_reward";
           await storage.addMilestoneReward(req.session.userId, ad.price);
+          step = "normal_milestone_amount";
           await storage.addMilestoneAmount(req.session.userId, ad.price);
+          step = "normal_increment_completed";
           await storage.incrementAdsCompleted(req.session.userId);
 
-          // Check first ad and milestones
+          step = "normal_get_updated_user";
           const updatedUser = await storage.getUser(req.session.userId);
           const newAdsCount = updatedUser?.totalAdsCompleted || 0;
+          step = "normal_get_click_count";
           const totalClicks = await storage.getUserAdClickCount(req.session.userId);
 
           if (totalClicks === 1) {
+            step = "normal_reset_destination";
             await storage.resetDestinationAmount(req.session.userId);
           }
 
           // E-Voucher milestone check
           if (updatedUser?.milestoneAdsCount && newAdsCount === updatedUser.milestoneAdsCount && !updatedUser.adsLocked) {
+            step = "evoucher_lock";
             await storage.updateUser(req.session.userId, { adsLocked: true });
             milestoneReached = true;
             milestoneData = {
@@ -982,6 +1058,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!milestoneReached && updatedUser?.bonusAdsCount && newAdsCount === updatedUser.bonusAdsCount) {
             const bonusAmount = parseFloat(updatedUser.bonusAmount || "0");
             if (bonusAmount > 0) {
+              step = "ebonus_apply";
               const currentDestination = parseFloat(updatedUser.destinationAmount || "0");
               await storage.updateUser(req.session.userId, {
                 destinationAmount: (currentDestination + bonusAmount).toFixed(2),
@@ -999,7 +1076,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       } catch (postClickErr: any) {
-        console.error("[AD_CLICK] Post-click operation failed (click was recorded):", postClickErr?.message);
+        console.error(`[AD_CLICK] Post-click failed at step="${step}":`, postClickErr?.message);
       }
 
       // Always return success since the click was recorded
@@ -1025,9 +1102,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(response);
     } catch (error: any) {
-      console.error("Record ad click error:", error);
+      console.error(`[AD_CLICK] FATAL at step="${step}":`, error);
       const message = error?.message || error?.toString() || "Unknown error";
-      res.status(500).json({ error: "Failed to record ad click", details: message });
+      res.status(500).json({ error: `Ad click failed at: ${step}`, details: message });
     }
   });
 
