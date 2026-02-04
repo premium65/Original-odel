@@ -1,9 +1,12 @@
-import { useState } from "react";
-import { 
-  Save, Mail, Phone, MapPin, Globe, Facebook, Twitter, 
+import { useState, useEffect } from "react";
+import {
+  Save, Mail, Phone, MapPin, Globe, Facebook, Twitter,
   Instagram, Youtube, CreditCard, Plus, Trash2, Link,
-  FileText, HelpCircle, Send
+  FileText, HelpCircle, Send, Loader2
 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 interface FooterLink {
   id: number;
@@ -20,6 +23,9 @@ interface SocialLink {
 }
 
 export default function FooterSettings() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
   const [contact, setContact] = useState({
     phone: "+94 11 123 4567",
     email: "support@odelads.com",
@@ -73,8 +79,50 @@ export default function FooterSettings() {
     { id: 3, name: "AMEX", enabled: true },
   ]);
 
+  const { data: contentData, isLoading } = useQuery({
+    queryKey: ["admin-content", "footer-settings"],
+    queryFn: () => api.getContent("footer-settings"),
+  });
+
+  useEffect(() => {
+    if (contentData && contentData.length > 0) {
+      try {
+        const content = contentData[0];
+        if (content.metadata) {
+          const parsed = typeof content.metadata === 'string' ? JSON.parse(content.metadata) : content.metadata;
+          if (parsed.contact) setContact(prev => ({ ...prev, ...parsed.contact }));
+          if (parsed.newsletter) setNewsletter(prev => ({ ...prev, ...parsed.newsletter }));
+          if (parsed.copyright) setCopyright(prev => ({ ...prev, ...parsed.copyright }));
+          if (parsed.customerCare) setCustomerCare(parsed.customerCare);
+          if (parsed.aboutLinks) setAboutLinks(parsed.aboutLinks);
+          if (parsed.helpLinks) setHelpLinks(parsed.helpLinks);
+          if (parsed.socialLinks) setSocialLinks(parsed.socialLinks);
+          if (parsed.paymentMethods) setPaymentMethods(parsed.paymentMethods);
+        }
+      } catch (e) {
+        console.error("Failed to parse footer settings:", e);
+      }
+    }
+  }, [contentData]);
+
+  const mutation = useMutation({
+    mutationFn: (data: any) => api.updateContent("footer-settings", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-content", "footer-settings"] });
+      toast({ title: "Footer settings saved!" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save settings", variant: "destructive" });
+    },
+  });
+
   const handleSave = () => {
-    alert("Footer settings saved successfully!");
+    mutation.mutate({
+      section: "main",
+      title: "Footer Settings",
+      content: "",
+      metadata: JSON.stringify({ contact, newsletter, copyright, customerCare, aboutLinks, helpLinks, socialLinks, paymentMethods }),
+    });
   };
 
   const getSocialIcon = (platform: string) => {
@@ -96,6 +144,14 @@ export default function FooterSettings() {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-[#6b7280]" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -109,8 +165,8 @@ export default function FooterSettings() {
             <p className="text-[#9ca3af]">Configure footer content and contact information</p>
           </div>
         </div>
-        <button onClick={handleSave} className="px-5 py-2.5 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90">
-          <Save className="h-5 w-5" /> Save Changes
+        <button onClick={handleSave} disabled={mutation.isPending} className="px-5 py-2.5 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90 disabled:opacity-50">
+          {mutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />} Save Changes
         </button>
       </div>
 

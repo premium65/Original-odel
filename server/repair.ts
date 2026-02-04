@@ -11,6 +11,60 @@ export async function repairDatabase() {
     console.log("[DB REPAIR] Starting automatic schema repair...");
 
     try {
+        // Ensure core tables exist
+        await db.execute(sql`CREATE TABLE IF NOT EXISTS sessions (
+            sid VARCHAR PRIMARY KEY,
+            sess JSONB NOT NULL,
+            expire TIMESTAMP NOT NULL
+        )`);
+        await db.execute(sql`CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON sessions (expire)`);
+
+        await db.execute(sql`CREATE TABLE IF NOT EXISTS users (
+            id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+            email VARCHAR UNIQUE,
+            username TEXT,
+            password TEXT,
+            first_name VARCHAR(255),
+            last_name VARCHAR(255),
+            profile_image_url VARCHAR(255),
+            is_admin BOOLEAN DEFAULT FALSE,
+            status TEXT DEFAULT 'pending',
+            balance DECIMAL(10,2) DEFAULT 0.00,
+            created_at TIMESTAMP DEFAULT NOW(),
+            updated_at TIMESTAMP DEFAULT NOW()
+        )`);
+
+        await db.execute(sql`CREATE TABLE IF NOT EXISTS ads (
+            id SERIAL PRIMARY KEY,
+            title TEXT NOT NULL,
+            description TEXT NOT NULL,
+            image_url TEXT NOT NULL,
+            target_url TEXT NOT NULL,
+            price DECIMAL(10,2) NOT NULL,
+            type TEXT DEFAULT 'click',
+            url TEXT,
+            reward DECIMAL(10,2),
+            duration INTEGER DEFAULT 30,
+            total_views INTEGER DEFAULT 0,
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT NOW()
+        )`);
+
+        await db.execute(sql`CREATE TABLE IF NOT EXISTS withdrawals (
+            id SERIAL PRIMARY KEY,
+            user_id VARCHAR NOT NULL REFERENCES users(id),
+            amount DECIMAL(10,2) NOT NULL,
+            method TEXT NOT NULL,
+            account_details TEXT,
+            bank_name TEXT,
+            bank_account TEXT,
+            processed_by VARCHAR,
+            processed_at TIMESTAMP,
+            status TEXT DEFAULT 'pending',
+            reason TEXT,
+            created_at TIMESTAMP DEFAULT NOW()
+        )`);
+
         // Add missing columns safely
         await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS first_name VARCHAR(255)`);
         await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name VARCHAR(255)`);
@@ -41,6 +95,25 @@ export async function repairDatabase() {
         await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS account_number TEXT`);
         await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS account_holder_name TEXT`);
         await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS branch_name TEXT`);
+
+        // E-Voucher and E-Bonus columns
+        await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS milestone_ads_count INTEGER`);
+        await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS ads_locked BOOLEAN DEFAULT FALSE`);
+        await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS e_voucher_banner_url TEXT`);
+        await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS bonus_ads_count INTEGER`);
+        await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS bonus_amount DECIMAL(10,2)`);
+        await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS e_bonus_banner_url TEXT`);
+
+        // Ensure ad_clicks table exists with all required columns
+        await db.execute(sql`CREATE TABLE IF NOT EXISTS ad_clicks (
+            id SERIAL PRIMARY KEY,
+            user_id VARCHAR NOT NULL REFERENCES users(id),
+            ad_id INTEGER NOT NULL REFERENCES ads(id),
+            earned_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT NOW()
+        )`);
+        // Add earned_amount column if table existed without it
+        await db.execute(sql`ALTER TABLE ad_clicks ADD COLUMN IF NOT EXISTS earned_amount DECIMAL(10,2) NOT NULL DEFAULT 0`);
 
         console.log("[DB REPAIR] Database schema repaired successfully!");
     } catch (error: any) {

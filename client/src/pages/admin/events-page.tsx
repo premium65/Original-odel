@@ -1,8 +1,11 @@
-import { useState } from "react";
-import { 
+import { useState, useEffect } from "react";
+import {
   Calendar, Save, Plus, Trash2, Edit, Eye, Gift, Sparkles, Star,
-  PartyPopper, Clock, CheckCircle
+  PartyPopper, Clock, CheckCircle, Loader2
 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 interface Event {
   id: number;
@@ -16,6 +19,9 @@ interface Event {
 }
 
 export default function AdminEventsPage() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
   // Banner Settings
   const [bannerSettings, setBannerSettings] = useState({
     title: "Special Events & Promotions",
@@ -68,6 +74,47 @@ export default function AdminEventsPage() {
     endedText: "Ended",
     endedColor: "#6b7280"
   });
+
+  const { data: contentData, isLoading } = useQuery({
+    queryKey: ["admin-content", "events-page"],
+    queryFn: () => api.getContent("events-page"),
+  });
+
+  useEffect(() => {
+    if (contentData && contentData.length > 0) {
+      try {
+        const content = contentData[0];
+        if (content.metadata) {
+          const parsed = typeof content.metadata === 'string' ? JSON.parse(content.metadata) : content.metadata;
+          if (parsed.bannerSettings) setBannerSettings(prev => ({ ...prev, ...parsed.bannerSettings }));
+          if (parsed.events) setEvents(parsed.events);
+          if (parsed.statusSettings) setStatusSettings(prev => ({ ...prev, ...parsed.statusSettings }));
+        }
+      } catch (e) {
+        console.error("Failed to parse events page settings:", e);
+      }
+    }
+  }, [contentData]);
+
+  const mutation = useMutation({
+    mutationFn: (data: any) => api.updateContent("events-page", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-content", "events-page"] });
+      toast({ title: "Events page settings saved!" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save settings", variant: "destructive" });
+    },
+  });
+
+  const handleSaveAll = () => {
+    mutation.mutate({
+      section: "main",
+      title: "Events Page Settings",
+      content: "",
+      metadata: JSON.stringify({ bannerSettings, events, statusSettings }),
+    });
+  };
 
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -141,11 +188,17 @@ export default function AdminEventsPage() {
             <p className="text-[#9ca3af]">Manage special events and promotional offers</p>
           </div>
         </div>
-        <button className="px-5 py-2.5 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90">
-          <Save className="h-5 w-5" /> Save All Changes
+        <button onClick={handleSaveAll} disabled={mutation.isPending} className="px-5 py-2.5 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90 disabled:opacity-50">
+          {mutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />} Save All Changes
         </button>
       </div>
 
+      {isLoading ? (
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-[#a855f7]" />
+        </div>
+      ) : (
+      <>
       {/* Preview */}
       <div className="bg-[#1a2332] rounded-2xl border border-[#2a3a4d] p-6">
         <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
@@ -290,6 +343,8 @@ export default function AdminEventsPage() {
           })}
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

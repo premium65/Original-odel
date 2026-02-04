@@ -11,10 +11,12 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, DollarSign, Crown } from "lucide-react";
+import { api } from "@/lib/api";
 
 export default function AdminPremiumPurchases() {
     const { data: purchases, isLoading } = useQuery({
-        queryKey: ["/api/admin/premium/purchases"],
+        queryKey: ["admin-premium-purchases"],
+        queryFn: () => api.getPremiumPurchases(),
     });
 
     if (isLoading) {

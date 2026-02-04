@@ -1,8 +1,11 @@
-import { useState } from "react";
-import { 
+import { useState, useEffect } from "react";
+import {
   Shield, Save, CheckCircle, Star, TrendingUp, Crown, Eye,
-  Plus, Trash2, Edit, Award
+  Plus, Trash2, Edit, Award, Loader2
 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 interface LoyaltyLevel {
   id: number;
@@ -14,6 +17,9 @@ interface LoyaltyLevel {
 }
 
 export default function AdminStatusPage() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
   // Account Status Card
   const [accountStatus, setAccountStatus] = useState({
     enabled: true,
@@ -61,6 +67,48 @@ export default function AdminStatusPage() {
 
   const [editingLevel, setEditingLevel] = useState<LoyaltyLevel | null>(null);
 
+  const { data: contentData, isLoading } = useQuery({
+    queryKey: ["admin-content", "status-page"],
+    queryFn: () => api.getContent("status-page"),
+  });
+
+  useEffect(() => {
+    if (contentData && contentData.length > 0) {
+      try {
+        const content = contentData[0];
+        if (content.metadata) {
+          const parsed = typeof content.metadata === 'string' ? JSON.parse(content.metadata) : content.metadata;
+          if (parsed.accountStatus) setAccountStatus(prev => ({ ...prev, ...parsed.accountStatus }));
+          if (parsed.loyaltyPoints) setLoyaltyPoints(prev => ({ ...prev, ...parsed.loyaltyPoints }));
+          if (parsed.loyaltyLevels) setLoyaltyLevels(parsed.loyaltyLevels);
+          if (parsed.activityStats) setActivityStats(prev => ({ ...prev, ...parsed.activityStats }));
+        }
+      } catch (e) {
+        console.error("Failed to parse status page settings:", e);
+      }
+    }
+  }, [contentData]);
+
+  const mutation = useMutation({
+    mutationFn: (data: any) => api.updateContent("status-page", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-content", "status-page"] });
+      toast({ title: "Status page settings saved!" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save settings", variant: "destructive" });
+    },
+  });
+
+  const handleSaveAll = () => {
+    mutation.mutate({
+      section: "main",
+      title: "Status Page Settings",
+      content: "",
+      metadata: JSON.stringify({ accountStatus, loyaltyPoints, loyaltyLevels, activityStats }),
+    });
+  };
+
   const addLevel = () => {
     const newLevel: LoyaltyLevel = {
       id: Date.now(),
@@ -94,6 +142,14 @@ export default function AdminStatusPage() {
     });
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-[#10b981]" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -107,8 +163,8 @@ export default function AdminStatusPage() {
             <p className="text-[#9ca3af]">Configure user status, loyalty points, and activity</p>
           </div>
         </div>
-        <button className="px-5 py-2.5 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90">
-          <Save className="h-5 w-5" /> Save All Changes
+        <button onClick={handleSaveAll} disabled={mutation.isPending} className="px-5 py-2.5 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90 disabled:opacity-50">
+          {mutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />} Save All Changes
         </button>
       </div>
 

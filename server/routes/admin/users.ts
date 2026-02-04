@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 import { db } from "../../db";
 import { users, milestones } from "@shared/schema";
 import { eq, desc, sql, and } from "drizzle-orm";
+import { storage } from "../../storage";
 
 const router = Router();
 
@@ -420,6 +421,8 @@ router.post("/:id/add-value", async (req, res) => {
     if (field === 'points') {
       // Set points directly
       updateExpr = { points: numValue };
+    } else if (field === 'balance') {
+      updateExpr = { balance: sql`${users.balance} + ${amount}::numeric` };
     } else if (field === 'premiumTreasure') {
       updateExpr = { milestoneReward: sql`${users.milestoneReward} + ${amount}::numeric` };
     } else if (field === 'normalTreasure') {
@@ -434,6 +437,213 @@ router.post("/:id/add-value", async (req, res) => {
     res.json(updated[0]);
   } catch (error: any) {
     res.status(500).json({ error: error.message || "Server error" });
+  }
+});
+
+// Set user restriction (frontend calls /restrict)
+router.post("/:id/restrict", async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { adsLimit, deposit, commission, pendingAmount } = req.body;
+
+    if (!adsLimit || adsLimit <= 0) {
+      return res.status(400).json({ error: "Invalid ads limit" });
+    }
+    if (!deposit || parseFloat(deposit) <= 0 || isNaN(parseFloat(deposit))) {
+      return res.status(400).json({ error: "Invalid deposit amount" });
+    }
+    if (!commission || parseFloat(commission) <= 0 || isNaN(parseFloat(commission))) {
+      return res.status(400).json({ error: "Invalid commission amount" });
+    }
+
+    const updatedUser = await storage.setUserRestriction(userId, adsLimit, deposit, commission, pendingAmount);
+    if (!updatedUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const { password: _, ...userWithoutPassword } = updatedUser;
+    res.json(userWithoutPassword);
+  } catch (error: any) {
+    console.error("Set restriction error:", error);
+    res.status(500).json({ error: error.message || "Server error" });
+  }
+});
+
+// Remove user restriction (frontend calls POST /unrestrict)
+router.post("/:id/unrestrict", async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const updatedUser = await storage.removeUserRestriction(userId);
+    if (!updatedUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const { password: _, ...userWithoutPassword } = updatedUser;
+    res.json(userWithoutPassword);
+  } catch (error: any) {
+    console.error("Remove restriction error:", error);
+    res.status(500).json({ error: error.message || "Server error" });
+  }
+});
+
+// Update user details (username, mobile, password)
+router.patch("/:id/details", async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { username, mobileNumber, password } = req.body;
+
+    const updatedUser = await storage.updateUserDetails(userId, {
+      username,
+      mobileNumber,
+      password,
+    });
+
+    if (!updatedUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const { password: _, ...userWithoutPassword } = updatedUser;
+    res.json(userWithoutPassword);
+  } catch (error: any) {
+    console.error("Update user details error:", error);
+    res.status(500).json({ error: error.message || "Server error" });
+  }
+});
+
+// Update bank details
+router.patch("/:id/bank", async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { bankName, accountNumber, accountHolderName, branchName } = req.body;
+
+    const updatedUser = await storage.updateUserBankDetails(userId, {
+      bankName,
+      accountNumber,
+      accountHolderName,
+      branchName,
+    });
+
+    if (!updatedUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const { password: _, ...userWithoutPassword } = updatedUser;
+    res.json(userWithoutPassword);
+  } catch (error: any) {
+    console.error("Update bank details error:", error);
+    res.status(500).json({ error: error.message || "Server error" });
+  }
+});
+
+// Create E-Voucher (Milestone Hold System)
+router.post("/:id/evoucher", async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { milestoneAdsCount, milestoneAmount, milestoneReward, ongoingMilestone, bannerUrl } = req.body;
+
+    if (!milestoneAdsCount || milestoneAdsCount <= 0) {
+      return res.status(400).json({ error: "Invalid milestone ads count" });
+    }
+
+    const user = await storage.getUser(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const updatedUser = await storage.updateUser(userId, {
+      milestoneAdsCount: parseInt(milestoneAdsCount),
+      milestoneAmount: milestoneAmount || "-5000",
+      milestoneReward: milestoneReward || "0",
+      ongoingMilestone: ongoingMilestone || "0",
+      adsLocked: false,
+      eVoucherBannerUrl: bannerUrl || null,
+    });
+
+    if (!updatedUser) {
+      return res.status(404).json({ error: "Failed to update user" });
+    }
+
+    const { password: _, ...userWithoutPassword } = updatedUser;
+    res.json(userWithoutPassword);
+  } catch (error: any) {
+    console.error("Create E-Voucher error:", error);
+    res.status(500).json({ error: error.message || "Server error" });
+  }
+});
+
+// Clear E-Voucher lock (unlock after deposit)
+router.post("/:id/evoucher-unlock", async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    const updatedUser = await storage.updateUser(userId, {
+      milestoneAmount: "0",
+      adsLocked: false,
+      hasDeposit: true,
+    });
+
+    if (!updatedUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const { password: _, ...userWithoutPassword } = updatedUser;
+    res.json(userWithoutPassword);
+  } catch (error: any) {
+    console.error("E-Voucher unlock error:", error);
+    res.status(500).json({ error: error.message || "Server error" });
+  }
+});
+
+// Create E-Bonus (Instant Reward - NO locking)
+router.post("/:id/ebonus", async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { bonusAdsCount, bonusAmount, bannerUrl } = req.body;
+
+    if (!bonusAdsCount || bonusAdsCount <= 0) {
+      return res.status(400).json({ error: "Invalid bonus ads count" });
+    }
+    if (!bonusAmount || parseFloat(bonusAmount) <= 0) {
+      return res.status(400).json({ error: "Invalid bonus amount" });
+    }
+
+    const updatedUser = await storage.updateUser(userId, {
+      bonusAdsCount: parseInt(bonusAdsCount),
+      bonusAmount: bonusAmount,
+      eBonusBannerUrl: bannerUrl || null,
+    });
+
+    if (!updatedUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const { password: _, ...userWithoutPassword } = updatedUser;
+    res.json(userWithoutPassword);
+  } catch (error: any) {
+    console.error("Create E-Bonus error:", error);
+    res.status(500).json({ error: error.message || "Server error" });
+  }
+});
+
+// Toggle admin status
+router.post("/:id/toggle-admin", async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { isAdmin } = req.body;
+
+    const updatedUser = await storage.updateUser(userId, {
+      isAdmin: !!isAdmin
+    });
+
+    if (!updatedUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const { password: _, ...userWithoutPassword } = updatedUser;
+    res.json(userWithoutPassword);
+  } catch (error) {
+    console.error("Toggle admin error:", error);
+    res.status(500).json({ error: "Server error" });
   }
 });
 

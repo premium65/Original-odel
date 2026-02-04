@@ -1,7 +1,13 @@
-import { useState } from "react";
-import { Percent, Save, Plus, Trash2, Edit, Users, DollarSign, TrendingUp } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Percent, Save, Plus, Trash2, Edit, Users, DollarSign, TrendingUp, Loader2 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Commission() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
   const [settings, setSettings] = useState({
     enableCommission: true,
     defaultPercentage: 10,
@@ -15,7 +21,53 @@ export default function Commission() {
     { id: 3, name: "Gold", minReferrals: 51, maxReferrals: 100, percentage: 15, enabled: true },
   ]);
 
-  const handleSave = () => alert("Commission settings saved!");
+  const { data: contentData, isLoading } = useQuery({
+    queryKey: ["admin-content", "commission-settings"],
+    queryFn: () => api.getContent("commission-settings"),
+  });
+
+  useEffect(() => {
+    if (contentData && contentData.length > 0) {
+      try {
+        const content = contentData[0];
+        if (content.metadata) {
+          const parsed = typeof content.metadata === 'string' ? JSON.parse(content.metadata) : content.metadata;
+          if (parsed.settings) setSettings(prev => ({ ...prev, ...parsed.settings }));
+          if (parsed.tiers) setTiers(parsed.tiers);
+        }
+      } catch (e) {
+        console.error("Failed to parse commission settings:", e);
+      }
+    }
+  }, [contentData]);
+
+  const mutation = useMutation({
+    mutationFn: (data: any) => api.updateContent("commission-settings", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-content", "commission-settings"] });
+      toast({ title: "Commission settings saved!" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save commission settings", variant: "destructive" });
+    },
+  });
+
+  const handleSave = () => {
+    mutation.mutate({
+      section: "main",
+      title: "Commission Settings",
+      content: "",
+      metadata: JSON.stringify({ settings, tiers }),
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-[#8b5cf6]" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -29,8 +81,8 @@ export default function Commission() {
             <p className="text-[#9ca3af]">Manage referral commission rates</p>
           </div>
         </div>
-        <button onClick={handleSave} className="px-5 py-2.5 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90">
-          <Save className="h-5 w-5" /> Save
+        <button onClick={handleSave} disabled={mutation.isPending} className="px-5 py-2.5 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-xl flex items-center gap-2 hover:opacity-90 disabled:opacity-50">
+          {mutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />} Save
         </button>
       </div>
 
