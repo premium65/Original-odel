@@ -695,4 +695,76 @@ router.post("/:id/toggle-admin", async (req, res) => {
   }
 });
 
+// Manual deposit adapter (backward compatibility)
+router.post("/:id/deposit", async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { amount, description } = req.body;
+    const adminId = req.session.userId ? String(req.session.userId) : "unknown";
+
+    // Validation
+    if (!amount) {
+      console.warn(`[USER_DEPOSIT_ADAPTER] Missing amount, admin: ${adminId}, userId: ${userId}`);
+      return res.status(400).json({ error: "Amount is required" });
+    }
+
+    // Coerce to number and validate
+    const numAmount = Number(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      console.warn(`[USER_DEPOSIT_ADAPTER] Invalid amount: ${amount}, admin: ${adminId}, userId: ${userId}`);
+      return res.status(400).json({ error: "Amount must be a positive number" });
+    }
+
+    // Normalize userId
+    const targetUserId = String(userId);
+
+    // Verify user exists before proceeding
+    const existingUser = await db.select().from(users).where(eq(users.id, targetUserId)).limit(1);
+    if (!existingUser.length) {
+      console.warn(`[USER_DEPOSIT_ADAPTER] User not found: ${targetUserId}, admin: ${adminId}`);
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Import deposits and transactions tables
+    const { deposits, transactions } = await import("@shared/schema");
+
+    // Use Drizzle transaction for atomicity
+    const result = await db.transaction(async (tx) => {
+      // 1. Create deposit record
+      const [deposit] = await tx.insert(deposits).values({
+        userId: targetUserId,
+        amount: numAmount.toFixed(2),
+        type: "manual_add",
+        method: "admin_manual",
+        description: description || "Manual deposit by admin",
+        reference: `MANUAL-${Date.now()}`,
+        status: "approved"
+      }).returning();
+
+      // 2. Add amount to user balance
+      await tx.update(users).set({
+        balance: sql`${users.balance} + ${numAmount}::numeric`,
+        hasDeposit: true
+      }).where(eq(users.id, targetUserId));
+
+      // 3. Create transaction record
+      await tx.insert(transactions).values({
+        userId: targetUserId,
+        type: "deposit",
+        amount: numAmount.toFixed(2),
+        status: "approved",
+        description: description || "Manual deposit by admin"
+      });
+
+      return deposit;
+    });
+
+    console.log(`[USER_DEPOSIT_ADAPTER] Success: admin ${adminId} added ${numAmount} LKR to user ${targetUserId}`);
+    res.status(201).json({ success: true, deposit: result });
+  } catch (error: any) {
+    console.error("[USER_DEPOSIT_ADAPTER] Error:", error);
+    res.status(500).json({ error: error.message || "Failed to create manual deposit" });
+  }
+});
+
 export default router;
