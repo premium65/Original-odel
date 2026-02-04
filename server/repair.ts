@@ -115,6 +115,45 @@ export async function repairDatabase() {
         // Add earned_amount column if table existed without it
         await db.execute(sql`ALTER TABLE ad_clicks ADD COLUMN IF NOT EXISTS earned_amount DECIMAL(10,2) NOT NULL DEFAULT 0`);
 
+        // Ensure deposits table exists
+        await db.execute(sql`CREATE TABLE IF NOT EXISTS deposits (
+            id SERIAL PRIMARY KEY,
+            user_id VARCHAR NOT NULL REFERENCES users(id),
+            amount DECIMAL(10,2) NOT NULL,
+            type TEXT NOT NULL,
+            description TEXT,
+            method TEXT,
+            reference TEXT,
+            status TEXT DEFAULT 'pending',
+            created_at TIMESTAMP DEFAULT NOW()
+        )`);
+
+        // Ensure transactions table exists
+        await db.execute(sql`CREATE TABLE IF NOT EXISTS transactions (
+            id SERIAL PRIMARY KEY,
+            user_id VARCHAR REFERENCES users(id),
+            type TEXT NOT NULL,
+            amount DECIMAL(10,2) NOT NULL,
+            status TEXT DEFAULT 'pending',
+            description TEXT,
+            reference TEXT,
+            created_at TIMESTAMP DEFAULT NOW()
+        )`);
+
+        // Ensure milestones table exists
+        await db.execute(sql`CREATE TABLE IF NOT EXISTS milestones (
+            id SERIAL PRIMARY KEY,
+            user_id VARCHAR REFERENCES users(id),
+            total_ads INTEGER DEFAULT 12,
+            completed_ads INTEGER DEFAULT 0,
+            deposit_amount DECIMAL(10,2),
+            reward_amount DECIMAL(10,2),
+            commission_per_ad DECIMAL(10,2),
+            status TEXT DEFAULT 'active',
+            created_at TIMESTAMP DEFAULT NOW(),
+            completed_at TIMESTAMP
+        )`);
+
         console.log("[DB REPAIR] Database schema repaired successfully!");
     } catch (error: any) {
         console.error("[DB REPAIR] Schema repair failed:", error.message);

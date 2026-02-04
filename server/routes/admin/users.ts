@@ -107,15 +107,23 @@ router.get("/admins", async (req, res) => {
 // Get user by ID
 router.get("/:id", async (req, res) => {
   try {
+    if (!db) return res.status(503).json({ error: "Database unavailable" });
     const user = await db.select().from(users).where(eq(users.id, req.params.id)).limit(1);
     if (!user.length) return res.status(404).json({ error: "User not found" });
     const { password, ...userData } = user[0];
 
-    // Get user milestone
-    const milestone = await db.select().from(milestones).where(and(eq(milestones.userId, req.params.id), eq(milestones.status, "active"))).limit(1);
+    // Get user milestone (non-critical - don't fail if milestones table missing)
+    let milestone = null;
+    try {
+      const milestoneResult = await db.select().from(milestones).where(and(eq(milestones.userId, req.params.id), eq(milestones.status, "active"))).limit(1);
+      milestone = milestoneResult[0] || null;
+    } catch (err) {
+      console.error("[USERS] Milestones query failed (table may not exist):", (err as any).message);
+    }
 
-    res.json({ ...userData, milestone: milestone[0] || null });
+    res.json({ ...userData, milestone });
   } catch (error) {
+    console.error("[USERS] Get user by ID error:", error);
     res.status(500).json({ error: "Server error" });
   }
 });

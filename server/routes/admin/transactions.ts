@@ -133,13 +133,13 @@ router.post("/deposits/manual", async (req, res) => {
       return res.status(400).json({ error: "Amount must be a positive number" });
     }
 
+    if (!db) return res.status(503).json({ error: "Database unavailable" });
+
     // Verify the user exists before creating deposit
     const existingUser = await db.select({ id: users.id }).from(users).where(eq(users.id, normalizedUserId)).limit(1);
     if (!existingUser.length) {
       return res.status(400).json({ error: "User not found" });
     }
-
-    if (!db) return res.status(503).json({ error: "Database unavailable" });
 
     console.log(`[MANUAL_DEPOSIT] Admin creating deposit: userId=${normalizedUserId}, amount=${numAmount}`);
 
