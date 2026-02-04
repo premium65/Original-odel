@@ -51,7 +51,14 @@ export default function Deposits() {
       setUserSearch("");
     },
     onError: (error: any) => {
-      toast({ title: "Failed to add deposit", description: error.message, variant: "destructive" });
+      // Show server-provided error message
+      const errorMessage = error.message || "Failed to add deposit";
+      console.error("[DEPOSITS_UI] Manual deposit error:", errorMessage);
+      toast({ 
+        title: "Failed to add deposit", 
+        description: errorMessage, 
+        variant: "destructive" 
+      });
     }
   });
 
