@@ -304,12 +304,18 @@ export default function Deposits() {
                     return;
                   }
 
-                  // selectedUser may be an object or an id — normalize to primitive id
-                  const rawUserId = typeof selectedUser === "object" ? (selectedUser.id ?? selectedUser) : selectedUser;
-                  const userIdStr = String(rawUserId).trim();
+                  // Normalize selectedUser to string ID
+                  // selectedUser is expected to be an object with an 'id' property
+                  let userIdStr = "";
+                  if (typeof selectedUser === "object" && selectedUser !== null) {
+                    userIdStr = String(selectedUser.id || "").trim();
+                  } else {
+                    userIdStr = String(selectedUser).trim();
+                  }
+
                   const numAmount = parseFloat(String(depositAmount));
 
-                  if (!userIdStr || userIdStr === 'undefined' || userIdStr === 'null') {
+                  if (!userIdStr) {
                     toast({ title: "Invalid input", description: "Please select a valid user", variant: "destructive" });
                     return;
                   }

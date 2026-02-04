@@ -109,21 +109,22 @@ router.put("/withdrawals/:id", async (req, res) => {
 // Create manual deposit
 router.post("/deposits/manual", async (req, res) => {
   try {
-    // TEMP DEBUG: log incoming body so we can see exactly what frontend sends
-    console.log("[ADMIN][manual deposit] req.body:", req.body);
+    // DEBUG: log incoming body to help diagnose issues (remove in production)
+    if (process.env.NODE_ENV === "development") {
+      console.log("[ADMIN][manual deposit] req.body:", req.body);
+    }
 
     const { userId, amount, description } = req.body;
 
-    if (userId === undefined || amount === undefined) {
+    if (userId === undefined || userId === null || amount === undefined || amount === null) {
       return res.status(400).json({ error: "User ID and amount are required" });
     }
 
     // Coerce and validate types early to produce clear errors instead of DB exceptions
-    // userId should be a string (UUID), so just ensure it's not empty
     const userIdStr = String(userId).trim();
     const numAmount = parseFloat(amount);
 
-    if (!userIdStr || userIdStr === 'undefined' || userIdStr === 'null') {
+    if (!userIdStr) {
       return res.status(400).json({ error: "Invalid userId" });
     }
 
