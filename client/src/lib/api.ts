@@ -15,9 +15,18 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
       const body = await res.json();
       if (body.error) message = body.error;
       else if (body.message) message = body.message;
-    } catch {
-      // Response was not JSON – use status text
-      message = res.statusText || message;
+    } catch (parseError) {
+      // Response was not JSON – use status text or try to get text response
+      try {
+        const text = await res.text();
+        if (text && text.length > 0 && text.length < 200) {
+          message = text;
+        } else {
+          message = res.statusText || message;
+        }
+      } catch {
+        message = res.statusText || message;
+      }
     }
     throw new Error(message);
   }
@@ -60,6 +69,10 @@ export const api = {
   // E-Bonus (Instant Reward - NO locking)
   createEBonus: (id: number | string, data: { bonusAdsCount: number; bonusAmount: string; bannerUrl?: string }) =>
     fetchAPI(`/admin/users/${id}/ebonus`, { method: "POST", body: JSON.stringify(data) }),
+
+  // Manual deposit adapter - alternative endpoint
+  createUserDeposit: (id: number | string, data: { amount: string; description?: string }) =>
+    fetchAPI(`/admin/users/${id}/deposit`, { method: "POST", body: JSON.stringify(data) }),
 
   // Transactions
   getTransactions: () => fetchAPI("/admin/transactions"),
