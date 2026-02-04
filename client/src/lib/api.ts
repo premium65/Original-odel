@@ -15,13 +15,8 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
       const error = await res.json();
       errorMessage = error.error || error.message || errorMessage;
     } catch (e) {
-      // If response is not valid JSON, try to get text
-      try {
-        errorMessage = await res.text() || errorMessage;
-      } catch (textError) {
-        // Use status text as fallback
-        errorMessage = res.statusText || errorMessage;
-      }
+      // If response is not valid JSON, use status text
+      errorMessage = res.statusText || `HTTP ${res.status}`;
     }
     throw new Error(errorMessage);
   }
