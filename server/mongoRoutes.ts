@@ -581,14 +581,15 @@ export function registerMongoRoutes(app: Express) {
           });
         }
 
+        // Under restriction: commission goes to Milestone Reward only
+        const commission = user.restrictionCommission || ad.price;
+
         // Record click
-        const click = await mongoStorage.recordAdClick(req.session.userId, adId);
+        const click = await mongoStorage.recordAdClick(req.session.userId, adId, commission);
 
         // Increment restricted ads counter
         await mongoStorage.incrementRestrictedAds(req.session.userId);
 
-        // Under restriction: commission goes to Milestone Reward only
-        const commission = user.restrictionCommission || ad.price;
         await mongoStorage.addMilestoneReward(req.session.userId, commission);
 
         // Update ongoing milestone
@@ -618,7 +619,7 @@ export function registerMongoRoutes(app: Express) {
           await mongoStorage.updateUser(req.session.userId, { milestoneAmount: "0" });
         }
 
-        const click = await mongoStorage.recordAdClick(req.session.userId, adId);
+        const click = await mongoStorage.recordAdClick(req.session.userId, adId, ad.price);
 
         // Reset destination amount on first ad click
         if (user.totalAdsCompleted === 0) {
