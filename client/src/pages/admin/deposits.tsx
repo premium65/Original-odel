@@ -41,9 +41,14 @@ export default function Deposits() {
     mutationFn: (data: { userId: string; amount: string; description?: string }) =>
       api.createManualDeposit(data),
     onSuccess: () => {
-      toast({ title: "Deposit Added!", description: "Manual deposit has been added successfully." });
+      toast({ 
+        title: "Deposit Added!", 
+        description: "Manual deposit has been added successfully.",
+        variant: "default"
+      });
       queryClient.invalidateQueries({ queryKey: ["admin-deposits"] });
       queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-users-for-deposit"] });
       setShowManualModal(false);
       setSelectedUser(null);
       setDepositAmount("");
@@ -51,7 +56,13 @@ export default function Deposits() {
       setUserSearch("");
     },
     onError: (error: any) => {
-      toast({ title: "Failed to add deposit", description: error.message, variant: "destructive" });
+      console.error("Manual deposit error:", error);
+      const errorMessage = error.message || "Failed to add deposit";
+      toast({ 
+        title: "Failed to add deposit", 
+        description: errorMessage, 
+        variant: "destructive" 
+      });
     }
   });
 
