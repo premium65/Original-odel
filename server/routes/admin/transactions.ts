@@ -111,18 +111,35 @@ router.post("/deposits/manual", async (req, res) => {
   try {
     const { userId, amount, description } = req.body;
 
+    // Log incoming request body for debugging
+    console.log("Manual deposit request body:", req.body);
+
+    // Validate required fields
     if (!userId || !amount) {
       return res.status(400).json({ error: "User ID and amount are required" });
     }
 
+    // Convert and validate userId
+    const numericUserId = Number(userId);
+    if (isNaN(numericUserId) || numericUserId <= 0) {
+      return res.status(400).json({ error: "Invalid user ID - must be a positive number" });
+    }
+
+    // Convert and validate amount
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount) || numAmount <= 0) {
-      return res.status(400).json({ error: "Invalid amount" });
+      return res.status(400).json({ error: "Invalid amount - must be a positive number" });
+    }
+
+    // Verify user exists
+    const userExists = await db.select({ id: users.id }).from(users).where(eq(users.id, String(numericUserId))).limit(1);
+    if (!userExists || userExists.length === 0) {
+      return res.status(404).json({ error: "User not found" });
     }
 
     // Create deposit record
     const deposit = await db.insert(deposits).values({
-      userId,
+      userId: String(numericUserId),
       amount: numAmount.toFixed(2),
       type: "manual_add",
       method: "admin_manual",
@@ -135,11 +152,11 @@ router.post("/deposits/manual", async (req, res) => {
     await db.update(users).set({
       balance: sql`${users.balance} + ${numAmount}::numeric`,
       hasDeposit: true
-    }).where(eq(users.id, userId));
+    }).where(eq(users.id, String(numericUserId)));
 
     // Create transaction record
     await db.insert(transactions).values({
-      userId,
+      userId: String(numericUserId),
       type: "deposit",
       amount: numAmount.toFixed(2),
       status: "approved",
@@ -149,7 +166,7 @@ router.post("/deposits/manual", async (req, res) => {
     res.json({ success: true, deposit: deposit[0] });
   } catch (error) {
     console.error("Manual deposit error:", error);
-    res.status(500).json({ error: "Server error" });
+    res.status(500).json({ error: "Server error - failed to create deposit" });
   }
 });
 

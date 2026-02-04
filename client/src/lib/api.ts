@@ -10,8 +10,20 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
     },
   });
   if (!res.ok) {
-    const error = await res.json();
-    throw new Error(error.error || "API Error");
+    let errorMessage = "API Error";
+    try {
+      const error = await res.json();
+      errorMessage = error.error || error.message || errorMessage;
+    } catch (e) {
+      // If response is not valid JSON, try to get text
+      try {
+        errorMessage = await res.text() || errorMessage;
+      } catch (textError) {
+        // Use status text as fallback
+        errorMessage = res.statusText || errorMessage;
+      }
+    }
+    throw new Error(errorMessage);
   }
   return res.json();
 }
