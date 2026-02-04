@@ -26,7 +26,7 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
       try {
         const json = JSON.parse(text);
         errorMessage = json?.error || json?.message || errorMessage;
-      } catch {
+      } catch (parseError) {
         // If not JSON, use the text as-is (could be HTML error page)
         errorMessage = text.length > MAX_ERROR_MESSAGE_LENGTH 
           ? `${text.substring(0, MAX_ERROR_MESSAGE_LENGTH)}...` 
@@ -82,7 +82,7 @@ export const api = {
   getDeposits: () => fetchAPI("/admin/transactions/deposits"),
   updateWithdrawal: (id: number, data: any) => fetchAPI(`/admin/transactions/withdrawals/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   updateDeposit: (id: number, data: any) => fetchAPI(`/admin/transactions/deposits/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-  createManualDeposit: (data: { userId: string; amount: string; description?: string }) =>
+  createManualDeposit: (data: { userId: string; amount: number; description?: string }) =>
     fetchAPI("/admin/transactions/deposits/manual", { method: "POST", body: JSON.stringify(data) }),
 
   // Ads

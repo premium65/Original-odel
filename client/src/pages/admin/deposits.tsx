@@ -38,12 +38,14 @@ export default function Deposits() {
   ).slice(0, 5);
 
   const manualDepositMutation = useMutation({
-    mutationFn: (data: { userId: string; amount: string; description?: string }) =>
+    mutationFn: (data: { userId: string; amount: number; description?: string }) =>
       api.createManualDeposit(data),
     onSuccess: () => {
       toast({ title: "Deposit Added!", description: "Manual deposit has been added successfully." });
       queryClient.invalidateQueries({ queryKey: ["admin-deposits"] });
       queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-users-for-deposit"] });
       setShowManualModal(false);
       setSelectedUser(null);
       setDepositAmount("");
@@ -305,30 +307,36 @@ export default function Deposits() {
                   }
 
                   // Extract userId from selectedUser
-                  // selectedUser is typically a user object from the API with an 'id' property,
-                  // but we handle the string case defensively for flexibility
-                  let userIdStr = "";
-                  if (typeof selectedUser === "object" && selectedUser !== null) {
-                    userIdStr = String(selectedUser.id || "").trim();
-                  } else {
-                    userIdStr = String(selectedUser).trim();
-                  }
-
-                  const numAmount = parseFloat(String(depositAmount));
-
-                  if (!userIdStr) {
+                  // selectedUser is expected to be a user object from the API with an 'id' property
+                  if (
+                    typeof selectedUser !== "object" ||
+                    selectedUser === null ||
+                    !selectedUser.id ||
+                    String(selectedUser.id).trim() === ""
+                  ) {
                     toast({ title: "Invalid input", description: "Please select a valid user", variant: "destructive" });
                     return;
                   }
 
-                  if (Number.isNaN(numAmount) || numAmount <= 0) {
-                    toast({ title: "Invalid input", description: "Please provide a positive amount", variant: "destructive" });
+                  const userIdStr = String(selectedUser.id).trim();
+                  const numAmount = parseFloat(String(depositAmount));
+
+                  if (Number.isNaN(numAmount) || numAmount <= 0 || !Number.isFinite(numAmount)) {
+                    toast({ title: "Invalid input", description: "Please provide a valid positive amount", variant: "destructive" });
+                    return;
+                  }
+
+                  // Validate decimal precision (max 2 decimal places)
+                  const amountStr = String(depositAmount).trim();
+                  const decimalPlaces = (amountStr.split('.')[1] || '').length;
+                  if (decimalPlaces > 2) {
+                    toast({ title: "Invalid input", description: "Amount must have at most 2 decimal places", variant: "destructive" });
                     return;
                   }
 
                   manualDepositMutation.mutate({
                     userId: userIdStr,
-                    amount: String(numAmount),
+                    amount: numAmount,
                     description: depositDescription || undefined,
                   });
                 }}

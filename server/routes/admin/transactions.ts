@@ -128,8 +128,37 @@ router.post("/deposits/manual", async (req, res) => {
       return res.status(400).json({ error: "Invalid userId" });
     }
 
-    if (Number.isNaN(numAmount) || numAmount <= 0) {
+    // Validate UUID format (basic check for UUID pattern)
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidPattern.test(userIdStr)) {
+      return res.status(400).json({ error: "Invalid user ID format" });
+    }
+
+    if (Number.isNaN(numAmount) || numAmount <= 0 || !Number.isFinite(numAmount)) {
       return res.status(400).json({ error: "Invalid amount" });
+    }
+
+    // Validate decimal precision (max 2 decimal places)
+    const decimalPlaces = (numAmount.toString().split('.')[1] || '').length;
+    if (decimalPlaces > 2) {
+      return res.status(400).json({ error: "Amount must have at most 2 decimal places" });
+    }
+
+    // Validate maximum amount (prevent abuse)
+    const MAX_DEPOSIT_AMOUNT = 1000000; // 1 million LKR
+    if (numAmount > MAX_DEPOSIT_AMOUNT) {
+      return res.status(400).json({ error: `Amount cannot exceed ${MAX_DEPOSIT_AMOUNT.toLocaleString()} LKR` });
+    }
+
+    // Check if user exists before creating deposit
+    const existingUsers = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.id, userIdStr))
+      .limit(1);
+
+    if (!existingUsers.length) {
+      return res.status(404).json({ error: "User not found" });
     }
 
     // Create deposit record
