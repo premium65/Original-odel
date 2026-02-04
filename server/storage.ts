@@ -225,11 +225,30 @@ export class DatabaseStorage implements IStorage {
 
   // Ad Click operations
   async recordAdClick(userId: string, adId: number, earnedAmount: string): Promise<AdClick> {
-    const [click] = await db
-      .insert(adClicks)
-      .values({ userId, adId, earnedAmount })
-      .returning();
-    return click;
+    try {
+      const [click] = await db
+        .insert(adClicks)
+        .values({ userId, adId, earnedAmount })
+        .returning();
+      return click;
+    } catch (err: any) {
+      // Fallback: if earned_amount column doesn't exist yet, try raw SQL insert
+      console.error("[recordAdClick] Drizzle insert failed, trying raw SQL fallback:", err?.message);
+      const result = await db.execute(
+        sql`INSERT INTO ad_clicks (user_id, ad_id, earned_amount, created_at)
+            VALUES (${userId}, ${adId}, ${earnedAmount}, NOW())
+            RETURNING *`
+      );
+      const row = (result as any).rows?.[0] || (result as any)[0];
+      if (!row) throw new Error("Failed to insert ad click record");
+      return {
+        id: row.id,
+        userId: row.user_id,
+        adId: row.ad_id,
+        earnedAmount: row.earned_amount,
+        createdAt: row.created_at,
+      } as AdClick;
+    }
   }
 
   async getUserAdClicks(userId: string): Promise<AdClick[]> {

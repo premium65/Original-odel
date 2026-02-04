@@ -68,8 +68,12 @@ import { repairDatabase } from "./repair";
 console.log("--> DEPLOYMENT CHECK: FIX APPLIED (Commit 7378106+) <--");
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Auto-repair DB on startup (safeguard)
-  repairDatabase().catch(console.error);
+  // Auto-repair DB on startup (safeguard) - await to ensure schema is ready
+  try {
+    await repairDatabase();
+  } catch (e) {
+    console.error("[DB REPAIR] Repair failed on startup:", e);
+  }
 
   // setup client sessions
   const sessionConfig: session.SessionOptions = {
@@ -1068,9 +1072,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         res.json({ success: true, click, earnings: ad.price, restricted: false });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Record ad click error:", error);
-      res.status(500).send("Failed to record ad click");
+      const message = error?.message || error?.toString() || "Unknown error";
+      res.status(500).json({ error: "Failed to record ad click", details: message });
     }
   });
 
@@ -1208,9 +1213,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         res.json({ success: true, click, earnings: ad.price, restricted: false });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Record ad click error:", error);
-      res.status(500).send("Failed to record ad click");
+      const message = error?.message || error?.toString() || "Unknown error";
+      res.status(500).json({ error: "Failed to record ad click", details: message });
     }
   });
 
