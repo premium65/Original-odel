@@ -9,10 +9,18 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
       ...options.headers,
     },
   });
+  
   if (!res.ok) {
-    const error = await res.json();
-    throw new Error(error.error || "API Error");
+    // Try to parse JSON error response
+    try {
+      const error = await res.json();
+      throw new Error(error.error || error.message || res.statusText || "API Error");
+    } catch (parseError) {
+      // If JSON parsing fails, use status text
+      throw new Error(res.statusText || "API Error");
+    }
   }
+  
   return res.json();
 }
 

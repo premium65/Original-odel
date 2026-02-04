@@ -110,20 +110,37 @@ router.put("/withdrawals/:id", async (req, res) => {
 router.post("/deposits/manual", async (req, res) => {
   try {
     const { userId, amount, description } = req.body;
+    const adminId = req.session.userId;
 
-    if (!userId || !amount) {
-      return res.status(400).json({ error: "User ID and amount are required" });
+    // Validate inputs
+    if (!userId) {
+      return res.status(400).json({ error: "User ID is required" });
     }
 
-    const numAmount = parseFloat(amount);
+    if (!amount) {
+      return res.status(400).json({ error: "Amount is required" });
+    }
+
+    // Type coercion and validation
+    const targetUserId = String(userId);
+    const numAmount = Number(amount);
+    
     if (isNaN(numAmount) || numAmount <= 0) {
-      return res.status(400).json({ error: "Invalid amount" });
+      return res.status(400).json({ error: "Amount must be a positive number" });
     }
+
+    // Verify user exists
+    const userCheck = await db.select().from(users).where(eq(users.id, targetUserId)).limit(1);
+    if (!userCheck.length) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    console.log(`[MANUAL_DEPOSIT] Admin ${adminId} adding ${numAmount} LKR to user ${targetUserId}`);
 
     // Create deposit record
     const deposit = await db.insert(deposits).values({
-      userId,
-      amount: numAmount.toFixed(2),
+      userId: targetUserId,
+      amount: String(numAmount),
       type: "manual_add",
       method: "admin_manual",
       description: description || "Manual deposit by admin",
@@ -135,21 +152,24 @@ router.post("/deposits/manual", async (req, res) => {
     await db.update(users).set({
       balance: sql`${users.balance} + ${numAmount}::numeric`,
       hasDeposit: true
-    }).where(eq(users.id, userId));
+    }).where(eq(users.id, targetUserId));
 
     // Create transaction record
     await db.insert(transactions).values({
-      userId,
+      userId: targetUserId,
       type: "deposit",
-      amount: numAmount.toFixed(2),
+      amount: String(numAmount),
       status: "approved",
       description: description || "Manual deposit by admin"
     });
 
-    res.json({ success: true, deposit: deposit[0] });
+    console.log(`[MANUAL_DEPOSIT] Success: Deposit ${deposit[0].id} created for user ${targetUserId}`);
+    
+    res.status(201).json({ success: true, deposit: deposit[0] });
   } catch (error) {
-    console.error("Manual deposit error:", error);
-    res.status(500).json({ error: "Server error" });
+    console.error("[MANUAL_DEPOSIT] Error:", error);
+    const errorMessage = error instanceof Error ? error.message : "Server error";
+    res.status(500).json({ error: errorMessage });
   }
 });
 

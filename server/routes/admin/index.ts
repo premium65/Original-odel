@@ -12,18 +12,32 @@ import { storage } from "../../storage";
 async function requireAdmin(req: Request, res: Response, next: NextFunction) {
     try {
         if (!req.session.userId) {
+            console.log("[ADMIN_AUTH_MIDDLEWARE] No session userId found");
             return res.status(401).json({ error: "Not authenticated" });
         }
 
+        const sessionUserId = req.session.userId;
+        
         // Handle hardcoded admin case
-        if (req.session.userId === "admin" && (req.session as any).isAdmin) {
+        if (sessionUserId === "admin" && (req.session as any).isAdmin) {
             return next();
         }
 
+        // Normalize userId - try both string and numeric forms for lookups
+        const userIdString = String(sessionUserId);
+        const userIdNumber = isNaN(Number(sessionUserId)) ? null : Number(sessionUserId);
+
         // Try PostgreSQL first
-        const user = await storage.getUser(req.session.userId);
+        let user = await storage.getUser(userIdString);
+        
+        // If not found and we have a numeric ID, try that too
+        if (!user && userIdNumber !== null) {
+            user = await storage.getUser(String(userIdNumber));
+        }
+        
         if (user) {
             if (!user.isAdmin) {
+                console.log(`[ADMIN_AUTH_MIDDLEWARE] User ${user.id} is not an admin`);
                 return res.status(403).json({ error: "Admin access required" });
             }
             return next();
@@ -34,9 +48,13 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction) {
         const { mongoStorage } = await import("../../mongoStorage");
         if (isMongoConnected()) {
             try {
-                const mongoUser = await mongoStorage.getUser(req.session.userId);
+                let mongoUser = await mongoStorage.getUser(userIdString);
+                if (!mongoUser && userIdNumber !== null) {
+                    mongoUser = await mongoStorage.getUser(String(userIdNumber));
+                }
                 if (mongoUser) {
                     if (!mongoUser.isAdmin) {
+                        console.log(`[ADMIN_AUTH_MIDDLEWARE] MongoDB user ${mongoUser.id} is not an admin`);
                         return res.status(403).json({ error: "Admin access required" });
                     }
                     return next();
@@ -48,14 +66,16 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction) {
 
         // Try in-memory fallback
         const { inMemoryUsers } = await import("../../memStorage");
-        const memUser = inMemoryUsers.find(u => u.id === req.session.userId);
+        const memUser = inMemoryUsers.find(u => u.id === userIdString || (userIdNumber !== null && u.id === String(userIdNumber)));
         if (memUser) {
             if (!memUser.isAdmin) {
+                console.log(`[ADMIN_AUTH_MIDDLEWARE] In-memory user ${memUser.id} is not an admin`);
                 return res.status(403).json({ error: "Admin access required" });
             }
             return next();
         }
 
+        console.log(`[ADMIN_AUTH_MIDDLEWARE] User not found in any storage: sessionId=${sessionUserId}`);
         return res.status(403).json({ error: "Admin access required" });
     } catch (error) {
         console.error("[ADMIN_AUTH_MIDDLEWARE] Error:", error);
