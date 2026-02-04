@@ -109,20 +109,29 @@ router.put("/withdrawals/:id", async (req, res) => {
 // Create manual deposit
 router.post("/deposits/manual", async (req, res) => {
   try {
+    // TEMP DEBUG: log incoming body so we can see exactly what frontend sends
+    console.log("[ADMIN][manual deposit] req.body:", req.body);
+
     const { userId, amount, description } = req.body;
 
-    if (!userId || !amount) {
+    if (userId === undefined || amount === undefined) {
       return res.status(400).json({ error: "User ID and amount are required" });
     }
 
+    const numericUserId = Number(userId);
     const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount <= 0) {
+
+    if (Number.isNaN(numericUserId) || numericUserId <= 0) {
+      return res.status(400).json({ error: "Invalid userId" });
+    }
+
+    if (Number.isNaN(numAmount) || numAmount <= 0) {
       return res.status(400).json({ error: "Invalid amount" });
     }
 
     // Create deposit record
     const deposit = await db.insert(deposits).values({
-      userId,
+      userId: String(numericUserId),
       amount: numAmount.toFixed(2),
       type: "manual_add",
       method: "admin_manual",
@@ -135,11 +144,11 @@ router.post("/deposits/manual", async (req, res) => {
     await db.update(users).set({
       balance: sql`${users.balance} + ${numAmount}::numeric`,
       hasDeposit: true
-    }).where(eq(users.id, userId));
+    }).where(eq(users.id, String(numericUserId)));
 
     // Create transaction record
     await db.insert(transactions).values({
-      userId,
+      userId: String(numericUserId),
       type: "deposit",
       amount: numAmount.toFixed(2),
       status: "approved",

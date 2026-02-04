@@ -38,8 +38,8 @@ export default function Deposits() {
   ).slice(0, 5);
 
   const manualDepositMutation = useMutation({
-    mutationFn: (data: { userId: string; amount: string; description?: string }) =>
-      api.createManualDeposit(data),
+    mutationFn: (data: { userId: number; amount: string; description?: string }) =>
+      api.createManualDeposit(data as any),
     onSuccess: () => {
       toast({ title: "Deposit Added!", description: "Manual deposit has been added successfully." });
       queryClient.invalidateQueries({ queryKey: ["admin-deposits"] });
@@ -54,6 +54,36 @@ export default function Deposits() {
       toast({ title: "Failed to add deposit", description: error.message, variant: "destructive" });
     }
   });
+
+  const handleCreateDeposit = () => {
+    if (!selectedUser || !depositAmount) {
+      toast({ 
+        title: "Error", 
+        description: "Please select user and enter amount", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    const userId = typeof selectedUser === 'object' ? selectedUser.id ?? selectedUser : selectedUser;
+    const numericUserId = Number(userId);
+    const numAmount = parseFloat(String(depositAmount));
+
+    if (Number.isNaN(numericUserId) || Number.isNaN(numAmount) || numAmount <= 0) {
+      toast({ 
+        title: "Invalid input", 
+        description: "Please provide a valid user and amount", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    manualDepositMutation.mutate({
+      userId: numericUserId,
+      amount: String(numAmount),
+      description: depositDescription || undefined,
+    });
+  };
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
@@ -298,15 +328,7 @@ export default function Deposits() {
                 Cancel
               </button>
               <button
-                onClick={() => {
-                  if (selectedUser && depositAmount) {
-                    manualDepositMutation.mutate({
-                      userId: selectedUser.id,
-                      amount: depositAmount,
-                      description: depositDescription || undefined
-                    });
-                  }
-                }}
+                onClick={handleCreateDeposit}
                 disabled={manualDepositMutation.isPending || !selectedUser || !depositAmount}
                 className="px-4 py-2 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-lg flex items-center gap-2 disabled:opacity-50"
               >
