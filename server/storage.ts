@@ -225,6 +225,12 @@ export class DatabaseStorage implements IStorage {
 
   // Ad Click operations
   async recordAdClick(userId: string, adId: number, earnedAmount: string): Promise<AdClick> {
+    // Try 3 approaches in order:
+    // 1. Drizzle insert (with earned_amount)
+    // 2. Raw SQL with earned_amount
+    // 3. Raw SQL without earned_amount (if column doesn't exist)
+
+    // Attempt 1: Drizzle ORM insert
     try {
       const [click] = await db
         .insert(adClicks)
@@ -232,23 +238,53 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return click;
     } catch (err: any) {
-      // Fallback: if earned_amount column doesn't exist yet, try raw SQL insert
-      console.error("[recordAdClick] Drizzle insert failed, trying raw SQL fallback:", err?.message);
+      console.error("[recordAdClick] Drizzle insert failed:", err?.message);
+    }
+
+    // Attempt 2: Raw SQL with earned_amount
+    try {
       const result = await db.execute(
         sql`INSERT INTO ad_clicks (user_id, ad_id, earned_amount, created_at)
             VALUES (${userId}, ${adId}, ${earnedAmount}, NOW())
             RETURNING *`
       );
       const row = (result as any).rows?.[0] || (result as any)[0];
-      if (!row) throw new Error("Failed to insert ad click record");
-      return {
-        id: row.id,
-        userId: row.user_id,
-        adId: row.ad_id,
-        earnedAmount: row.earned_amount,
-        createdAt: row.created_at,
-      } as AdClick;
+      if (row) {
+        return {
+          id: row.id,
+          userId: row.user_id,
+          adId: row.ad_id,
+          earnedAmount: row.earned_amount || earnedAmount,
+          createdAt: row.created_at,
+        } as AdClick;
+      }
+    } catch (err2: any) {
+      console.error("[recordAdClick] Raw SQL with earned_amount failed:", err2?.message);
     }
+
+    // Attempt 3: Raw SQL without earned_amount (column may not exist)
+    try {
+      const result = await db.execute(
+        sql`INSERT INTO ad_clicks (user_id, ad_id, created_at)
+            VALUES (${userId}, ${adId}, NOW())
+            RETURNING *`
+      );
+      const row = (result as any).rows?.[0] || (result as any)[0];
+      if (row) {
+        return {
+          id: row.id,
+          userId: row.user_id,
+          adId: row.ad_id,
+          earnedAmount: row.earned_amount || earnedAmount,
+          createdAt: row.created_at,
+        } as AdClick;
+      }
+    } catch (err3: any) {
+      console.error("[recordAdClick] Raw SQL without earned_amount failed:", err3?.message);
+      throw err3;
+    }
+
+    throw new Error("Failed to insert ad click record after all attempts");
   }
 
   async getUserAdClicks(userId: string): Promise<AdClick[]> {
@@ -387,11 +423,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserAdClickCount(userId: string): Promise<number> {
-    const clicks = await db
-      .select()
-      .from(adClicks)
-      .where(eq(adClicks.userId, userId));
-    return clicks.length;
+    try {
+      const result = await db.execute(
+        sql`SELECT COUNT(*)::int as count FROM ad_clicks WHERE user_id = ${userId}`
+      );
+      const row = (result as any).rows?.[0] || (result as any)[0];
+      return row?.count || 0;
+    } catch {
+      return 0;
+    }
   }
 
   async resetDestinationAmount(userId: string): Promise<User | undefined> {
