@@ -53,7 +53,17 @@ export class MongoStorage {
   }
 
   async updateUserStatus(userId: string, status: string): Promise<User | undefined> {
-    return undefined;
+    const collection = getUsersCollection();
+    try {
+      const result = await collection.findOneAndUpdate(
+        { _id: new ObjectId(userId) },
+        { $set: { status } },
+        { returnDocument: "after" }
+      );
+      return result as unknown as User | undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   async updateUserDetails(id: string, data: any): Promise<User | undefined> { return undefined; }
@@ -93,7 +103,30 @@ export class MongoStorage {
   async approveWithdrawal(id: number, adminId: string): Promise<Withdrawal | undefined> { return undefined; }
   async rejectWithdrawal(id: number, adminId: string, notes: string): Promise<Withdrawal | undefined> { return undefined; }
 
-  async updateUser(id: string | number, data: any): Promise<User | undefined> { return undefined; }
+  async updateUser(id: string | number, data: any): Promise<User | undefined> {
+    const collection = getUsersCollection();
+    try {
+      const result = await collection.findOneAndUpdate(
+        { _id: new ObjectId(id.toString()) },
+        { $set: data },
+        { returnDocument: "after" }
+      );
+      return result as unknown as User | undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  async deleteUser(userId: string): Promise<boolean> {
+    const collection = getUsersCollection();
+    try {
+      const result = await collection.deleteOne({ _id: new ObjectId(userId) });
+      return result.deletedCount > 0;
+    } catch {
+      return false;
+    }
+  }
+
   async resetUserAds(userId: string | number): Promise<User | undefined> { return undefined; }
   async getAllDeposits(): Promise<User[]> { return []; }
   async getAllCommissions(): Promise<User[]> { return []; }

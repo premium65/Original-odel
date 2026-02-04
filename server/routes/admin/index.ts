@@ -20,13 +20,43 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction) {
             return next();
         }
 
-        // Database lookup
+        // Try PostgreSQL first
         const user = await storage.getUser(req.session.userId);
-        if (!user || !user.isAdmin) {
-            return res.status(403).json({ error: "Admin access required" });
+        if (user) {
+            if (!user.isAdmin) {
+                return res.status(403).json({ error: "Admin access required" });
+            }
+            return next();
         }
 
-        next();
+        // Try MongoDB fallback
+        const { isMongoConnected } = await import("../../mongoConnection");
+        const { mongoStorage } = await import("../../mongoStorage");
+        if (isMongoConnected()) {
+            try {
+                const mongoUser = await mongoStorage.getUser(req.session.userId);
+                if (mongoUser) {
+                    if (!mongoUser.isAdmin) {
+                        return res.status(403).json({ error: "Admin access required" });
+                    }
+                    return next();
+                }
+            } catch (err) {
+                console.error("[ADMIN_AUTH_MIDDLEWARE] MongoDB error:", err);
+            }
+        }
+
+        // Try in-memory fallback
+        const { inMemoryUsers } = await import("../../memStorage");
+        const memUser = inMemoryUsers.find(u => u.id === req.session.userId);
+        if (memUser) {
+            if (!memUser.isAdmin) {
+                return res.status(403).json({ error: "Admin access required" });
+            }
+            return next();
+        }
+
+        return res.status(403).json({ error: "Admin access required" });
     } catch (error) {
         console.error("[ADMIN_AUTH_MIDDLEWARE] Error:", error);
         return res.status(500).json({ error: "Authentication error" });
