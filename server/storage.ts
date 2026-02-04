@@ -627,6 +627,40 @@ export class DatabaseStorage implements IStorage {
     const { premiumPurchases } = await import("@shared/schema");
     return await db.select().from(premiumPurchases).orderBy(desc(premiumPurchases.createdAt));
   }
+
+  async getAllPremiumPlans(): Promise<any[]> {
+    if (!db) return [];
+    const { premiumPlans } = await import("@shared/schema");
+    return await db.select().from(premiumPlans).orderBy(premiumPlans.sortOrder);
+  }
+
+  async getPremiumPlan(id: number): Promise<any | undefined> {
+    if (!db) return undefined;
+    const { premiumPlans } = await import("@shared/schema");
+    const [plan] = await db.select().from(premiumPlans).where(eq(premiumPlans.id, id));
+    return plan;
+  }
+
+  async createPremiumPlan(data: any): Promise<any> {
+    if (!db) throw new Error("Database not initialized");
+    const { premiumPlans } = await import("@shared/schema");
+    const [plan] = await db.insert(premiumPlans).values(data).returning();
+    return plan;
+  }
+
+  async updatePremiumPlan(id: number, data: any): Promise<any | undefined> {
+    if (!db) return undefined;
+    const { premiumPlans } = await import("@shared/schema");
+    const [plan] = await db.update(premiumPlans).set(data).where(eq(premiumPlans.id, id)).returning();
+    return plan;
+  }
+
+  async deletePremiumPlan(id: number): Promise<boolean> {
+    if (!db) return false;
+    const { premiumPlans } = await import("@shared/schema");
+    const result = await db.delete(premiumPlans).where(eq(premiumPlans.id, id));
+    return true;
+  }
 }
 
 export const storage = new DatabaseStorage();
