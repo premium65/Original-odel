@@ -335,8 +335,8 @@ export class DatabaseStorage implements IStorage {
     const [user] = await db
       .update(users)
       .set({
-        adsClicked: 0,
-        // Add other ad-related resets if necessary
+        totalAdsCompleted: 0,
+        restrictedAdsCompleted: 0,
       })
       .where(eq(users.id, userId.toString()))
       .returning();
@@ -545,10 +545,10 @@ export class DatabaseStorage implements IStorage {
       .values({
         userId,
         amount,
-        bankFullName: bankDetails.fullName,
-        bankAccountNumber: bankDetails.accountNumber,
+        method: "Bank Transfer",
         bankName: bankDetails.bankName,
-        bankBranch: bankDetails.branch,
+        bankAccount: bankDetails.accountNumber,
+        accountDetails: `${bankDetails.fullName} - ${bankDetails.branch}`,
       })
       .returning();
     return withdrawal;

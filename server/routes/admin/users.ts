@@ -306,8 +306,56 @@ router.post("/:id/balance", async (req, res) => {
 // Freeze user
 router.post("/:id/freeze", async (req, res) => {
   try {
-    const updated = await db.update(users).set({ status: "frozen", updatedAt: new Date() }).where(eq(users.id, req.params.id)).returning();
-    res.json(updated[0]);
+    const userId = req.params.id;
+
+    // Try PostgreSQL first
+    if (db) {
+      const updated = await db.update(users).set({ status: "frozen", updatedAt: new Date() }).where(eq(users.id, userId)).returning();
+      if (updated.length) {
+        return res.json(updated[0]);
+      }
+    }
+
+    // Try MongoDB fallback
+    const { isMongoConnected } = await import("../../mongoConnection");
+    const { mongoStorage } = await import("../../mongoStorage");
+    if (isMongoConnected()) {
+      const mongoUser = await mongoStorage.updateUserStatus(userId, "frozen");
+      if (mongoUser) {
+        return res.json(mongoUser);
+      }
+    }
+
+    res.status(404).json({ error: "User not found" });
+  } catch (error) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Unfreeze/reactivate user
+router.post("/:id/unfreeze", async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    // Try PostgreSQL first
+    if (db) {
+      const updated = await db.update(users).set({ status: "active", updatedAt: new Date() }).where(eq(users.id, userId)).returning();
+      if (updated.length) {
+        return res.json(updated[0]);
+      }
+    }
+
+    // Try MongoDB fallback
+    const { isMongoConnected } = await import("../../mongoConnection");
+    const { mongoStorage } = await import("../../mongoStorage");
+    if (isMongoConnected()) {
+      const mongoUser = await mongoStorage.updateUserStatus(userId, "active");
+      if (mongoUser) {
+        return res.json(mongoUser);
+      }
+    }
+
+    res.status(404).json({ error: "User not found" });
   } catch (error) {
     res.status(500).json({ error: "Server error" });
   }

@@ -548,8 +548,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const clickMap = new Map<number, Date>();
         userClicks.forEach(click => {
           const existing = clickMap.get(click.adId);
-          if (!existing || new Date(click.clickedAt) > existing) {
-            clickMap.set(click.adId, new Date(click.clickedAt));
+          if (!existing || new Date(click.createdAt!) > existing) {
+            clickMap.set(click.adId, new Date(click.createdAt!));
           }
         });
 
