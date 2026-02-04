@@ -673,6 +673,65 @@ router.post("/:id/ebonus", async (req, res) => {
   }
 });
 
+// Manual deposit via user route (backward-compatible adapter)
+router.post("/:id/deposit", async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { amount, description } = req.body;
+
+    if (amount === undefined || amount === null || amount === "") {
+      return res.status(400).json({ error: "Amount is required" });
+    }
+    const numAmount = Number(amount);
+    if (!Number.isFinite(numAmount) || numAmount <= 0) {
+      return res.status(400).json({ error: "Amount must be a positive number" });
+    }
+
+    // Verify user exists
+    const existingUser = await db.select({ id: users.id }).from(users).where(eq(users.id, userId)).limit(1);
+    if (!existingUser.length) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Import deposits and transactions tables
+    const { deposits, transactions } = await import("@shared/schema");
+
+    console.log(`[MANUAL_DEPOSIT] Admin creating deposit via user route: userId=${userId}, amount=${numAmount}`);
+
+    // Create deposit record
+    const deposit = await db.insert(deposits).values({
+      userId,
+      amount: numAmount.toFixed(2),
+      type: "manual_add",
+      method: "admin_manual",
+      description: description || "Manual deposit by admin",
+      reference: `MANUAL-${Date.now()}`,
+      status: "approved"
+    }).returning();
+
+    // Update user balance
+    await db.update(users).set({
+      balance: sql`COALESCE(${users.balance}, 0) + ${numAmount}::numeric`,
+      hasDeposit: true
+    }).where(eq(users.id, userId));
+
+    // Create transaction record
+    await db.insert(transactions).values({
+      userId,
+      type: "deposit",
+      amount: numAmount.toFixed(2),
+      status: "approved",
+      description: description || "Manual deposit by admin"
+    });
+
+    console.log(`[MANUAL_DEPOSIT] Success via user route: depositId=${deposit[0]?.id}, userId=${userId}, amount=${numAmount}`);
+    res.status(201).json({ success: true, deposit: deposit[0] });
+  } catch (error) {
+    console.error("[MANUAL_DEPOSIT] Error via user route:", error);
+    res.status(500).json({ error: "Failed to create manual deposit" });
+  }
+});
+
 // Toggle admin status
 router.post("/:id/toggle-admin", async (req, res) => {
   try {

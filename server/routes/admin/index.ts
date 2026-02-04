@@ -11,17 +11,20 @@ import { storage } from "../../storage";
 // Admin authentication middleware
 async function requireAdmin(req: Request, res: Response, next: NextFunction) {
     try {
-        if (!req.session.userId) {
+        // Normalize userId to string (may arrive as number from MongoDB or other session stores)
+        const rawUserId = req.session.userId;
+        if (!rawUserId) {
             return res.status(401).json({ error: "Not authenticated" });
         }
+        const userId = String(rawUserId);
 
         // Handle hardcoded admin case
-        if (req.session.userId === "admin" && (req.session as any).isAdmin) {
+        if (userId === "admin" && (req.session as any).isAdmin) {
             return next();
         }
 
         // Try PostgreSQL first
-        const user = await storage.getUser(req.session.userId);
+        const user = await storage.getUser(userId);
         if (user) {
             if (!user.isAdmin) {
                 return res.status(403).json({ error: "Admin access required" });
@@ -34,7 +37,7 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction) {
         const { mongoStorage } = await import("../../mongoStorage");
         if (isMongoConnected()) {
             try {
-                const mongoUser = await mongoStorage.getUser(req.session.userId);
+                const mongoUser = await mongoStorage.getUser(userId);
                 if (mongoUser) {
                     if (!mongoUser.isAdmin) {
                         return res.status(403).json({ error: "Admin access required" });
@@ -48,7 +51,7 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction) {
 
         // Try in-memory fallback
         const { inMemoryUsers } = await import("../../memStorage");
-        const memUser = inMemoryUsers.find(u => u.id === req.session.userId);
+        const memUser = inMemoryUsers.find(u => u.id === userId);
         if (memUser) {
             if (!memUser.isAdmin) {
                 return res.status(403).json({ error: "Admin access required" });
