@@ -110,46 +110,72 @@ router.put("/withdrawals/:id", async (req, res) => {
 router.post("/deposits/manual", async (req, res) => {
   try {
     const { userId, amount, description } = req.body;
+    const adminId = req.session.userId ? String(req.session.userId) : "unknown";
 
-    if (!userId || !amount) {
-      return res.status(400).json({ error: "User ID and amount are required" });
+    // Validation
+    if (!userId) {
+      console.warn(`[MANUAL_DEPOSIT] Missing userId, admin: ${adminId}`);
+      return res.status(400).json({ error: "User ID is required" });
     }
 
-    const numAmount = parseFloat(amount);
+    if (!amount) {
+      console.warn(`[MANUAL_DEPOSIT] Missing amount, admin: ${adminId}, userId: ${userId}`);
+      return res.status(400).json({ error: "Amount is required" });
+    }
+
+    // Coerce to number and validate
+    const numAmount = Number(amount);
     if (isNaN(numAmount) || numAmount <= 0) {
-      return res.status(400).json({ error: "Invalid amount" });
+      console.warn(`[MANUAL_DEPOSIT] Invalid amount: ${amount}, admin: ${adminId}, userId: ${userId}`);
+      return res.status(400).json({ error: "Amount must be a positive number" });
     }
 
-    // Create deposit record
-    const deposit = await db.insert(deposits).values({
-      userId,
-      amount: numAmount.toFixed(2),
-      type: "manual_add",
-      method: "admin_manual",
-      description: description || "Manual deposit by admin",
-      reference: `MANUAL-${Date.now()}`,
-      status: "approved"
-    }).returning();
+    // Normalize userId
+    const targetUserId = String(userId);
 
-    // Add amount to user balance
-    await db.update(users).set({
-      balance: sql`${users.balance} + ${numAmount}::numeric`,
-      hasDeposit: true
-    }).where(eq(users.id, userId));
+    // Verify user exists before proceeding
+    const existingUser = await db.select().from(users).where(eq(users.id, targetUserId)).limit(1);
+    if (!existingUser.length) {
+      console.warn(`[MANUAL_DEPOSIT] User not found: ${targetUserId}, admin: ${adminId}`);
+      return res.status(404).json({ error: "User not found" });
+    }
 
-    // Create transaction record
-    await db.insert(transactions).values({
-      userId,
-      type: "deposit",
-      amount: numAmount.toFixed(2),
-      status: "approved",
-      description: description || "Manual deposit by admin"
+    // Use Drizzle transaction for atomicity
+    const result = await db.transaction(async (tx) => {
+      // 1. Create deposit record
+      const [deposit] = await tx.insert(deposits).values({
+        userId: targetUserId,
+        amount: numAmount.toFixed(2),
+        type: "manual_add",
+        method: "admin_manual",
+        description: description || "Manual deposit by admin",
+        reference: `MANUAL-${Date.now()}`,
+        status: "approved"
+      }).returning();
+
+      // 2. Add amount to user balance
+      await tx.update(users).set({
+        balance: sql`${users.balance} + ${numAmount}::numeric`,
+        hasDeposit: true
+      }).where(eq(users.id, targetUserId));
+
+      // 3. Create transaction record
+      await tx.insert(transactions).values({
+        userId: targetUserId,
+        type: "deposit",
+        amount: numAmount.toFixed(2),
+        status: "approved",
+        description: description || "Manual deposit by admin"
+      });
+
+      return deposit;
     });
 
-    res.json({ success: true, deposit: deposit[0] });
-  } catch (error) {
-    console.error("Manual deposit error:", error);
-    res.status(500).json({ error: "Server error" });
+    console.log(`[MANUAL_DEPOSIT] Success: admin ${adminId} added ${numAmount} LKR to user ${targetUserId}`);
+    res.status(201).json({ success: true, deposit: result });
+  } catch (error: any) {
+    console.error("[MANUAL_DEPOSIT] Error:", error);
+    res.status(500).json({ error: error.message || "Failed to create manual deposit" });
   }
 });
 

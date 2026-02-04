@@ -53,11 +53,16 @@ router.post("/login", async (req, res) => {
       return res.status(403).json({ error: "Access denied" });
     }
 
-    // Set session
-    req.session.userId = user[0].id;
+    // Set session - normalize userId as string and set isAdmin flag
+    req.session.userId = String(user[0].id);
+    req.session.isAdmin = true;
 
     req.session.save((err) => {
-      if (err) return res.status(500).json({ error: "Session save error" });
+      if (err) {
+        console.error("[ADMIN_AUTH] Session save error:", err);
+        return res.status(500).json({ error: "Session save error" });
+      }
+      console.log(`[ADMIN_AUTH] Login successful for user ${user[0].username}, session userId: ${req.session.userId}`);
       res.json({ user: { id: user[0].id, username: user[0].username, email: user[0].email, isAdmin: user[0].isAdmin } });
     });
   } catch (error) {
@@ -77,10 +82,16 @@ router.post("/logout", (req, res) => {
 // Get current user
 router.get("/me", async (req, res) => {
   try {
-    if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
+    // Normalize session userId
+    const sessionUserId = req.session.userId ? String(req.session.userId) : null;
+    
+    if (!sessionUserId) {
+      console.warn("[ADMIN_AUTH] /me called without userId in session");
+      return res.status(401).json({ error: "Not authenticated" });
+    }
 
     // Handle hardcoded admin case
-    if (req.session.userId === "admin" && req.session.isAdmin) {
+    if (sessionUserId === "admin" && req.session.isAdmin) {
       return res.json({
         id: "admin",
         username: "admin",
@@ -94,16 +105,21 @@ router.get("/me", async (req, res) => {
 
     // Database lookup if db is available
     if (!db) {
+      console.error("[ADMIN_AUTH] Database not available for /me");
       return res.status(401).json({ error: "Invalid session" });
     }
 
-    const user = await db.select().from(users).where(eq(users.id, req.session.userId)).limit(1);
+    const user = await db.select().from(users).where(eq(users.id, sessionUserId)).limit(1);
 
-    if (!user.length) return res.status(404).json({ error: "User not found" });
+    if (!user.length) {
+      console.warn(`[ADMIN_AUTH] User ${sessionUserId} not found in database for /me`);
+      return res.status(404).json({ error: "User not found" });
+    }
 
     const { password, ...userData } = user[0];
     res.json(userData);
   } catch (error) {
+    console.error("[ADMIN_AUTH] /me error:", error);
     res.status(401).json({ error: "Invalid session" });
   }
 });
