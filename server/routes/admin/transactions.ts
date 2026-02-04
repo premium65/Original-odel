@@ -111,8 +111,10 @@ router.post("/deposits/manual", async (req, res) => {
   try {
     const { userId, amount, description } = req.body;
 
-    // Log incoming request body for debugging
-    console.log("Manual deposit request body:", req.body);
+    // Log incoming request body for debugging (only in development)
+    if (process.env.NODE_ENV === 'development') {
+      console.log("Manual deposit request body:", req.body);
+    }
 
     // Validate required fields
     if (!userId || !amount) {
@@ -132,8 +134,8 @@ router.post("/deposits/manual", async (req, res) => {
     }
 
     // Verify user exists
-    const userExists = await db.select({ id: users.id }).from(users).where(eq(users.id, String(numericUserId))).limit(1);
-    if (!userExists || userExists.length === 0) {
+    const userResult = await db.select({ id: users.id }).from(users).where(eq(users.id, String(numericUserId))).limit(1);
+    if (!userResult || userResult.length === 0) {
       return res.status(404).json({ error: "User not found" });
     }
 
