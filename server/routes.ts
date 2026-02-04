@@ -32,6 +32,7 @@ async function verifyPassword(password: string, hash: string): Promise<boolean> 
 declare module "express-session" {
   interface SessionData {
     userId?: string;
+    isAdmin?: boolean;
   }
 }
 
@@ -84,13 +85,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     name: "connect.sid"
   };
 
+  // Trust proxy for secure cookies behind reverse proxy (must be set BEFORE session middleware)
+  app.set('trust proxy', 1);
+
   // Use memory session store (simpler and more reliable)
   console.log("[SESSION] Using memory session store");
 
   app.use(session(sessionConfig));
-
-  // Trust proxy for secure cookies behind reverse proxy
-  app.set('trust proxy', 1);
 
   // CORS middleware
   app.use(
@@ -376,7 +377,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Admin check
       if (username === "admin" && password === "admin123") {
         req.session.userId = "admin";
-        (req.session as any).isAdmin = true;
+        req.session.isAdmin = true;
 
         req.session.save((err) => {
           if (err) {
@@ -405,7 +406,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
+      // Try finding user by username first, then by email
       let user: any = await findUserByUsername(loginIdentifier);
+      if (!user) {
+        // Try email lookup across all storage backends
+        user = await storage.getUserByEmail(loginIdentifier);
+        if (!user && isMongoConnected()) {
+          try {
+            user = await mongoStorage.getUserByEmail(loginIdentifier);
+          } catch (e) {
+            console.error("[LOGIN] MongoDB email lookup error:", e);
+          }
+        }
+        if (!user) {
+          const memUser = inMemoryUsers.find(u => u.email === loginIdentifier || u.username === loginIdentifier);
+          if (memUser) user = memUser;
+        }
+      }
 
       if (!user) {
         return res.status(401).json({ error: "Invalid username or password" });

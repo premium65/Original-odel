@@ -19,7 +19,7 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction) {
         const userId = String(rawUserId);
 
         // Handle hardcoded admin case
-        if (userId === "admin" && (req.session as any).isAdmin) {
+        if (userId === "admin" && req.session.isAdmin) {
             return next();
         }
 

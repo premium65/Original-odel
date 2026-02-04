@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 import { db } from "../../db";
 import { users } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import { storage } from "../../storage";
 
 const router = Router();
 
@@ -53,11 +54,15 @@ router.post("/login", async (req, res) => {
       return res.status(403).json({ error: "Access denied" });
     }
 
-    // Set session
+    // Set session (store isAdmin so middleware can verify without DB roundtrip)
     req.session.userId = user[0].id;
+    req.session.isAdmin = true;
 
     req.session.save((err) => {
-      if (err) return res.status(500).json({ error: "Session save error" });
+      if (err) {
+        console.error("[ADMIN_AUTH] Session save error:", err);
+        return res.status(500).json({ error: "Session save error" });
+      }
       res.json({ user: { id: user[0].id, username: user[0].username, email: user[0].email, isAdmin: user[0].isAdmin } });
     });
   } catch (error) {
@@ -84,7 +89,7 @@ router.get("/me", async (req, res) => {
     const userId = String(rawUserId);
 
     // Handle hardcoded admin case
-    if (userId === "admin" && (req.session as any).isAdmin) {
+    if (userId === "admin" && req.session.isAdmin) {
       return res.json({
         id: "admin",
         username: "admin",
@@ -96,20 +101,40 @@ router.get("/me", async (req, res) => {
       });
     }
 
-    // Database lookup if db is available
-    if (!db) {
-      return res.status(401).json({ error: "Invalid session" });
+    // Try PostgreSQL via storage
+    const pgUser = await storage.getUser(userId);
+    if (pgUser) {
+      const { password, ...userData } = pgUser;
+      return res.json(userData);
     }
 
-    const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    // Try MongoDB fallback
+    const { isMongoConnected } = await import("../../mongoConnection");
+    const { mongoStorage } = await import("../../mongoStorage");
+    if (isMongoConnected()) {
+      try {
+        const mongoUser = await mongoStorage.getUser(userId);
+        if (mongoUser) {
+          const { password, ...userData } = mongoUser as any;
+          return res.json(userData);
+        }
+      } catch (err) {
+        console.error("[ADMIN_AUTH] /me MongoDB error:", err);
+      }
+    }
 
-    if (!user.length) return res.status(404).json({ error: "User not found" });
+    // Try in-memory fallback
+    const { inMemoryUsers } = await import("../../memStorage");
+    const memUser = inMemoryUsers.find((u: any) => u.id === userId);
+    if (memUser) {
+      const { password, ...userData } = memUser;
+      return res.json(userData);
+    }
 
-    const { password, ...userData } = user[0];
-    res.json(userData);
+    return res.status(404).json({ error: "User not found" });
   } catch (error) {
     console.error("[ADMIN_AUTH] /me error:", error);
-    res.status(401).json({ error: "Invalid session" });
+    res.status(500).json({ error: "Session lookup failed" });
   }
 });
 
