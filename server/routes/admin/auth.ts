@@ -77,10 +77,16 @@ router.post("/logout", (req, res) => {
 // Get current user
 router.get("/me", async (req, res) => {
   try {
-    if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
+    if (!req.session.userId) {
+      console.log("[ADMIN_AUTH] /me: No userId in session");
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    // Coerce userId to string for consistent handling
+    const userId = String(req.session.userId);
 
     // Handle hardcoded admin case
-    if (req.session.userId === "admin" && req.session.isAdmin) {
+    if (userId === "admin" && (req.session as any).isAdmin) {
       return res.json({
         id: "admin",
         username: "admin",
@@ -94,16 +100,21 @@ router.get("/me", async (req, res) => {
 
     // Database lookup if db is available
     if (!db) {
+      console.log("[ADMIN_AUTH] /me: Database not available");
       return res.status(401).json({ error: "Invalid session" });
     }
 
-    const user = await db.select().from(users).where(eq(users.id, req.session.userId)).limit(1);
+    const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
 
-    if (!user.length) return res.status(404).json({ error: "User not found" });
+    if (!user.length) {
+      console.log("[ADMIN_AUTH] /me: User not found:", userId);
+      return res.status(404).json({ error: "User not found" });
+    }
 
     const { password, ...userData } = user[0];
     res.json(userData);
   } catch (error) {
+    console.error("[ADMIN_AUTH] /me error:", error);
     res.status(401).json({ error: "Invalid session" });
   }
 });
