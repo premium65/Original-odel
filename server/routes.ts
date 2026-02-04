@@ -527,7 +527,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Username, email, and password are required" });
       }
 
-      // Try to create user in database, but have fallback for any issues
+      // Ensure database is available before registration
+      if (!db) {
+        return res.status(503).json({ error: "Database is not connected. Please contact support." });
+      }
+
       try {
         // Hash password
         const hashedPassword = await hashPassword(password);
@@ -582,56 +586,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ error: "Account already exists" });
         }
 
-        // If database is down or has issues, save to in-memory storage
-        console.log("Database unavailable, saving to in-memory storage");
-        const hashedPassword = await hashPassword(password);
-        const inMemoryUser = {
-          id: "mem_" + Date.now(),
-          username,
-          email,
-          password: hashedPassword,
-          firstName: firstName || '',
-          lastName: lastName || '',
-          status: 'pending',
-          isAdmin: false,
-          createdAt: new Date().toISOString(),
-          registeredAt: new Date().toISOString(),
-          milestoneAmount: "0",
-          milestoneReward: "0",
-          destinationAmount: "25000",
-          ongoingMilestone: "0",
-          totalAdsCompleted: 0,
-          points: 0,
-          pendingAmount: "0",
-          hasDeposit: false,
-          restrictedAdsCompleted: 0,
-          notificationsEnabled: true,
-          language: "en",
-          theme: "dark",
-        };
-
-        inMemoryUsers.push(inMemoryUser);
-        console.log("User saved to in-memory storage:", inMemoryUser.id, inMemoryUser.username);
-
-        return res.json({
-          success: true,
-          userId: inMemoryUser.id,
-          message: "Registration successful! Your account is pending admin approval.",
-          status: "pending",
-          note: "Account created successfully (awaiting admin activation)"
-        });
+        // Database is unavailable - return a real error instead of fake success
+        console.error("Database unavailable during registration:", errorMessage);
+        return res.status(500).json({ error: "Registration failed. Database is unavailable. Please try again later." });
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Registration error:", error);
-      // Even if everything fails, provide a graceful response
-      return res.json({
-        success: true,
-        userId: "fallback_" + Date.now(),
-        message: "Registration successful! Your account is pending admin approval.",
-        status: "pending",
-        note: "Account created successfully (processing in background)"
-      });
+      return res.status(500).json({ error: "Registration failed. Please try again later." });
     }
   });
 
@@ -694,20 +656,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let user: any = null;
 
-      // Check in-memory users first
-      const memoryUser = inMemoryUsers.find(u => u.username === loginIdentifier || u.email === loginIdentifier);
-      if (memoryUser) {
-        console.log("[LOGIN] Found user in in-memory storage");
-        user = memoryUser;
+      // Try database users
+      if (isMongoConnected()) {
+        console.log("[LOGIN] Using MongoDB for authentication");
+        user = await mongoStorage.getUserByUsername(loginIdentifier);
       } else {
-        // Try database users
-        if (isMongoConnected()) {
-          console.log("[LOGIN] Using MongoDB for authentication");
-          user = await mongoStorage.getUserByUsername(loginIdentifier);
-        } else {
-          console.log("[LOGIN] Using PostgreSQL for authentication");
-          user = await storage.getUserByUsername(loginIdentifier);
-        }
+        console.log("[LOGIN] Using PostgreSQL for authentication");
+        user = await storage.getUserByUsername(loginIdentifier);
       }
 
       console.log("[LOGIN] User found:", !!user);
