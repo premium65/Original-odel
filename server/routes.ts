@@ -35,6 +35,30 @@ declare module "express-session" {
   }
 }
 
+// Helper: find user in both MongoDB and PostgreSQL
+async function findUser(userId: string): Promise<any> {
+  let user: any = null;
+  if (isMongoConnected()) {
+    user = await mongoStorage.getUser(userId);
+  }
+  if (!user) {
+    user = await storage.getUser(userId);
+  }
+  return user;
+}
+
+// Helper: find user by username in both databases
+async function findUserByUsername(username: string): Promise<any> {
+  let user: any = null;
+  if (isMongoConnected()) {
+    user = await mongoStorage.getUserByUsername(username);
+  }
+  if (!user) {
+    user = await storage.getUserByUsername(username);
+  }
+  return user;
+}
+
 import { repairDatabase } from "./repair";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -119,7 +143,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check database
-      const user = await storage.getUser(req.session.userId);
+      const user = await findUser(req.session.userId);
       if (user) {
         const { password, ...userWithoutPassword } = user;
         return res.json(userWithoutPassword);
@@ -244,7 +268,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const user = await storage.getUser(req.session.userId);
+      const user = await findUser(req.session.userId);
       if (user && user.isAdmin) {
         return res.json({
           isLoggedIn: true,
@@ -381,15 +405,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      let user: any = null;
-
-      // Check both databases - user may be in either one
-      if (isMongoConnected()) {
-        user = await mongoStorage.getUserByUsername(loginIdentifier);
-      }
-      if (!user) {
-        user = await storage.getUserByUsername(loginIdentifier);
-      }
+      let user: any = await findUserByUsername(loginIdentifier);
 
       if (!user) {
         return res.status(401).json({ error: "Invalid username or password" });
@@ -459,15 +475,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(401).send("Not authenticated");
     }
 
-    let user: any = null;
-
-    // Check both databases - user may be in either one
-    if (isMongoConnected()) {
-      user = await mongoStorage.getUser(req.session.userId);
-    }
-    if (!user && req.session.userId) {
-      user = await storage.getUser(req.session.userId);
-    }
+    let user: any = await findUser(req.session.userId);
 
     if (!user) {
       return res.status(404).send("User not found");
@@ -488,7 +496,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).send("Not authenticated");
       }
 
-      const currentUser = await storage.getUser(req.session.userId);
+      const currentUser = await findUser(req.session.userId);
       if (!currentUser || currentUser.status !== "active") {
         return res.status(403).send("You must have an active account to submit ratings");
       }
@@ -590,7 +598,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).send("Ad not found");
       }
 
-      const user = await storage.getUser(req.session.userId);
+      const user = await findUser(req.session.userId);
       if (!user) {
         return res.status(404).send("User not found");
       }
@@ -647,7 +655,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.addMilestoneAmount(req.session.userId, priceStr);
         await storage.incrementAdsCompleted(req.session.userId);
 
-        const updatedUser = await storage.getUser(req.session.userId);
+        const updatedUser = await findUser(req.session.userId);
         const newAdsCount = updatedUser?.totalAdsCompleted || 0;
         const totalClicks = await storage.getUserAdClickCount(req.session.userId);
 
