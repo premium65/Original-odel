@@ -1,7 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcrypt";
 import { db } from "../../db";
-import { users, milestones } from "@shared/schema";
+import { users, milestones, deposits, transactions } from "@shared/schema";
 import { eq, desc, sql, and } from "drizzle-orm";
 import { storage } from "../../storage";
 
@@ -724,9 +724,6 @@ router.post("/:id/deposit", async (req, res) => {
       console.warn(`[USER_DEPOSIT_ADAPTER] User not found: ${targetUserId}, admin: ${adminId}`);
       return res.status(404).json({ error: "User not found" });
     }
-
-    // Import deposits and transactions tables
-    const { deposits, transactions } = await import("@shared/schema");
 
     // Use Drizzle transaction for atomicity
     const result = await db.transaction(async (tx) => {
