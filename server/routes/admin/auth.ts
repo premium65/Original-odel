@@ -53,11 +53,16 @@ router.post("/login", async (req, res) => {
       return res.status(403).json({ error: "Access denied" });
     }
 
-    // Set session
+    // Set session with isAdmin flag
     req.session.userId = user[0].id;
+    req.session.isAdmin = user[0].isAdmin;
 
     req.session.save((err) => {
-      if (err) return res.status(500).json({ error: "Session save error" });
+      if (err) {
+        console.error("[ADMIN_AUTH] Session save error:", err);
+        return res.status(500).json({ error: "Session save error" });
+      }
+      console.log("[ADMIN_AUTH] Login successful for admin user:", user[0].username);
       res.json({ user: { id: user[0].id, username: user[0].username, email: user[0].email, isAdmin: user[0].isAdmin } });
     });
   } catch (error) {

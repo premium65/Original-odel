@@ -695,4 +695,88 @@ router.post("/:id/toggle-admin", async (req, res) => {
   }
 });
 
+// Manual deposit (backward-compatible endpoint)
+router.post("/:id/deposit", async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { amount, description } = req.body;
+    const adminId = req.session.userId;
+
+    console.log("[MANUAL_DEPOSIT_LEGACY] Request from admin:", adminId, "for user:", userId, "amount:", amount);
+
+    // Validate inputs
+    if (!amount) {
+      console.log("[MANUAL_DEPOSIT_LEGACY] Missing amount");
+      return res.status(400).json({ error: "Amount is required" });
+    }
+
+    // Parse and validate amount
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount)) {
+      console.log("[MANUAL_DEPOSIT_LEGACY] Invalid amount format:", amount);
+      return res.status(400).json({ error: "Invalid amount format" });
+    }
+    if (numAmount <= 0) {
+      console.log("[MANUAL_DEPOSIT_LEGACY] Amount must be positive:", numAmount);
+      return res.status(400).json({ error: "Amount must be greater than zero" });
+    }
+
+    // Convert userId to string
+    const userIdStr = String(userId);
+
+    // Verify user exists
+    const existingUser = await db.select().from(users).where(eq(users.id, userIdStr)).limit(1);
+    if (!existingUser.length) {
+      console.log("[MANUAL_DEPOSIT_LEGACY] User not found:", userIdStr);
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Import required schemas
+    const { deposits, transactions } = await import("@shared/schema");
+
+    // Use transaction for atomicity
+    const result = await db.transaction(async (tx) => {
+      // Create deposit record
+      const deposit = await tx.insert(deposits).values({
+        userId: userIdStr,
+        amount: numAmount.toFixed(2),
+        type: "manual_add",
+        method: "admin_manual",
+        description: description || "Manual deposit by admin",
+        reference: `MANUAL-${Date.now()}`,
+        status: "approved"
+      }).returning();
+
+      // Add amount to user balance
+      await tx.update(users).set({
+        balance: sql`${users.balance} + ${numAmount}::numeric`,
+        hasDeposit: true,
+        updatedAt: new Date()
+      }).where(eq(users.id, userIdStr));
+
+      // Create transaction record
+      await tx.insert(transactions).values({
+        userId: userIdStr,
+        type: "deposit",
+        amount: numAmount.toFixed(2),
+        status: "approved",
+        description: description || "Manual deposit by admin"
+      });
+
+      return deposit[0];
+    });
+
+    // Fetch updated user
+    const updatedUser = await db.select().from(users).where(eq(users.id, userIdStr)).limit(1);
+    const { password: _, ...userWithoutPassword } = updatedUser[0];
+
+    console.log("[MANUAL_DEPOSIT_LEGACY] Success - Deposit ID:", result.id, "Amount:", numAmount);
+    res.status(201).json({ ...userWithoutPassword, deposit: result });
+  } catch (error: any) {
+    console.error("[MANUAL_DEPOSIT_LEGACY] Error:", error);
+    const errorMessage = error.message || "Server error";
+    res.status(500).json({ error: "Failed to process manual deposit", details: errorMessage });
+  }
+});
+
 export default router;
