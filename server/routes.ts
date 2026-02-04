@@ -383,9 +383,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let user: any = null;
 
+      // Check both databases - user may be in either one
       if (isMongoConnected()) {
         user = await mongoStorage.getUserByUsername(loginIdentifier);
-      } else {
+      }
+      if (!user) {
         user = await storage.getUserByUsername(loginIdentifier);
       }
 
@@ -459,9 +461,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     let user: any = null;
 
+    // Check both databases - user may be in either one
     if (isMongoConnected()) {
       user = await mongoStorage.getUser(req.session.userId);
-    } else if (req.session.userId) {
+    }
+    if (!user && req.session.userId) {
       user = await storage.getUser(req.session.userId);
     }
 
