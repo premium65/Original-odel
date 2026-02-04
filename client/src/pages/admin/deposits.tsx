@@ -304,8 +304,9 @@ export default function Deposits() {
                     return;
                   }
 
-                  // Normalize selectedUser to string ID
-                  // selectedUser is expected to be an object with an 'id' property
+                  // Extract userId from selectedUser
+                  // selectedUser is typically a user object from the API with an 'id' property,
+                  // but we handle the string case defensively for flexibility
                   let userIdStr = "";
                   if (typeof selectedUser === "object" && selectedUser !== null) {
                     userIdStr = String(selectedUser.id || "").trim();

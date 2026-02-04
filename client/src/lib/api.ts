@@ -1,4 +1,5 @@
 const API_BASE = "/api";
+const MAX_ERROR_MESSAGE_LENGTH = 100;
 
 class APIError extends Error {
   constructor(message: string, public status: number) {
@@ -27,7 +28,9 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
         errorMessage = json?.error || json?.message || errorMessage;
       } catch {
         // If not JSON, use the text as-is (could be HTML error page)
-        errorMessage = text.length > 100 ? `${text.substring(0, 100)}...` : text;
+        errorMessage = text.length > MAX_ERROR_MESSAGE_LENGTH 
+          ? `${text.substring(0, MAX_ERROR_MESSAGE_LENGTH)}...` 
+          : text;
       }
     }
     
