@@ -8,6 +8,7 @@ const router = Router();
 // Get all transactions
 router.get("/", async (req, res) => {
   try {
+    if (!db) return res.status(503).json({ error: "Database unavailable" });
     const allTransactions = await db.select({
       id: transactions.id,
       userId: transactions.userId,
@@ -30,6 +31,7 @@ router.get("/", async (req, res) => {
 // Get withdrawals
 router.get("/withdrawals", async (req, res) => {
   try {
+    if (!db) return res.status(503).json({ error: "Database unavailable" });
     const allWithdrawals = await db.select({
       id: withdrawals.id,
       userId: withdrawals.userId,
@@ -52,6 +54,7 @@ router.get("/withdrawals", async (req, res) => {
 // Get deposits
 router.get("/deposits", async (req, res) => {
   try {
+    if (!db) return res.status(503).json({ error: "Database unavailable" });
     const allDeposits = await db.select({
       id: deposits.id,
       userId: deposits.userId,
@@ -74,6 +77,7 @@ router.get("/deposits", async (req, res) => {
 // Approve/Reject withdrawal
 router.put("/withdrawals/:id", async (req, res) => {
   try {
+    if (!db) return res.status(503).json({ error: "Database unavailable" });
     const { status, processedBy } = req.body;
     const withdrawal = await db.select().from(withdrawals).where(eq(withdrawals.id, Number(req.params.id))).limit(1);
     if (!withdrawal.length) return res.status(404).json({ error: "Withdrawal not found" });
@@ -135,6 +139,8 @@ router.post("/deposits/manual", async (req, res) => {
       return res.status(400).json({ error: "User not found" });
     }
 
+    if (!db) return res.status(503).json({ error: "Database unavailable" });
+
     console.log(`[MANUAL_DEPOSIT] Admin creating deposit: userId=${normalizedUserId}, amount=${numAmount}`);
 
     // Create deposit record
@@ -174,6 +180,7 @@ router.post("/deposits/manual", async (req, res) => {
 // Approve deposit
 router.put("/deposits/:id", async (req, res) => {
   try {
+    if (!db) return res.status(503).json({ error: "Database unavailable" });
     const { status } = req.body;
     const deposit = await db.select().from(deposits).where(eq(deposits.id, Number(req.params.id))).limit(1);
     if (!deposit.length) return res.status(404).json({ error: "Deposit not found" });

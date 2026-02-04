@@ -32,6 +32,7 @@ async function verifyPassword(password: string, hash: string): Promise<boolean> 
 declare module "express-session" {
   interface SessionData {
     userId?: string;
+    isAdmin?: boolean;
   }
 }
 
@@ -84,13 +85,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     name: "connect.sid"
   };
 
+  // Trust proxy for secure cookies behind reverse proxy (must be set BEFORE session middleware)
+  app.set('trust proxy', 1);
+
   // Use memory session store (simpler and more reliable)
   console.log("[SESSION] Using memory session store");
 
   app.use(session(sessionConfig));
-
-  // Trust proxy for secure cookies behind reverse proxy
-  app.set('trust proxy', 1);
 
   // CORS middleware
   app.use(
