@@ -39,7 +39,11 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    const user = await db.select().from(users).where(eq(users.username, username)).limit(1);
+    // Search by username first, then fall back to email
+    let user = await db.select().from(users).where(eq(users.username, username)).limit(1);
+    if (!user.length) {
+      user = await db.select().from(users).where(eq(users.email, username)).limit(1);
+    }
 
     if (!user.length) {
       return res.status(401).json({ error: "Invalid credentials" });
