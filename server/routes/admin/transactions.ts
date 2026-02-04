@@ -154,9 +154,10 @@ router.post("/deposits/manual", async (req, res) => {
       status: "approved"
     }).returning();
 
-    // Add amount to user balance
+    // Add amount to user balance and milestoneAmount (withdrawable balance)
     await db.update(users).set({
       balance: sql`COALESCE(${users.balance}, 0) + ${numAmount}::numeric`,
+      milestoneAmount: sql`COALESCE(${users.milestoneAmount}, 0) + ${numAmount}::numeric`,
       hasDeposit: true
     }).where(eq(users.id, normalizedUserId));
 
@@ -186,9 +187,11 @@ router.put("/deposits/:id", async (req, res) => {
     if (!deposit.length) return res.status(404).json({ error: "Deposit not found" });
 
     if (status === "approved") {
-      // Add amount to user balance
+      // Add amount to user balance and milestoneAmount (withdrawable balance)
       await db.update(users).set({
-        balance: sql`${users.balance} + ${deposit[0].amount}`
+        balance: sql`COALESCE(${users.balance}, 0) + ${deposit[0].amount}`,
+        milestoneAmount: sql`COALESCE(${users.milestoneAmount}, 0) + ${deposit[0].amount}`,
+        hasDeposit: true
       }).where(eq(users.id, deposit[0].userId!));
     }
 
