@@ -116,8 +116,8 @@ export default function AdminAds() {
       toast({ title: "Ad created successfully!" });
       setIsCreating(false);
     },
-    onError: () => {
-      toast({ title: "Failed to create ad", variant: "destructive" });
+    onError: (err: any) => {
+      toast({ title: "Failed to create ad", description: err?.message || "Unknown error", variant: "destructive" });
     },
   });
 
@@ -127,8 +127,8 @@ export default function AdminAds() {
       queryClient.invalidateQueries({ queryKey: ["admin-ads"] });
       toast({ title: "Ad updated successfully!" });
     },
-    onError: () => {
-      toast({ title: "Failed to update ad", variant: "destructive" });
+    onError: (err: any) => {
+      toast({ title: "Failed to update ad", description: err?.message || "Unknown error", variant: "destructive" });
     },
   });
 
@@ -139,8 +139,8 @@ export default function AdminAds() {
       toast({ title: "Ad deleted successfully!" });
       setCurrentAd(null);
     },
-    onError: () => {
-      toast({ title: "Failed to delete ad", variant: "destructive" });
+    onError: (err: any) => {
+      toast({ title: "Failed to delete ad", description: err?.message || "Unknown error", variant: "destructive" });
     },
   });
 
