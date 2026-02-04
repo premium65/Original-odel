@@ -10,8 +10,17 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
     },
   });
   if (!res.ok) {
-    const error = await res.json();
-    throw new Error(error.error || "API Error");
+    const text = await res.text().catch(() => "");
+    try {
+      const json = text ? JSON.parse(text) : null;
+      throw new Error(json?.error || json?.message || `HTTP ${res.status}`);
+    } catch (e) {
+      // text wasn't JSON or parsing failed
+      if (e instanceof Error && e.message.startsWith("HTTP ")) {
+        throw e; // Re-throw if it's the HTTP error we created
+      }
+      throw new Error(text || `HTTP ${res.status}`);
+    }
   }
   return res.json();
 }

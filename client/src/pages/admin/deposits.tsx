@@ -299,13 +299,31 @@ export default function Deposits() {
               </button>
               <button
                 onClick={() => {
-                  if (selectedUser && depositAmount) {
-                    manualDepositMutation.mutate({
-                      userId: selectedUser.id,
-                      amount: depositAmount,
-                      description: depositDescription || undefined
-                    });
+                  if (!selectedUser || !depositAmount) {
+                    toast({ title: "Error", description: "Please select user and enter amount", variant: "destructive" });
+                    return;
                   }
+
+                  // selectedUser may be an object or an id — normalize to primitive id
+                  const rawUserId = typeof selectedUser === "object" ? (selectedUser.id ?? selectedUser) : selectedUser;
+                  const userIdStr = String(rawUserId).trim();
+                  const numAmount = parseFloat(String(depositAmount));
+
+                  if (!userIdStr || userIdStr === 'undefined' || userIdStr === 'null') {
+                    toast({ title: "Invalid input", description: "Please select a valid user", variant: "destructive" });
+                    return;
+                  }
+
+                  if (Number.isNaN(numAmount) || numAmount <= 0) {
+                    toast({ title: "Invalid input", description: "Please provide a positive amount", variant: "destructive" });
+                    return;
+                  }
+
+                  manualDepositMutation.mutate({
+                    userId: userIdStr,
+                    amount: String(numAmount),
+                    description: depositDescription || undefined,
+                  });
                 }}
                 disabled={manualDepositMutation.isPending || !selectedUser || !depositAmount}
                 className="px-4 py-2 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-lg flex items-center gap-2 disabled:opacity-50"
