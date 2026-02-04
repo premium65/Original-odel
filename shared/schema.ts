@@ -30,6 +30,15 @@ export const ads = pgTable("ads", {
   duration: integer("duration").default(30),
   totalViews: integer("total_views").default(0),
   isActive: boolean("is_active").default(true),
+  // Extended fields for ad cards
+  currency: text("currency").default("LKR"),
+  priceColor: text("price_color").default("#f59e0b"),
+  features: jsonb("features").default([]),
+  buttonText: text("button_text").default("Add to Cart"),
+  buttonIcon: text("button_icon").default("shopping-cart"),
+  buttonUrl: text("button_url"),
+  showOnDashboard: boolean("show_on_dashboard").default(true),
+  displayOrder: integer("display_order").default(1),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

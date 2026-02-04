@@ -37,16 +37,24 @@ export async function repairDatabase() {
         await db.execute(sql`CREATE TABLE IF NOT EXISTS ads (
             id SERIAL PRIMARY KEY,
             title TEXT NOT NULL,
-            description TEXT NOT NULL,
-            image_url TEXT NOT NULL,
-            target_url TEXT NOT NULL,
-            price DECIMAL(10,2) NOT NULL,
+            description TEXT NOT NULL DEFAULT '',
+            image_url TEXT NOT NULL DEFAULT '',
+            target_url TEXT NOT NULL DEFAULT '',
+            price DECIMAL(10,2) NOT NULL DEFAULT 0,
             type TEXT DEFAULT 'click',
             url TEXT,
             reward DECIMAL(10,2),
             duration INTEGER DEFAULT 30,
             total_views INTEGER DEFAULT 0,
             is_active BOOLEAN DEFAULT TRUE,
+            currency TEXT DEFAULT 'LKR',
+            price_color TEXT DEFAULT '#f59e0b',
+            features JSONB DEFAULT '[]',
+            button_text TEXT DEFAULT 'Add to Cart',
+            button_icon TEXT DEFAULT 'shopping-cart',
+            button_url TEXT,
+            show_on_dashboard BOOLEAN DEFAULT TRUE,
+            display_order INTEGER DEFAULT 1,
             created_at TIMESTAMP DEFAULT NOW()
         )`);
 
@@ -103,6 +111,16 @@ export async function repairDatabase() {
         await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS bonus_ads_count INTEGER`);
         await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS bonus_amount DECIMAL(10,2)`);
         await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS e_bonus_banner_url TEXT`);
+
+        // Add missing ads columns for extended ad card fields
+        await db.execute(sql`ALTER TABLE ads ADD COLUMN IF NOT EXISTS currency TEXT DEFAULT 'LKR'`);
+        await db.execute(sql`ALTER TABLE ads ADD COLUMN IF NOT EXISTS price_color TEXT DEFAULT '#f59e0b'`);
+        await db.execute(sql`ALTER TABLE ads ADD COLUMN IF NOT EXISTS features JSONB DEFAULT '[]'`);
+        await db.execute(sql`ALTER TABLE ads ADD COLUMN IF NOT EXISTS button_text TEXT DEFAULT 'Add to Cart'`);
+        await db.execute(sql`ALTER TABLE ads ADD COLUMN IF NOT EXISTS button_icon TEXT DEFAULT 'shopping-cart'`);
+        await db.execute(sql`ALTER TABLE ads ADD COLUMN IF NOT EXISTS button_url TEXT`);
+        await db.execute(sql`ALTER TABLE ads ADD COLUMN IF NOT EXISTS show_on_dashboard BOOLEAN DEFAULT TRUE`);
+        await db.execute(sql`ALTER TABLE ads ADD COLUMN IF NOT EXISTS display_order INTEGER DEFAULT 1`);
 
         // Ensure ad_clicks table exists with all required columns
         await db.execute(sql`CREATE TABLE IF NOT EXISTS ad_clicks (
