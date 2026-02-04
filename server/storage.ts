@@ -225,10 +225,18 @@ export class DatabaseStorage implements IStorage {
 
   // Ad Click operations
   async recordAdClick(userId: string, adId: number, earnedAmount: string): Promise<AdClick> {
-    // Try 3 approaches in order:
-    // 1. Drizzle insert (with earned_amount)
-    // 2. Raw SQL with earned_amount
-    // 3. Raw SQL without earned_amount (if column doesn't exist)
+    // Ensure ad_clicks table exists
+    try {
+      await db.execute(sql`CREATE TABLE IF NOT EXISTS ad_clicks (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR NOT NULL,
+        ad_id INTEGER NOT NULL,
+        earned_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`);
+    } catch (tableErr: any) {
+      console.error("[recordAdClick] Table ensure failed:", tableErr?.message);
+    }
 
     // Attempt 1: Drizzle ORM insert
     try {
@@ -241,7 +249,7 @@ export class DatabaseStorage implements IStorage {
       console.error("[recordAdClick] Drizzle insert failed:", err?.message);
     }
 
-    // Attempt 2: Raw SQL with earned_amount
+    // Attempt 2: Raw SQL insert
     try {
       const result = await db.execute(
         sql`INSERT INTO ad_clicks (user_id, ad_id, earned_amount, created_at)
@@ -259,29 +267,8 @@ export class DatabaseStorage implements IStorage {
         } as AdClick;
       }
     } catch (err2: any) {
-      console.error("[recordAdClick] Raw SQL with earned_amount failed:", err2?.message);
-    }
-
-    // Attempt 3: Raw SQL without earned_amount (column may not exist)
-    try {
-      const result = await db.execute(
-        sql`INSERT INTO ad_clicks (user_id, ad_id, created_at)
-            VALUES (${userId}, ${adId}, NOW())
-            RETURNING *`
-      );
-      const row = (result as any).rows?.[0] || (result as any)[0];
-      if (row) {
-        return {
-          id: row.id,
-          userId: row.user_id,
-          adId: row.ad_id,
-          earnedAmount: row.earned_amount || earnedAmount,
-          createdAt: row.created_at,
-        } as AdClick;
-      }
-    } catch (err3: any) {
-      console.error("[recordAdClick] Raw SQL without earned_amount failed:", err3?.message);
-      throw err3;
+      console.error("[recordAdClick] Raw SQL insert failed:", err2?.message);
+      throw err2;
     }
 
     throw new Error("Failed to insert ad click record after all attempts");
@@ -407,6 +394,7 @@ export class DatabaseStorage implements IStorage {
       'premiumTreasure': { milestoneReward: sql`${users.milestoneReward} + ${amount}` },
       'normalTreasure': { destinationAmount: sql`${users.destinationAmount} + ${amount}` },
       'bookingValue': { milestoneAmount: sql`${users.milestoneAmount} + ${amount}` },
+      'ongoingMilestone': { ongoingMilestone: amount },
     };
 
     const updateData = fieldMap[field];

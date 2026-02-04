@@ -912,121 +912,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Check if user has an active restriction
-      if (user.restrictionAdsLimit !== null && user.restrictionAdsLimit !== undefined) {
-        // Check if user has reached the restriction limit BEFORE processing
-        if (user.restrictedAdsCompleted >= user.restrictionAdsLimit) {
+      // Determine earnings
+      const isRestricted = user.restrictionAdsLimit !== null && user.restrictionAdsLimit !== undefined;
+
+      if (isRestricted) {
+        if (user.restrictedAdsCompleted >= user.restrictionAdsLimit!) {
           return res.status(403).json({
             error: "restriction_limit_reached",
             message: `You have reached the maximum of ${user.restrictionAdsLimit} ads allowed under restriction.`
           });
         }
+      }
 
-        // Under restriction: commission goes to Milestone Reward only
-        const commission = user.restrictionCommission || ad.price;
+      const earnings = isRestricted ? (user.restrictionCommission || ad.price) : ad.price;
 
-        // Record click
-        const click = await storage.recordAdClick(req.session.userId, adId, commission);
+      // Record the click - this is the critical operation
+      const click = await storage.recordAdClick(req.session.userId, adId, earnings);
 
-        // Increment restricted ads counter AFTER successful click
-        await storage.incrementRestrictedAds(req.session.userId);
+      // Post-click operations: wrapped so failures don't return 500 after click is recorded
+      let milestoneReached = false;
+      let bonusReached = false;
+      let milestoneData: any = {};
+      let bonusData: any = {};
 
-        await storage.addMilestoneReward(req.session.userId, commission);
+      try {
+        if (isRestricted) {
+          await storage.incrementRestrictedAds(req.session.userId);
+          await storage.addMilestoneReward(req.session.userId, earnings);
 
-        // Update ongoing milestone (reduce pending amount)
-        const currentOngoing = parseFloat(user.ongoingMilestone || "0");
-        const commissionValue = parseFloat(commission);
-        const newOngoing = Math.max(0, currentOngoing - commissionValue);
-        await storage.resetUserField(req.session.userId, "ongoingMilestone");
-        if (newOngoing > 0) {
-          await storage.addUserFieldValue(req.session.userId, "ongoingMilestone", newOngoing.toFixed(2));
-        }
+          // Update ongoing milestone (reduce pending amount)
+          const currentOngoing = parseFloat(user.ongoingMilestone || "0");
+          const commissionValue = parseFloat(earnings);
+          const newOngoing = Math.max(0, currentOngoing - commissionValue);
+          await storage.resetUserField(req.session.userId, "ongoingMilestone");
+          if (newOngoing > 0) {
+            await storage.addUserFieldValue(req.session.userId, "ongoingMilestone", newOngoing.toFixed(2));
+          }
 
-        // Increment total ads completed counter
-        await storage.incrementAdsCompleted(req.session.userId);
+          await storage.incrementAdsCompleted(req.session.userId);
+        } else {
+          // Normal flow: update all balances
+          await storage.addMilestoneReward(req.session.userId, ad.price);
+          await storage.addMilestoneAmount(req.session.userId, ad.price);
+          await storage.incrementAdsCompleted(req.session.userId);
 
-        res.json({
-          success: true,
-          click,
-          earnings: commission,
-          restricted: true,
-          restrictedCount: (user.restrictedAdsCompleted || 0) + 1,
-          restrictionLimit: user.restrictionAdsLimit
-        });
-      } else {
-        // Normal ad click (no restriction)
-        // Record click
-        const click = await storage.recordAdClick(req.session.userId, adId, ad.price);
+          // Check first ad and milestones
+          const updatedUser = await storage.getUser(req.session.userId);
+          const newAdsCount = updatedUser?.totalAdsCompleted || 0;
+          const totalClicks = await storage.getUserAdClickCount(req.session.userId);
 
-        // Add commission to milestone reward (total ad earnings tracker)
-        await storage.addMilestoneReward(req.session.userId, ad.price);
+          if (totalClicks === 1) {
+            await storage.resetDestinationAmount(req.session.userId);
+          }
 
-        // Add commission to milestone amount (withdrawable balance)
-        await storage.addMilestoneAmount(req.session.userId, ad.price);
+          // E-Voucher milestone check
+          if (updatedUser?.milestoneAdsCount && newAdsCount === updatedUser.milestoneAdsCount && !updatedUser.adsLocked) {
+            await storage.updateUser(req.session.userId, { adsLocked: true });
+            milestoneReached = true;
+            milestoneData = {
+              milestoneAdsCount: updatedUser.milestoneAdsCount,
+              milestoneAmount: updatedUser.milestoneAmount,
+              milestoneReward: updatedUser.milestoneReward,
+              ongoingMilestone: updatedUser.ongoingMilestone,
+              bannerUrl: updatedUser.eVoucherBannerUrl || null
+            };
+          }
 
-        // Increment total ads completed counter
-        await storage.incrementAdsCompleted(req.session.userId);
-
-        // Get updated user to check milestone
-        const updatedUser = await storage.getUser(req.session.userId);
-        const newAdsCount = updatedUser?.totalAdsCompleted || 0;
-
-        // Get total clicks to check if this is the first ad
-        const totalClicks = await storage.getUserAdClickCount(req.session.userId);
-
-        // Reset destination amount to 0 after first ad
-        if (totalClicks === 1) {
-          await storage.resetDestinationAmount(req.session.userId);
-        }
-
-        // Check if E-Voucher milestone is reached (LOCKS ads)
-        if (updatedUser?.milestoneAdsCount && newAdsCount === updatedUser.milestoneAdsCount && !updatedUser.adsLocked) {
-          // Lock ads - user must deposit to continue
-          await storage.updateUser(req.session.userId, { adsLocked: true });
-
-          return res.json({
-            success: true,
-            click,
-            earnings: ad.price,
-            restricted: false,
-            milestoneReached: true,
-            milestoneAdsCount: updatedUser.milestoneAdsCount,
-            milestoneAmount: updatedUser.milestoneAmount,
-            milestoneReward: updatedUser.milestoneReward,
-            ongoingMilestone: updatedUser.ongoingMilestone,
-            bannerUrl: updatedUser.eVoucherBannerUrl || null
-          });
-        }
-
-        // Check if E-Bonus is triggered (NO locking - instant reward)
-        if (updatedUser?.bonusAdsCount && newAdsCount === updatedUser.bonusAdsCount) {
-          // Add bonus to destinationAmount (wallet) - NO locking!
-          const bonusAmount = parseFloat(updatedUser.bonusAmount || "0");
-          const eBonusBannerUrl = updatedUser.eBonusBannerUrl;
-          if (bonusAmount > 0) {
-            const currentDestination = parseFloat(updatedUser.destinationAmount || "0");
-            await storage.updateUser(req.session.userId, {
-              destinationAmount: (currentDestination + bonusAmount).toFixed(2),
-              bonusAdsCount: null, // Clear so it doesn't trigger again
-              bonusAmount: null,
-              eBonusBannerUrl: null // Clear banner too
-            });
-
-            return res.json({
-              success: true,
-              click,
-              earnings: ad.price,
-              restricted: false,
-              bonusReached: true,
-              bonusAdsCount: updatedUser.bonusAdsCount,
-              bonusAmount: bonusAmount,
-              bannerUrl: eBonusBannerUrl || null
-            });
+          // E-Bonus check
+          if (!milestoneReached && updatedUser?.bonusAdsCount && newAdsCount === updatedUser.bonusAdsCount) {
+            const bonusAmount = parseFloat(updatedUser.bonusAmount || "0");
+            if (bonusAmount > 0) {
+              const currentDestination = parseFloat(updatedUser.destinationAmount || "0");
+              await storage.updateUser(req.session.userId, {
+                destinationAmount: (currentDestination + bonusAmount).toFixed(2),
+                bonusAdsCount: null,
+                bonusAmount: null,
+                eBonusBannerUrl: null
+              });
+              bonusReached = true;
+              bonusData = {
+                bonusAdsCount: updatedUser.bonusAdsCount,
+                bonusAmount: bonusAmount,
+                bannerUrl: updatedUser.eBonusBannerUrl || null
+              };
+            }
           }
         }
-
-        res.json({ success: true, click, earnings: ad.price, restricted: false });
+      } catch (postClickErr: any) {
+        console.error("[AD_CLICK] Post-click operation failed (click was recorded):", postClickErr?.message);
       }
+
+      // Always return success since the click was recorded
+      const response: any = {
+        success: true,
+        click,
+        earnings,
+        restricted: isRestricted,
+      };
+
+      if (isRestricted) {
+        response.restrictedCount = (user.restrictedAdsCompleted || 0) + 1;
+        response.restrictionLimit = user.restrictionAdsLimit;
+      }
+      if (milestoneReached) {
+        response.milestoneReached = true;
+        Object.assign(response, milestoneData);
+      }
+      if (bonusReached) {
+        response.bonusReached = true;
+        Object.assign(response, bonusData);
+      }
+
+      res.json(response);
     } catch (error: any) {
       console.error("Record ad click error:", error);
       const message = error?.message || error?.toString() || "Unknown error";
