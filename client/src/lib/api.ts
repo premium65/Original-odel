@@ -1,4 +1,12 @@
 const API_BASE = "/api";
+const MAX_ERROR_MESSAGE_LENGTH = 100;
+
+class APIError extends Error {
+  constructor(message: string, public status: number) {
+    super(message);
+    this.name = "APIError";
+  }
+}
 
 async function fetchAPI(endpoint: string, options: RequestInit = {}) {
   const res = await fetch(`${API_BASE}${endpoint}`, {
@@ -10,8 +18,23 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
     },
   });
   if (!res.ok) {
-    const error = await res.json();
-    throw new Error(error.error || "API Error");
+    const text = await res.text().catch(() => "");
+    let errorMessage = `HTTP ${res.status}`;
+    
+    // Try to parse as JSON and extract error message
+    if (text) {
+      try {
+        const json = JSON.parse(text);
+        errorMessage = json?.error || json?.message || errorMessage;
+      } catch {
+        // If not JSON, use the text as-is (could be HTML error page)
+        errorMessage = text.length > MAX_ERROR_MESSAGE_LENGTH 
+          ? `${text.substring(0, MAX_ERROR_MESSAGE_LENGTH)}...` 
+          : text;
+      }
+    }
+    
+    throw new APIError(errorMessage, res.status);
   }
   return res.json();
 }

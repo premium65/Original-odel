@@ -299,13 +299,38 @@ export default function Deposits() {
               </button>
               <button
                 onClick={() => {
-                  if (selectedUser && depositAmount) {
-                    manualDepositMutation.mutate({
-                      userId: selectedUser.id,
-                      amount: depositAmount,
-                      description: depositDescription || undefined
-                    });
+                  if (!selectedUser || !depositAmount) {
+                    toast({ title: "Error", description: "Please select user and enter amount", variant: "destructive" });
+                    return;
                   }
+
+                  // Extract userId from selectedUser
+                  // selectedUser is typically a user object from the API with an 'id' property,
+                  // but we handle the string case defensively for flexibility
+                  let userIdStr = "";
+                  if (typeof selectedUser === "object" && selectedUser !== null) {
+                    userIdStr = String(selectedUser.id || "").trim();
+                  } else {
+                    userIdStr = String(selectedUser).trim();
+                  }
+
+                  const numAmount = parseFloat(String(depositAmount));
+
+                  if (!userIdStr) {
+                    toast({ title: "Invalid input", description: "Please select a valid user", variant: "destructive" });
+                    return;
+                  }
+
+                  if (Number.isNaN(numAmount) || numAmount <= 0) {
+                    toast({ title: "Invalid input", description: "Please provide a positive amount", variant: "destructive" });
+                    return;
+                  }
+
+                  manualDepositMutation.mutate({
+                    userId: userIdStr,
+                    amount: String(numAmount),
+                    description: depositDescription || undefined,
+                  });
                 }}
                 disabled={manualDepositMutation.isPending || !selectedUser || !depositAmount}
                 className="px-4 py-2 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-lg flex items-center gap-2 disabled:opacity-50"
