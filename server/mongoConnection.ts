@@ -11,9 +11,11 @@ export async function connectMongo(): Promise<void> {
       return;
     }
 
-    mongoClient = new MongoClient("mongodb://127.0.0.1:27017");
+    const mongoUri = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017";
+    const mongoDbName = process.env.MONGODB_DB || "odeladspro";
+    mongoClient = new MongoClient(mongoUri);
     await mongoClient.connect();
-    db = mongoClient.db("odeladspro");
+    db = mongoClient.db(mongoDbName);
     usersCollection = db.collection("users");
     console.log("Connected to MongoDB successfully");
   } catch (error) {

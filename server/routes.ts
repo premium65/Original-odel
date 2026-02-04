@@ -527,18 +527,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Username, email, and password are required" });
       }
 
-      // Ensure database is available before registration
-      if (!db) {
-        return res.status(503).json({ error: "Database is not connected. Please contact support." });
-      }
-
       try {
         // Hash password
         const hashedPassword = await hashPassword(password);
         console.log("Password hashed successfully");
 
         // Create user in database with all required fields
-        const user = await storage.createUser({
+        const userData = {
           username,
           email,
           password: hashedPassword,
@@ -562,7 +557,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           notificationsEnabled: true,
           language: "en",
           theme: "dark",
-        });
+        };
+
+        let user = null;
+        if (isMongoConnected()) {
+          console.log("[REGISTER] Using MongoDB for registration");
+          user = await mongoStorage.createUser(userData);
+        } else if (db) {
+          console.log("[REGISTER] Using PostgreSQL for registration");
+          user = await storage.createUser(userData);
+        } else {
+          return res.status(503).json({ error: "Database is not connected. Please contact support." });
+        }
         console.log("User created successfully:", user.id, user.username);
 
         return res.json({
@@ -830,28 +836,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  const resolveUserStorage = async (userId: string) => {
+    if (isMongoConnected()) {
+      const mongoUser = await mongoStorage.getUser(userId);
+      if (mongoUser) {
+        return { user: mongoUser, storage: mongoStorage };
+      }
+    }
+    const pgUser = await storage.getUser(userId);
+    return { user: pgUser, storage };
+  };
+
+  const resolveAdsStorage = () => (db ? storage : (isMongoConnected() ? mongoStorage : storage));
+
   // Ads endpoints
   app.get("/api/ads", async (req, res) => {
     try {
-      const ads = await storage.getAllAds();
+      const adsStorage = resolveAdsStorage();
+      const ads = await adsStorage.getAllAds();
 
       // If user is authenticated, include their click history
       if (req.session.userId) {
-        const userClicks = await storage.getUserAdClicks(req.session.userId);
+        const { storage: userStorage } = await resolveUserStorage(req.session.userId);
+        const userClicks = await userStorage.getUserAdClicks(req.session.userId);
 
         // Create a map of ad ID to last click time
-        const clickMap = new Map<number, Date>();
+        const clickMap = new Map<string, Date>();
         userClicks.forEach(click => {
-          const existing = clickMap.get(click.adId);
-          if (!existing || new Date(click.clickedAt) > existing) {
-            clickMap.set(click.adId, new Date(click.clickedAt));
+          const adKey = String(click.adId);
+          const lastClick = (click as any).clickedAt || click.createdAt;
+          const existing = clickMap.get(adKey);
+          if (lastClick && (!existing || new Date(lastClick) > existing)) {
+            clickMap.set(adKey, new Date(lastClick));
           }
         });
 
         // Add lastClickedAt to each ad
         const adsWithClicks = ads.map(ad => ({
           ...ad,
-          lastClickedAt: clickMap.get(ad.id)?.toISOString() || null,
+          lastClickedAt: clickMap.get(String(ad.id))?.toISOString() || null,
         }));
 
         return res.json(adsWithClicks);
@@ -870,7 +893,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).send("Not authenticated");
       }
 
-      const count = await storage.getUserAdClickCount(req.session.userId);
+      const { storage: userStorage } = await resolveUserStorage(req.session.userId);
+      const count = await userStorage.getUserAdClickCount(req.session.userId);
       res.json({ count });
     } catch (error) {
       console.error("Fetch ad click count error:", error);
@@ -884,18 +908,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).send("Not authenticated");
       }
 
-      const adId = parseInt(req.params.adId) || (req.body.adId ? parseInt(req.body.adId) : 0);
+      const adIdParam = req.params.adId ?? req.body.adId;
+      if (!adIdParam) {
+        return res.status(400).send("Ad ID is required");
+      }
+
+      const adsStorage = resolveAdsStorage();
+      const adId = parseInt(adIdParam);
       if (!adId) {
         return res.status(400).send("Ad ID is required");
       }
 
-      const ad = await storage.getAd(adId);
+      const ad = await adsStorage.getAd(adId);
       if (!ad) {
         return res.status(404).send("Ad not found");
       }
 
       // Get user to check for restrictions
-      const user = await storage.getUser(req.session.userId);
+      const { user, storage: userStorage } = await resolveUserStorage(req.session.userId);
       if (!user) {
         return res.status(404).send("User not found");
       }
@@ -926,24 +956,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const commission = user.restrictionCommission || ad.price;
 
         // Record click
-        const click = await storage.recordAdClick(req.session.userId, adId, commission);
+        const click = await userStorage.recordAdClick(req.session.userId, adId, commission);
 
         // Increment restricted ads counter AFTER successful click
-        await storage.incrementRestrictedAds(req.session.userId);
+        await userStorage.incrementRestrictedAds(req.session.userId);
 
-        await storage.addMilestoneReward(req.session.userId, commission);
+        await userStorage.addMilestoneReward(req.session.userId, commission);
 
         // Update ongoing milestone (reduce pending amount)
         const currentOngoing = parseFloat(user.ongoingMilestone || "0");
         const commissionValue = parseFloat(commission);
         const newOngoing = Math.max(0, currentOngoing - commissionValue);
-        await storage.resetUserField(req.session.userId, "ongoingMilestone");
+        await userStorage.resetUserField(req.session.userId, "ongoingMilestone");
         if (newOngoing > 0) {
-          await storage.addUserFieldValue(req.session.userId, "ongoingMilestone", newOngoing.toFixed(2));
+          await userStorage.addUserFieldValue(req.session.userId, "ongoingMilestone", newOngoing.toFixed(2));
         }
 
         // Increment total ads completed counter
-        await storage.incrementAdsCompleted(req.session.userId);
+        await userStorage.incrementAdsCompleted(req.session.userId);
 
         res.json({
           success: true,
@@ -956,33 +986,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         // Normal ad click (no restriction)
         // Record click
-        const click = await storage.recordAdClick(req.session.userId, adId, ad.price);
+        const click = await userStorage.recordAdClick(req.session.userId, adId, ad.price);
 
         // Add commission to milestone reward (total ad earnings tracker)
-        await storage.addMilestoneReward(req.session.userId, ad.price);
+        await userStorage.addMilestoneReward(req.session.userId, ad.price);
 
         // Add commission to milestone amount (withdrawable balance)
-        await storage.addMilestoneAmount(req.session.userId, ad.price);
+        await userStorage.addMilestoneAmount(req.session.userId, ad.price);
 
         // Increment total ads completed counter
-        await storage.incrementAdsCompleted(req.session.userId);
+        await userStorage.incrementAdsCompleted(req.session.userId);
 
         // Get updated user to check milestone
-        const updatedUser = await storage.getUser(req.session.userId);
+        const updatedUser = await userStorage.getUser(req.session.userId);
         const newAdsCount = updatedUser?.totalAdsCompleted || 0;
 
         // Get total clicks to check if this is the first ad
-        const totalClicks = await storage.getUserAdClickCount(req.session.userId);
+        const totalClicks = await userStorage.getUserAdClickCount(req.session.userId);
 
         // Reset destination amount to 0 after first ad
         if (totalClicks === 1) {
-          await storage.resetDestinationAmount(req.session.userId);
+          await userStorage.resetDestinationAmount(req.session.userId);
         }
 
         // Check if E-Voucher milestone is reached (LOCKS ads)
         if (updatedUser?.milestoneAdsCount && newAdsCount === updatedUser.milestoneAdsCount && !updatedUser.adsLocked) {
           // Lock ads - user must deposit to continue
-          await storage.updateUser(req.session.userId, { adsLocked: true });
+          await userStorage.updateUser(req.session.userId, { adsLocked: true });
 
           return res.json({
             success: true,
@@ -1005,7 +1035,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const eBonusBannerUrl = updatedUser.eBonusBannerUrl;
           if (bonusAmount > 0) {
             const currentDestination = parseFloat(updatedUser.destinationAmount || "0");
-            await storage.updateUser(req.session.userId, {
+            await userStorage.updateUser(req.session.userId, {
               destinationAmount: (currentDestination + bonusAmount).toFixed(2),
               bonusAdsCount: null, // Clear so it doesn't trigger again
               bonusAmount: null,

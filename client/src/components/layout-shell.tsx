@@ -26,7 +26,7 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Re-verify admin status - type assertion since user claims are loose
-  const isAdmin = (user as any)?.isAdmin === true;
+  const isAdmin = Boolean((user as any)?.isAdmin);
 
   const navItems = [
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
