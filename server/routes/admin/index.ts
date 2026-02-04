@@ -12,18 +12,23 @@ import { storage } from "../../storage";
 async function requireAdmin(req: Request, res: Response, next: NextFunction) {
     try {
         if (!req.session.userId) {
+            console.log("[ADMIN_AUTH] No userId in session");
             return res.status(401).json({ error: "Not authenticated" });
         }
 
+        // Coerce userId to string for consistent lookups
+        const userId = String(req.session.userId);
+
         // Handle hardcoded admin case
-        if (req.session.userId === "admin" && (req.session as any).isAdmin) {
+        if (userId === "admin" && (req.session as any).isAdmin) {
             return next();
         }
 
         // Try PostgreSQL first
-        const user = await storage.getUser(req.session.userId);
+        const user = await storage.getUser(userId);
         if (user) {
             if (!user.isAdmin) {
+                console.log("[ADMIN_AUTH] User is not admin:", userId);
                 return res.status(403).json({ error: "Admin access required" });
             }
             return next();
@@ -34,9 +39,10 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction) {
         const { mongoStorage } = await import("../../mongoStorage");
         if (isMongoConnected()) {
             try {
-                const mongoUser = await mongoStorage.getUser(req.session.userId);
+                const mongoUser = await mongoStorage.getUser(userId);
                 if (mongoUser) {
                     if (!mongoUser.isAdmin) {
+                        console.log("[ADMIN_AUTH] Mongo user is not admin:", userId);
                         return res.status(403).json({ error: "Admin access required" });
                     }
                     return next();
@@ -48,14 +54,16 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction) {
 
         // Try in-memory fallback
         const { inMemoryUsers } = await import("../../memStorage");
-        const memUser = inMemoryUsers.find(u => u.id === req.session.userId);
+        const memUser = inMemoryUsers.find(u => u.id === userId);
         if (memUser) {
             if (!memUser.isAdmin) {
+                console.log("[ADMIN_AUTH] In-memory user is not admin:", userId);
                 return res.status(403).json({ error: "Admin access required" });
             }
             return next();
         }
 
+        console.log("[ADMIN_AUTH] User not found in any storage:", userId);
         return res.status(403).json({ error: "Admin access required" });
     } catch (error) {
         console.error("[ADMIN_AUTH_MIDDLEWARE] Error:", error);

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcrypt";
 import { db } from "../../db";
-import { users, milestones } from "@shared/schema";
+import { users, milestones, deposits, transactions } from "@shared/schema";
 import { eq, desc, sql, and } from "drizzle-orm";
 import { storage } from "../../storage";
 
@@ -691,6 +691,74 @@ router.post("/:id/toggle-admin", async (req, res) => {
     res.json(userWithoutPassword);
   } catch (error) {
     console.error("Toggle admin error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Adapter route: Add manual deposit to user (backward compatibility)
+// Forwards to the manual deposit endpoint logic
+router.post("/:id/deposit", async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { amount, description } = req.body;
+
+    // Validate
+    if (!amount) {
+      return res.status(400).json({ error: "Amount is required" });
+    }
+
+    const numAmount = Number(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      return res.status(400).json({ error: "Amount must be a positive number" });
+    }
+
+    // Coerce userId to string
+    const userIdStr = String(userId);
+
+    // Verify user exists
+    const userCheck = await db.select().from(users).where(eq(users.id, userIdStr)).limit(1);
+    if (!userCheck.length) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Generate reference
+    const reference = `MANUAL-${Date.now()}`;
+
+    // Log
+    const adminId = req.session?.userId || "unknown";
+    console.log(`[USER_DEPOSIT] Admin ${adminId} adding ${numAmount} LKR to user ${userIdStr}, ref: ${reference}`);
+
+    // Create deposit record
+    const deposit = await db.insert(deposits).values({
+      userId: userIdStr,
+      amount: numAmount.toFixed(2),
+      type: "manual_add",
+      method: "admin_manual",
+      description: description || "Manual deposit by admin",
+      reference,
+      status: "approved"
+    }).returning();
+
+    // Add to user balance
+    await db.update(users).set({
+      balance: sql`${users.balance} + ${numAmount}::numeric`,
+      hasDeposit: true
+    }).where(eq(users.id, userIdStr));
+
+    // Create transaction record
+    await db.insert(transactions).values({
+      userId: userIdStr,
+      type: "deposit",
+      amount: numAmount.toFixed(2),
+      status: "approved",
+      description: description || "Manual deposit by admin"
+    });
+
+    console.log(`[USER_DEPOSIT] Success: deposit ID ${deposit[0].id} created for user ${userIdStr}`);
+    res.status(201).json({ success: true, deposit: deposit[0] });
+  } catch (error) {
+    console.error("[USER_DEPOSIT] Error:", error);
+    console.error("[USER_DEPOSIT] Stack:", (error as Error).stack);
     res.status(500).json({ error: "Server error" });
   }
 });

@@ -50,8 +50,12 @@ export default function Deposits() {
       setDepositDescription("");
       setUserSearch("");
     },
-    onError: (error: any) => {
-      toast({ title: "Failed to add deposit", description: error.message, variant: "destructive" });
+    onError: (error: Error) => {
+      toast({ 
+        title: "Failed to add deposit", 
+        description: error.message || "Server error occurred",
+        variant: "destructive" 
+      });
     }
   });
 
