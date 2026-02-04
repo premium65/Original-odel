@@ -420,6 +420,8 @@ router.post("/:id/add-value", async (req, res) => {
     if (field === 'points') {
       // Set points directly
       updateExpr = { points: numValue };
+    } else if (field === 'balance') {
+      updateExpr = { balance: sql`${users.balance} + ${amount}::numeric` };
     } else if (field === 'premiumTreasure') {
       updateExpr = { milestoneReward: sql`${users.milestoneReward} + ${amount}::numeric` };
     } else if (field === 'normalTreasure') {
