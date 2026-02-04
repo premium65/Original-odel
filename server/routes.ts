@@ -963,14 +963,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
+        // Under restriction: commission goes to Milestone Reward only
+        const commission = user.restrictionCommission || ad.price;
+
         // Record click
-        const click = await storage.recordAdClick(req.session.userId, adId);
+        const click = await storage.recordAdClick(req.session.userId, adId, commission);
 
         // Increment restricted ads counter AFTER successful click
         await storage.incrementRestrictedAds(req.session.userId);
 
-        // Under restriction: commission goes to Milestone Reward only
-        const commission = user.restrictionCommission || ad.price;
         await storage.addMilestoneReward(req.session.userId, commission);
 
         // Update ongoing milestone (reduce pending amount)
@@ -996,7 +997,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         // Normal ad click (no restriction)
         // Record click
-        const click = await storage.recordAdClick(req.session.userId, adId);
+        const click = await storage.recordAdClick(req.session.userId, adId, ad.price);
 
         // Add commission to milestone reward (total ad earnings tracker)
         await storage.addMilestoneReward(req.session.userId, ad.price);
@@ -1152,14 +1153,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
+        // Under restriction: commission goes to Milestone Reward only
+        const commission = user.restrictionCommission || ad.price;
+
         // Record click
-        const click = await storage.recordAdClick(req.session.userId, parseInt(adId));
+        const click = await storage.recordAdClick(req.session.userId, parseInt(adId), commission);
 
         // Increment restricted ads counter AFTER successful click
         await storage.incrementRestrictedAds(req.session.userId);
 
-        // Under restriction: commission goes to Milestone Reward only
-        const commission = user.restrictionCommission || ad.price;
         await storage.addMilestoneReward(req.session.userId, commission);
 
         // Update ongoing milestone (reduce pending amount)
@@ -1185,7 +1187,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         // Normal ad click (no restriction)
         // Record click
-        const click = await storage.recordAdClick(req.session.userId, parseInt(adId));
+        const click = await storage.recordAdClick(req.session.userId, parseInt(adId), ad.price);
 
         // Add commission to milestone reward (total ad earnings tracker)
         await storage.addMilestoneReward(req.session.userId, ad.price);

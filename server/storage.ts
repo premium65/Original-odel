@@ -30,7 +30,7 @@ export interface IStorage {
   deleteAd(id: number): Promise<boolean>;
 
   // Ad Click operations
-  recordAdClick(userId: string, adId: number): Promise<AdClick>;
+  recordAdClick(userId: string, adId: number, earnedAmount: string): Promise<AdClick>;
   getUserAdClicks(userId: string): Promise<AdClick[]>;
   getAllAdClicks(): Promise<AdClick[]>;
 
@@ -224,10 +224,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Ad Click operations
-  async recordAdClick(userId: string, adId: number): Promise<AdClick> {
+  async recordAdClick(userId: string, adId: number, earnedAmount: string): Promise<AdClick> {
     const [click] = await db
       .insert(adClicks)
-      .values({ userId, adId })
+      .values({ userId, adId, earnedAmount })
       .returning();
     return click;
   }
