@@ -1,7 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcrypt";
 import { db } from "../../db";
-import { users, milestones } from "@shared/schema";
+import { users, milestones, deposits, transactions } from "@shared/schema";
 import { eq, desc, sql, and } from "drizzle-orm";
 import { storage } from "../../storage";
 
@@ -751,6 +751,79 @@ router.post("/:id/toggle-admin", async (req, res) => {
   } catch (error) {
     console.error("Toggle admin error:", error);
     res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Adapter route: Manual deposit for a user (alternative endpoint)
+// This is an adapter that forwards to the main transactions/deposits/manual endpoint
+router.post("/:id/deposit", async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { amount, description } = req.body;
+
+    // Validate userId
+    if (!userId) {
+      return res.status(400).json({ error: "User ID is required" });
+    }
+    const normalizedUserId = String(userId).trim();
+    if (!normalizedUserId) {
+      return res.status(400).json({ error: "User ID is required" });
+    }
+
+    // Validate and coerce amount
+    if (amount === undefined || amount === null || amount === "") {
+      return res.status(400).json({ error: "Amount is required" });
+    }
+    const numAmount = Number(amount);
+    if (!Number.isFinite(numAmount) || numAmount <= 0) {
+      return res.status(400).json({ error: "Amount must be a positive number" });
+    }
+
+    // Verify user exists
+    const user = await storage.getUser(normalizedUserId);
+    if (!user) {
+      return res.status(400).json({ error: "User not found" });
+    }
+
+    console.log(`[USER_DEPOSIT_ADAPTER] Admin creating deposit via adapter: userId=${normalizedUserId}, amount=${numAmount}`);
+
+    // Use transaction to ensure atomicity
+    const result = await db.transaction(async (tx) => {
+      // Create deposit record
+      const deposit = await tx.insert(deposits).values({
+        userId: normalizedUserId,
+        amount: numAmount.toFixed(2),
+        type: "manual_add",
+        method: "admin_manual",
+        description: description || "Manual deposit by admin",
+        reference: `MANUAL-${Date.now()}`,
+        status: "approved"
+      }).returning();
+
+      // Add amount to user balance
+      await tx.update(users).set({
+        balance: sql`COALESCE(${users.balance}, 0) + ${numAmount}::numeric`,
+        hasDeposit: true
+      }).where(eq(users.id, normalizedUserId));
+
+      // Create transaction record
+      await tx.insert(transactions).values({
+        userId: normalizedUserId,
+        type: "deposit",
+        amount: numAmount.toFixed(2),
+        status: "approved",
+        description: description || "Manual deposit by admin"
+      });
+
+      return deposit;
+    });
+
+    console.log(`[USER_DEPOSIT_ADAPTER] Success: depositId=${result[0]?.id}, userId=${normalizedUserId}, amount=${numAmount}`);
+    res.status(201).json({ success: true, deposit: result[0] });
+  } catch (error: any) {
+    console.error("[USER_DEPOSIT_ADAPTER] Error:", error);
+    const errorMessage = error?.message || "Failed to create manual deposit";
+    res.status(500).json({ error: errorMessage });
   }
 });
 
