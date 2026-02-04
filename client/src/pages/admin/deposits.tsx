@@ -327,9 +327,8 @@ export default function Deposits() {
                   }
 
                   // Validate decimal precision (max 2 decimal places)
-                  const amountStr = String(depositAmount).trim();
-                  const decimalPlaces = (amountStr.split('.')[1] || '').length;
-                  if (decimalPlaces > 2) {
+                  // Use mathematical check to avoid issues with scientific notation
+                  if (Math.round(numAmount * 100) !== numAmount * 100) {
                     toast({ title: "Invalid input", description: "Amount must have at most 2 decimal places", variant: "destructive" });
                     return;
                   }

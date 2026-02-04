@@ -139,8 +139,8 @@ router.post("/deposits/manual", async (req, res) => {
     }
 
     // Validate decimal precision (max 2 decimal places)
-    const decimalPlaces = (numAmount.toString().split('.')[1] || '').length;
-    if (decimalPlaces > 2) {
+    // Use mathematical check to avoid issues with scientific notation
+    if (Math.round(numAmount * 100) !== numAmount * 100) {
       return res.status(400).json({ error: "Amount must have at most 2 decimal places" });
     }
 
