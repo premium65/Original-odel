@@ -154,8 +154,10 @@ router.post("/deposits/manual", async (req, res) => {
       status: "approved"
     }).returning();
 
-    // Add amount to user balance
+    // Add amount to milestoneAmount (withdrawable balance) and milestoneReward (total earnings)
     await db.update(users).set({
+      milestoneAmount: sql`COALESCE(${users.milestoneAmount}, 0) + ${numAmount}::numeric`,
+      milestoneReward: sql`COALESCE(${users.milestoneReward}, 0) + ${numAmount}::numeric`,
       balance: sql`COALESCE(${users.balance}, 0) + ${numAmount}::numeric`,
       hasDeposit: true
     }).where(eq(users.id, normalizedUserId));
