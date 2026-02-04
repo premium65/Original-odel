@@ -308,7 +308,7 @@ export default function Deposits() {
                   }
                 }}
                 disabled={manualDepositMutation.isPending || !selectedUser || !depositAmount}
-                className="px-4 py-2 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-lg flex items-center gap-2 disabled:opacity-50"
+                className="px-4 py-2 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {manualDepositMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
                 Add Deposit

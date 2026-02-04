@@ -695,4 +695,77 @@ router.post("/:id/toggle-admin", async (req, res) => {
   }
 });
 
+// Manual deposit adapter (backward compatibility with useAdminDeposit hook)
+router.post("/:id/deposit", async (req, res) => {
+  try {
+    const targetUserId = req.params.id;
+    const { amount } = req.body;
+    const adminId = req.session.userId;
+
+    // Validate inputs
+    if (!amount) {
+      return res.status(400).json({ error: "Amount is required" });
+    }
+
+    // Type coercion and validation
+    const numAmount = Number(amount);
+    
+    if (isNaN(numAmount) || numAmount <= 0) {
+      return res.status(400).json({ error: "Amount must be a positive number" });
+    }
+
+    // Verify user exists
+    const userCheck = await db.select().from(users).where(eq(users.id, targetUserId)).limit(1);
+    if (!userCheck.length) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    console.log(`[MANUAL_DEPOSIT_ADAPTER] Admin ${adminId} adding ${numAmount} LKR to user ${targetUserId}`);
+
+    // Import deposits and transactions tables
+    const { deposits, transactions } = await import("@shared/schema");
+
+    // Create deposit record
+    const deposit = await db.insert(deposits).values({
+      userId: targetUserId,
+      amount: String(numAmount),
+      type: "manual_add",
+      method: "admin_manual",
+      description: "Manual deposit by admin",
+      reference: `MANUAL-${Date.now()}`,
+      status: "approved"
+    }).returning();
+
+    // Add amount to user balance
+    await db.update(users).set({
+      balance: sql`${users.balance} + ${numAmount}::numeric`,
+      hasDeposit: true
+    }).where(eq(users.id, targetUserId));
+
+    // Create transaction record
+    await db.insert(transactions).values({
+      userId: targetUserId,
+      type: "deposit",
+      amount: String(numAmount),
+      status: "approved",
+      description: "Manual deposit by admin"
+    });
+
+    console.log(`[MANUAL_DEPOSIT_ADAPTER] Success: Deposit ${deposit[0].id} created for user ${targetUserId}`);
+
+    // Return updated user
+    const updatedUser = await db.select().from(users).where(eq(users.id, targetUserId)).limit(1);
+    if (updatedUser.length) {
+      const { password: _, ...userWithoutPassword } = updatedUser[0];
+      return res.json(userWithoutPassword);
+    }
+
+    res.status(200).json({ success: true, deposit: deposit[0] });
+  } catch (error) {
+    console.error("[MANUAL_DEPOSIT_ADAPTER] Error:", error);
+    const errorMessage = error instanceof Error ? error.message : "Server error";
+    res.status(500).json({ error: errorMessage });
+  }
+});
+
 export default router;

@@ -55,9 +55,13 @@ router.post("/login", async (req, res) => {
 
     // Set session
     req.session.userId = user[0].id;
+    req.session.isAdmin = true;
 
     req.session.save((err) => {
-      if (err) return res.status(500).json({ error: "Session save error" });
+      if (err) {
+        console.error("[ADMIN_AUTH] Session save error:", err);
+        return res.status(500).json({ error: "Session save error" });
+      }
       res.json({ user: { id: user[0].id, username: user[0].username, email: user[0].email, isAdmin: user[0].isAdmin } });
     });
   } catch (error) {
