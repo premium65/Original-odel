@@ -5,6 +5,10 @@ import { eq, desc, sql } from "drizzle-orm";
 
 const router = Router();
 
+// Constants for validation
+const UUID_V4_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const MAX_DEPOSIT_AMOUNT = 1000000; // 1 million LKR
+
 // Get all transactions
 router.get("/", async (req, res) => {
   try {
@@ -129,8 +133,7 @@ router.post("/deposits/manual", async (req, res) => {
     }
 
     // Validate UUID format (basic check for UUID pattern)
-    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidPattern.test(userIdStr)) {
+    if (!UUID_V4_PATTERN.test(userIdStr)) {
       return res.status(400).json({ error: "Invalid user ID format" });
     }
 
@@ -145,7 +148,6 @@ router.post("/deposits/manual", async (req, res) => {
     }
 
     // Validate maximum amount (prevent abuse)
-    const MAX_DEPOSIT_AMOUNT = 1000000; // 1 million LKR
     if (numAmount > MAX_DEPOSIT_AMOUNT) {
       return res.status(400).json({ error: `Amount cannot exceed ${MAX_DEPOSIT_AMOUNT.toLocaleString()} LKR` });
     }
