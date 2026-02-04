@@ -77,10 +77,14 @@ router.post("/logout", (req, res) => {
 // Get current user
 router.get("/me", async (req, res) => {
   try {
-    if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
+    const rawUserId = req.session.userId;
+    if (!rawUserId) return res.status(401).json({ error: "Not authenticated" });
+
+    // Normalize userId to string (may be stored as number from MongoDB)
+    const userId = String(rawUserId);
 
     // Handle hardcoded admin case
-    if (req.session.userId === "admin" && req.session.isAdmin) {
+    if (userId === "admin" && (req.session as any).isAdmin) {
       return res.json({
         id: "admin",
         username: "admin",
@@ -97,13 +101,14 @@ router.get("/me", async (req, res) => {
       return res.status(401).json({ error: "Invalid session" });
     }
 
-    const user = await db.select().from(users).where(eq(users.id, req.session.userId)).limit(1);
+    const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
 
     if (!user.length) return res.status(404).json({ error: "User not found" });
 
     const { password, ...userData } = user[0];
     res.json(userData);
   } catch (error) {
+    console.error("[ADMIN_AUTH] /me error:", error);
     res.status(401).json({ error: "Invalid session" });
   }
 });

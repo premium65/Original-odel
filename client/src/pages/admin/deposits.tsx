@@ -205,7 +205,7 @@ export default function Deposits() {
 
       {/* Manual Deposit Modal */}
       {showManualModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setShowManualModal(false)}>
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => !manualDepositMutation.isPending && setShowManualModal(false)}>
           <div className="bg-[#1a2332] max-w-md w-full rounded-2xl border border-[#2a3a4d]" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between p-6 border-b border-[#2a3a4d]">
               <h2 className="text-xl font-bold text-white">Add Manual Deposit</h2>
@@ -294,14 +294,14 @@ export default function Deposits() {
               </div>
             </div>
             <div className="p-6 border-t border-[#2a3a4d] flex justify-end gap-3">
-              <button onClick={() => setShowManualModal(false)} className="px-4 py-2 bg-[#2a3a4d] hover:bg-[#374151] text-white rounded-lg">
+              <button onClick={() => setShowManualModal(false)} disabled={manualDepositMutation.isPending} className="px-4 py-2 bg-[#2a3a4d] hover:bg-[#374151] text-white rounded-lg disabled:opacity-50">
                 Cancel
               </button>
               <button
                 onClick={() => {
                   if (selectedUser && depositAmount) {
                     manualDepositMutation.mutate({
-                      userId: selectedUser.id,
+                      userId: String(selectedUser.id),
                       amount: depositAmount,
                       description: depositDescription || undefined
                     });

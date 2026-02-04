@@ -111,18 +111,35 @@ router.post("/deposits/manual", async (req, res) => {
   try {
     const { userId, amount, description } = req.body;
 
-    if (!userId || !amount) {
-      return res.status(400).json({ error: "User ID and amount are required" });
+    // Validate userId
+    if (!userId) {
+      return res.status(400).json({ error: "User ID is required" });
+    }
+    const normalizedUserId = String(userId).trim();
+    if (!normalizedUserId) {
+      return res.status(400).json({ error: "User ID is required" });
     }
 
-    const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount <= 0) {
-      return res.status(400).json({ error: "Invalid amount" });
+    // Validate and coerce amount
+    if (amount === undefined || amount === null || amount === "") {
+      return res.status(400).json({ error: "Amount is required" });
     }
+    const numAmount = Number(amount);
+    if (!Number.isFinite(numAmount) || numAmount <= 0) {
+      return res.status(400).json({ error: "Amount must be a positive number" });
+    }
+
+    // Verify the user exists before creating deposit
+    const existingUser = await db.select({ id: users.id }).from(users).where(eq(users.id, normalizedUserId)).limit(1);
+    if (!existingUser.length) {
+      return res.status(400).json({ error: "User not found" });
+    }
+
+    console.log(`[MANUAL_DEPOSIT] Admin creating deposit: userId=${normalizedUserId}, amount=${numAmount}`);
 
     // Create deposit record
     const deposit = await db.insert(deposits).values({
-      userId,
+      userId: normalizedUserId,
       amount: numAmount.toFixed(2),
       type: "manual_add",
       method: "admin_manual",
@@ -133,23 +150,24 @@ router.post("/deposits/manual", async (req, res) => {
 
     // Add amount to user balance
     await db.update(users).set({
-      balance: sql`${users.balance} + ${numAmount}::numeric`,
+      balance: sql`COALESCE(${users.balance}, 0) + ${numAmount}::numeric`,
       hasDeposit: true
-    }).where(eq(users.id, userId));
+    }).where(eq(users.id, normalizedUserId));
 
     // Create transaction record
     await db.insert(transactions).values({
-      userId,
+      userId: normalizedUserId,
       type: "deposit",
       amount: numAmount.toFixed(2),
       status: "approved",
       description: description || "Manual deposit by admin"
     });
 
-    res.json({ success: true, deposit: deposit[0] });
+    console.log(`[MANUAL_DEPOSIT] Success: depositId=${deposit[0]?.id}, userId=${normalizedUserId}, amount=${numAmount}`);
+    res.status(201).json({ success: true, deposit: deposit[0] });
   } catch (error) {
-    console.error("Manual deposit error:", error);
-    res.status(500).json({ error: "Server error" });
+    console.error("[MANUAL_DEPOSIT] Error:", error);
+    res.status(500).json({ error: "Failed to create manual deposit" });
   }
 });
 
