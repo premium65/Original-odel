@@ -32,6 +32,7 @@ async function verifyPassword(password: string, hash: string): Promise<boolean> 
 declare module "express-session" {
   interface SessionData {
     userId?: string;
+    isAdmin?: boolean;
   }
 }
 

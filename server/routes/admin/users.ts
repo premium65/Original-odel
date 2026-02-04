@@ -695,4 +695,92 @@ router.post("/:id/toggle-admin", async (req, res) => {
   }
 });
 
+// Adapter route for backward compatibility - manual deposit
+// This route is used by some hooks that reference /api/admin/users/:id/deposit
+// It calls the same manual deposit handler via internal redirect
+router.post("/:id/deposit", async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { amount, description } = req.body;
+
+    console.log(`[USER_DEPOSIT_ADAPTER] Redirecting deposit request for user ${userId} to manual deposit handler`);
+
+    // Validate required fields
+    if (!amount) {
+      return res.status(400).json({ error: "Amount is required" });
+    }
+
+    // Validate and coerce amount to number
+    const numAmount = Number(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      return res.status(400).json({ error: "Invalid amount. Must be a positive number." });
+    }
+
+    // Normalize userId
+    const normalizedUserId = String(userId);
+
+    // Import the necessary modules
+    const { deposits, transactions, users } = await import("@shared/schema");
+    const { sql, eq } = await import("drizzle-orm");
+    const { db } = await import("../../db");
+
+    // Verify user exists
+    const userCheck = await db.select().from(users).where(eq(users.id, normalizedUserId)).limit(1);
+    if (!userCheck.length) {
+      console.log("[USER_DEPOSIT_ADAPTER] User not found:", normalizedUserId);
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    console.log(`[USER_DEPOSIT_ADAPTER] Processing deposit for user ${userCheck[0].username}: ${numAmount} LKR`);
+
+    // Use Drizzle transaction for atomicity
+    const result = await db.transaction(async (tx) => {
+      // Create deposit record
+      const deposit = await tx.insert(deposits).values({
+        userId: normalizedUserId,
+        amount: String(numAmount),
+        type: "manual_add",
+        method: "admin_manual",
+        description: description || "Manual deposit by admin",
+        reference: `MANUAL-${Date.now()}`,
+        status: "approved"
+      }).returning();
+
+      // Add amount to user balance using numeric operation
+      await tx.update(users).set({
+        balance: sql`${users.balance} + ${numAmount}::numeric`,
+        hasDeposit: true
+      }).where(eq(users.id, normalizedUserId));
+
+      // Create transaction record
+      await tx.insert(transactions).values({
+        userId: normalizedUserId,
+        type: "deposit",
+        amount: String(numAmount),
+        status: "approved",
+        description: description || "Manual deposit by admin"
+      });
+
+      return deposit[0];
+    });
+
+    console.log(`[USER_DEPOSIT_ADAPTER] Deposit successful for user ${userCheck[0].username}: ID ${result.id}`);
+    res.json({ success: true, deposit: result });
+  } catch (error: any) {
+    console.error("[USER_DEPOSIT_ADAPTER] Error:", error);
+    console.error("[USER_DEPOSIT_ADAPTER] Stack trace:", error.stack);
+    
+    // Provide more detailed error messages
+    const errorMessage = error.message || "Unknown error occurred";
+    if (errorMessage.includes("foreign key")) {
+      return res.status(400).json({ error: "Invalid user ID - user does not exist" });
+    }
+    if (errorMessage.includes("constraint")) {
+      return res.status(400).json({ error: "Database constraint violation: " + errorMessage });
+    }
+    
+    res.status(500).json({ error: "Failed to add manual deposit. Please try again." });
+  }
+});
+
 export default router;
