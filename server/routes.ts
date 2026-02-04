@@ -878,13 +878,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/ads/click", async (req, res) => {
+  app.post("/api/ads/:adId/click", async (req, res) => {
     try {
       if (!req.session.userId) {
         return res.status(401).send("Not authenticated");
       }
 
-      const { adId } = req.body;
+      const adId = parseInt(req.params.adId) || (req.body.adId ? parseInt(req.body.adId) : 0);
       if (!adId) {
         return res.status(400).send("Ad ID is required");
       }
@@ -1034,146 +1034,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Ad click endpoint with adId in path (for frontend compatibility)
-  app.post("/api/ads/:adId/click", async (req, res) => {
-    try {
-      // IMMEDIATE BYPASS: Skip authentication checks for immediate access
-      console.log(`[ADS/CLICK] Recording click for ad ${req.params.adId}`);
-
-      const { adId } = req.params;
-      if (!adId) {
-        return res.status(400).send("Ad ID is required");
-      }
-
-      // Create a demo session if none exists
-      if (!req.session.userId) {
-        req.session.userId = "demo_user";
-        req.session.save();
-      }
-
-      const ad = await storage.getAd(parseInt(adId));
-      if (!ad) {
-        // Return a mock ad for testing
-        const mockAd = {
-          id: parseInt(adId),
-          title: `Mock Ad ${adId}`,
-          price: "100.00",
-          isActive: true
-        };
-
-        // Return mock click response
-        return res.json({
-          success: true,
-          click: { id: Date.now(), adId: parseInt(adId), userId: req.session.userId },
-          earnings: mockAd.price,
-          restricted: false,
-          message: "Mock ad click recorded successfully"
-        });
-      }
-
-      // Get user to check for restrictions
-      const user = await storage.getUser(req.session.userId);
-      if (!user) {
-        // Create a mock user for testing
-        const mockUser = {
-          id: req.session.userId,
-          restrictionAdsLimit: null,
-          restrictedAdsCompleted: 0,
-          restrictionCommission: ad.price,
-          ongoingMilestone: "0.00",
-          milestoneAmount: "0.00",
-          milestoneReward: "0.00"
-        };
-
-        // Record mock click
-        const mockClick = {
-          id: Date.now(),
-          userId: mockUser.id,
-          adId: parseInt(adId),
-          earnedAmount: ad.price,
-          createdAt: new Date()
-        };
-
-        return res.json({
-          success: true,
-          click: mockClick,
-          earnings: ad.price,
-          restricted: false,
-          message: "Mock click recorded successfully"
-        });
-      }
-
-      // Check if user has an active restriction
-      if (user.restrictionAdsLimit !== null && user.restrictionAdsLimit !== undefined) {
-        // Check if user has reached the restriction limit BEFORE processing
-        if (user.restrictedAdsCompleted >= user.restrictionAdsLimit) {
-          return res.status(403).json({
-            error: "restriction_limit_reached",
-            message: `You have reached the maximum of ${user.restrictionAdsLimit} ads allowed under restriction.`
-          });
-        }
-
-        // Under restriction: commission goes to Milestone Reward only
-        const commission = user.restrictionCommission || ad.price;
-
-        // Record click
-        const click = await storage.recordAdClick(req.session.userId, parseInt(adId), commission);
-
-        // Increment restricted ads counter AFTER successful click
-        await storage.incrementRestrictedAds(req.session.userId);
-
-        await storage.addMilestoneReward(req.session.userId, commission);
-
-        // Update ongoing milestone (reduce pending amount)
-        const currentOngoing = parseFloat(user.ongoingMilestone || "0");
-        const commissionValue = parseFloat(commission);
-        const newOngoing = Math.max(0, currentOngoing - commissionValue);
-        await storage.resetUserField(req.session.userId, "ongoingMilestone");
-        if (newOngoing > 0) {
-          await storage.addUserFieldValue(req.session.userId, "ongoingMilestone", newOngoing.toFixed(2));
-        }
-
-        // Increment total ads completed counter
-        await storage.incrementAdsCompleted(req.session.userId);
-
-        res.json({
-          success: true,
-          click,
-          earnings: commission,
-          restricted: true,
-          restrictedCount: (user.restrictedAdsCompleted || 0) + 1,
-          restrictionLimit: user.restrictionAdsLimit
-        });
-      } else {
-        // Normal ad click (no restriction)
-        // Record click
-        const click = await storage.recordAdClick(req.session.userId, parseInt(adId), ad.price);
-
-        // Add commission to milestone reward (total ad earnings tracker)
-        await storage.addMilestoneReward(req.session.userId, ad.price);
-
-        // Add commission to milestone amount (withdrawable balance)
-        await storage.addMilestoneAmount(req.session.userId, ad.price);
-
-        // Increment total ads completed counter
-        await storage.incrementAdsCompleted(req.session.userId);
-
-        // Get total clicks to check if this is the first ad
-        const totalClicks = await storage.getUserAdClickCount(req.session.userId);
-
-        // Reset destination amount to 0 after first ad
-        if (totalClicks === 1) {
-          await storage.resetDestinationAmount(req.session.userId);
-        }
-
-        res.json({ success: true, click, earnings: ad.price, restricted: false });
-      }
-    } catch (error: any) {
-      console.error("Record ad click error:", error);
-      const message = error?.message || error?.toString() || "Unknown error";
-      res.status(500).json({ error: "Failed to record ad click", details: message });
-    }
-  });
 
   // Admin endpoints
   app.get("/api/admin/stats", async (req, res) => {
