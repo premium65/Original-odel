@@ -110,46 +110,92 @@ router.put("/withdrawals/:id", async (req, res) => {
 router.post("/deposits/manual", async (req, res) => {
   try {
     const { userId, amount, description } = req.body;
+    const adminId = req.session.userId;
 
+    // Validate required fields
     if (!userId || !amount) {
+      console.log("[MANUAL_DEPOSIT] Missing required fields - userId:", userId, "amount:", amount);
       return res.status(400).json({ error: "User ID and amount are required" });
     }
 
-    const numAmount = parseFloat(amount);
+    // Validate and coerce amount to number
+    const numAmount = Number(amount);
     if (isNaN(numAmount) || numAmount <= 0) {
-      return res.status(400).json({ error: "Invalid amount" });
+      console.log("[MANUAL_DEPOSIT] Invalid amount:", amount);
+      return res.status(400).json({ error: "Invalid amount. Must be a positive number." });
     }
 
+    // Validate userId format (string is expected)
+    const normalizedUserId = String(userId);
+    
+    console.log("[MANUAL_DEPOSIT] Starting manual deposit - Admin:", adminId, "Target User:", normalizedUserId, "Amount:", numAmount);
+
+    // Check if user exists
+    const userCheck = await db.select().from(users).where(eq(users.id, normalizedUserId)).limit(1);
+    if (!userCheck.length) {
+      console.log("[MANUAL_DEPOSIT] User not found:", normalizedUserId);
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Perform database operations
+    // Note: Drizzle ORM transactions are available via db.transaction() but for simplicity
+    // we'll do sequential operations with error handling
+    
     // Create deposit record
-    const deposit = await db.insert(deposits).values({
-      userId,
-      amount: numAmount.toFixed(2),
+    const depositData = {
+      userId: normalizedUserId,
+      amount: numAmount.toString(), // Store as string for decimal precision
       type: "manual_add",
       method: "admin_manual",
       description: description || "Manual deposit by admin",
       reference: `MANUAL-${Date.now()}`,
       status: "approved"
-    }).returning();
+    };
+    
+    console.log("[MANUAL_DEPOSIT] Creating deposit record:", depositData);
+    const deposit = await db.insert(deposits).values(depositData).returning();
 
-    // Add amount to user balance
+    // Update user balance - use SQL to ensure atomic operation
+    console.log("[MANUAL_DEPOSIT] Updating user balance - adding:", numAmount);
     await db.update(users).set({
       balance: sql`${users.balance} + ${numAmount}::numeric`,
-      hasDeposit: true
-    }).where(eq(users.id, userId));
+      hasDeposit: true,
+      updatedAt: new Date()
+    }).where(eq(users.id, normalizedUserId));
 
     // Create transaction record
-    await db.insert(transactions).values({
-      userId,
+    const transactionData = {
+      userId: normalizedUserId,
       type: "deposit",
-      amount: numAmount.toFixed(2),
+      amount: numAmount.toString(),
       status: "approved",
       description: description || "Manual deposit by admin"
-    });
+    };
+    
+    console.log("[MANUAL_DEPOSIT] Creating transaction record:", transactionData);
+    await db.insert(transactions).values(transactionData);
 
-    res.json({ success: true, deposit: deposit[0] });
-  } catch (error) {
-    console.error("Manual deposit error:", error);
-    res.status(500).json({ error: "Server error" });
+    console.log("[MANUAL_DEPOSIT] Success - Deposit ID:", deposit[0].id, "User:", normalizedUserId, "Amount:", numAmount);
+    
+    res.status(201).json({ 
+      success: true, 
+      deposit: deposit[0],
+      message: "Deposit added successfully"
+    });
+  } catch (error: any) {
+    console.error("[MANUAL_DEPOSIT] Error:", error);
+    
+    // Return more specific error messages
+    let errorMessage = "Failed to add deposit";
+    if (error.code === "23505") {
+      errorMessage = "Duplicate deposit reference";
+    } else if (error.code === "23503") {
+      errorMessage = "User not found";
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+    
+    res.status(500).json({ error: errorMessage });
   }
 });
 

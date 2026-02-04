@@ -695,4 +695,93 @@ router.post("/:id/toggle-admin", async (req, res) => {
   }
 });
 
+// Manual deposit adapter endpoint (backward compatibility)
+router.post("/:id/deposit", async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { amount, description } = req.body;
+    const adminId = req.session.userId;
+
+    console.log("[USER_DEPOSIT_ADAPTER] Received request - Admin:", adminId, "User:", userId, "Amount:", amount);
+
+    // Validate required fields
+    if (!amount) {
+      return res.status(400).json({ error: "Amount is required" });
+    }
+
+    // Validate and coerce amount to number
+    const numAmount = Number(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      console.log("[USER_DEPOSIT_ADAPTER] Invalid amount:", amount);
+      return res.status(400).json({ error: "Invalid amount. Must be a positive number." });
+    }
+
+    // Normalize userId
+    const normalizedUserId = String(userId);
+
+    // Check if user exists
+    const userCheck = await db.select().from(users).where(eq(users.id, normalizedUserId)).limit(1);
+    if (!userCheck.length) {
+      console.log("[USER_DEPOSIT_ADAPTER] User not found:", normalizedUserId);
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Create deposit record
+    const { deposits, transactions } = await import("@shared/schema");
+    const depositData = {
+      userId: normalizedUserId,
+      amount: numAmount.toString(),
+      type: "manual_add",
+      method: "admin_manual",
+      description: description || "Manual deposit by admin",
+      reference: `MANUAL-${Date.now()}`,
+      status: "approved"
+    };
+
+    console.log("[USER_DEPOSIT_ADAPTER] Creating deposit");
+    const deposit = await db.insert(deposits).values(depositData).returning();
+
+    // Update user balance
+    console.log("[USER_DEPOSIT_ADAPTER] Updating user balance");
+    const updated = await db.update(users).set({
+      balance: sql`${users.balance} + ${numAmount}::numeric`,
+      hasDeposit: true,
+      updatedAt: new Date()
+    }).where(eq(users.id, normalizedUserId)).returning();
+
+    // Create transaction record
+    console.log("[USER_DEPOSIT_ADAPTER] Creating transaction record");
+    await db.insert(transactions).values({
+      userId: normalizedUserId,
+      type: "deposit",
+      amount: numAmount.toString(),
+      status: "approved",
+      description: description || "Manual deposit by admin"
+    });
+
+    console.log("[USER_DEPOSIT_ADAPTER] Success - Deposit ID:", deposit[0].id);
+    
+    const { password: _, ...userWithoutPassword } = updated[0];
+    res.status(201).json({
+      success: true,
+      user: userWithoutPassword,
+      deposit: deposit[0],
+      message: "Deposit added successfully"
+    });
+  } catch (error: any) {
+    console.error("[USER_DEPOSIT_ADAPTER] Error:", error);
+    
+    let errorMessage = "Failed to add deposit";
+    if (error.code === "23505") {
+      errorMessage = "Duplicate deposit reference";
+    } else if (error.code === "23503") {
+      errorMessage = "User not found";
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+    
+    res.status(500).json({ error: errorMessage });
+  }
+});
+
 export default router;
