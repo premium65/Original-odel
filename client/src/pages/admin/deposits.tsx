@@ -51,7 +51,11 @@ export default function Deposits() {
       setUserSearch("");
     },
     onError: (error: any) => {
-      toast({ title: "Failed to add deposit", description: error.message, variant: "destructive" });
+      toast({ 
+        title: "Failed to add deposit", 
+        description: error.message || "An error occurred while adding the deposit", 
+        variant: "destructive" 
+      });
     }
   });
 
@@ -299,13 +303,36 @@ export default function Deposits() {
               </button>
               <button
                 onClick={() => {
-                  if (selectedUser && depositAmount) {
-                    manualDepositMutation.mutate({
-                      userId: selectedUser.id,
-                      amount: depositAmount,
-                      description: depositDescription || undefined
+                  // Defensive checks before mutation
+                  if (!selectedUser || !selectedUser.id) {
+                    toast({ 
+                      title: "Validation Error", 
+                      description: "Please select a valid user", 
+                      variant: "destructive" 
                     });
+                    return;
                   }
+
+                  const amountNum = parseFloat(depositAmount);
+                  if (!depositAmount || isNaN(amountNum) || amountNum <= 0) {
+                    toast({ 
+                      title: "Validation Error", 
+                      description: "Please enter a valid positive amount", 
+                      variant: "destructive" 
+                    });
+                    return;
+                  }
+
+                  // Ensure userId is sent as a string representation of the numeric ID
+                  const userId = typeof selectedUser.id === 'number' 
+                    ? String(selectedUser.id) 
+                    : selectedUser.id;
+
+                  manualDepositMutation.mutate({
+                    userId: userId,
+                    amount: String(amountNum),
+                    description: depositDescription || undefined
+                  });
                 }}
                 disabled={manualDepositMutation.isPending || !selectedUser || !depositAmount}
                 className="px-4 py-2 bg-gradient-to-r from-[#10b981] to-[#059669] text-white font-semibold rounded-lg flex items-center gap-2 disabled:opacity-50"
