@@ -36,6 +36,7 @@ export default function AdminPremiumManage() {
   const [bankModal, setBankModal] = useState(false);
   const [profileModal, setProfileModal] = useState(false);
   const [deleteModal, setDeleteModal] = useState(false);
+  const [addValueModal, setAddValueModal] = useState(false); // New: Add Value modal
   const [showPassword, setShowPassword] = useState(false);
 
   // Form states
@@ -50,6 +51,7 @@ export default function AdminPremiumManage() {
   const [addMoneyAmount, setAddMoneyAmount] = useState("");
   const [setAdsCount, setSetAdsCount] = useState("");
   const [rewardsPoints, setRewardsPoints] = useState("");
+  const [addValueForm, setAddValueForm] = useState({ field: "milestoneAmount", amount: "" }); // New: Add Value form
   const [bankForm, setBankForm] = useState({
     bankName: "",
     accountNumber: "",
@@ -256,6 +258,33 @@ export default function AdminPremiumManage() {
     }
   });
 
+  // ADD VALUE Mutation (for milestoneAmount, ongoingMilestone, milestoneReward)
+  const addValueMutation = useMutation({
+    mutationFn: ({ field, amount }: { field: string; amount: string }) => 
+      api.addUserValue(selectedUserId!, field, amount),
+    onSuccess: () => {
+      toast({ title: "Value Added!", description: "Field updated successfully." });
+      setAddValueModal(false);
+      setAddValueForm({ field: "milestoneAmount", amount: "" });
+      refetchUser();
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to add value", description: error.message, variant: "destructive" });
+    }
+  });
+
+  // RESET FIELD Mutation
+  const resetFieldMutation = useMutation({
+    mutationFn: (field: string) => api.resetUserField(selectedUserId!, field),
+    onSuccess: () => {
+      toast({ title: "Field Reset!", description: "Field set to 0 successfully." });
+      refetchUser();
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to reset field", description: error.message, variant: "destructive" });
+    }
+  });
+
   // Open modals with current data
   const openBankModal = () => {
     if (selectedUser) {
@@ -283,17 +312,20 @@ export default function AdminPremiumManage() {
   // User stats display
   const userStats = selectedUser ? [
     { label: "Balance", value: `LKR ${parseFloat(selectedUser.balance || 0).toLocaleString()}`, color: "#3b82f6" },
-    { label: "Ads Completed", value: selectedUser.totalAdsCompleted || 0, color: "#10b981" },
-    { label: "Points", value: `${selectedUser.points || 0}/100`, color: "#8b5cf6" },
-    { label: "Status", value: selectedUser.status, color: selectedUser.status === "active" ? "#10b981" : selectedUser.status === "frozen" ? "#ef4444" : "#f59e0b" },
+    { label: "Milestone Amount", value: `LKR ${parseFloat(selectedUser.milestoneAmount || 0).toLocaleString()}`, color: parseFloat(selectedUser.milestoneAmount || 0) < 0 ? "#ef4444" : "#10b981" },
+    { label: "Ongoing Milestone", value: `LKR ${parseFloat(selectedUser.ongoingMilestone || 0).toLocaleString()}`, color: "#f59e0b" },
+    { label: "Milestone Reward", value: `LKR ${parseFloat(selectedUser.milestoneReward || 0).toLocaleString()}`, color: "#8b5cf6" },
+    { label: "Ads Completed", value: selectedUser.totalAdsCompleted || 0, color: "#06b6d4" },
+    { label: "Points", value: `${selectedUser.points || 0}/100`, color: "#14b8a6" },
   ] : [];
 
-  // 10 Action buttons configuration
+  // 11 Action buttons configuration (added ADD VALUE)
   const actionButtons = [
     { id: "evoucher", label: "E-VOUCHER", icon: Gift, color: "#f59e0b", desc: "Milestone + Lock", onClick: () => setEVoucherModal(true) },
     { id: "adreset", label: "AD RESET", icon: RotateCcw, color: "#ef4444", desc: "Reset to 0", onClick: () => adResetMutation.mutate() },
     { id: "ebonus", label: "E-BONUS", icon: Star, color: "#10b981", desc: "Instant bonus", onClick: () => setEBonusModal(true) },
     { id: "addmoney", label: "ADD $", icon: DollarSign, color: "#3b82f6", desc: "Add balance", onClick: () => setAddMoneyModal(true) },
+    { id: "addvalue", label: "ADD VALUE", icon: Wallet, color: "#f97316", desc: "Set milestone fields", onClick: () => setAddValueModal(true) },
     { id: "ads", label: "AD'S", icon: Target, color: "#06b6d4", desc: "Set ads count", onClick: () => setSetAdsModal(true) },
     { id: "rewards", label: "REWARDS", icon: Award, color: "#8b5cf6", desc: "Points 0-100", onClick: () => setRewardsModal(true) },
     { id: "bank", label: "BANK", icon: Building2, color: "#14b8a6", desc: "Bank details", onClick: openBankModal },
@@ -306,7 +338,7 @@ export default function AdminPremiumManage() {
     <div className="space-y-6">
       <div className="flex items-center gap-4">
         <div className="w-12 h-12 rounded-xl bg-[#f59e0b] flex items-center justify-center"><Crown className="h-6 w-6 text-white" /></div>
-        <div><h1 className="text-2xl font-bold text-white">Premium Manage</h1><p className="text-[#9ca3af]">Complete user management with 10 options</p></div>
+        <div><h1 className="text-2xl font-bold text-white">Premium Manage</h1><p className="text-[#9ca3af]">Complete user management with 11 options</p></div>
       </div>
 
       <div className="bg-[#1a2332] rounded-2xl p-6 border border-[#2a3a4d]">
@@ -795,6 +827,68 @@ export default function AdminPremiumManage() {
             {profileMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
             Save Profile
           </button>
+        </div>
+      </Modal>
+
+      {/* ADD VALUE Modal - For setting milestone fields */}
+      <Modal isOpen={addValueModal} onClose={() => setAddValueModal(false)} title="Add Value to Milestone Fields">
+        <div className="space-y-4">
+          <div className="bg-[#f97316]/10 border border-[#f97316]/30 rounded-lg p-3 text-sm text-[#f97316]">
+            <p className="font-semibold mb-2">Field Meanings:</p>
+            <ul className="space-y-1 text-xs">
+              <li>• <strong>Milestone Amount</strong>: Main balance (can be negative). Customer must earn to positive before withdrawal.</li>
+              <li>• <strong>Ongoing Milestone</strong>: Pending/locked amount (display only, motivational).</li>
+              <li>• <strong>Milestone Reward</strong>: Commission per ad click.</li>
+            </ul>
+          </div>
+          
+          <div>
+            <label className="block text-sm text-[#9ca3af] mb-1">Select Field</label>
+            <select
+              className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#f97316]"
+              value={addValueForm.field}
+              onChange={(e) => setAddValueForm({ ...addValueForm, field: e.target.value })}
+            >
+              <option value="milestoneAmount">Milestone Amount (Main Balance)</option>
+              <option value="ongoingMilestone">Ongoing Milestone (Pending/Locked)</option>
+              <option value="milestoneReward">Milestone Reward (Commission)</option>
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm text-[#9ca3af] mb-1">Amount (can be negative for Milestone Amount)</label>
+            <input
+              type="text"
+              className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#f97316]"
+              value={addValueForm.amount}
+              onChange={(e) => setAddValueForm({ ...addValueForm, amount: e.target.value })}
+              placeholder="e.g. -5000 or 10000"
+            />
+            <p className="text-xs text-[#6b7280] mt-1">
+              {addValueForm.field === "milestoneAmount" && `Current: LKR ${parseFloat(selectedUser?.milestoneAmount || 0).toLocaleString()}`}
+              {addValueForm.field === "ongoingMilestone" && `Current: LKR ${parseFloat(selectedUser?.ongoingMilestone || 0).toLocaleString()}`}
+              {addValueForm.field === "milestoneReward" && `Current: LKR ${parseFloat(selectedUser?.milestoneReward || 0).toLocaleString()}`}
+            </p>
+          </div>
+          
+          <div className="flex gap-2">
+            <button
+              onClick={() => resetFieldMutation.mutate(addValueForm.field)}
+              disabled={resetFieldMutation.isPending}
+              className="flex-1 py-3 bg-[#ef4444] text-white font-semibold rounded-xl disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-[#dc2626]"
+            >
+              {resetFieldMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Reset to 0
+            </button>
+            <button
+              onClick={() => addValueMutation.mutate(addValueForm)}
+              disabled={addValueMutation.isPending || !addValueForm.amount}
+              className="flex-1 py-3 bg-gradient-to-r from-[#f97316] to-[#ea580c] text-white font-semibold rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {addValueMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Add Value
+            </button>
+          </div>
         </div>
       </Modal>
 
