@@ -144,8 +144,9 @@ export default function WithdrawPage() {
                       <h3 className="font-semibold text-zinc-700 dark:text-zinc-300">Withdrawal Locked</h3>
                     </div>
                     <p className="text-sm text-zinc-500 mb-3">
-                      Complete {adsUntilPayout} more ads to unlock withdrawals
-                      {!userData.hasDeposit && <span> or receive a deposit from admin</span>}
+                      To unlock withdrawals, you need to:
+                      <br />• Complete {PAYOUT_UNLOCK_ADS} ads ({totalAds}/{PAYOUT_UNLOCK_ADS} completed)
+                      <br />• Or receive a deposit from admin
                     </p>
                     <div className="h-2 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
                       <div 
