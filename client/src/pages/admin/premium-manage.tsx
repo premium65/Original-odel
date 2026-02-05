@@ -858,7 +858,8 @@ export default function AdminPremiumManage() {
           <div>
             <label className="block text-sm text-[#9ca3af] mb-1">Amount (can be negative for Milestone Amount)</label>
             <input
-              type="text"
+              type="number"
+              step="0.01"
               className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#f97316]"
               value={addValueForm.amount}
               onChange={(e) => setAddValueForm({ ...addValueForm, amount: e.target.value })}
