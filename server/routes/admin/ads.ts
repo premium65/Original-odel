@@ -28,9 +28,11 @@ async function ensureAdColumns() {
 router.get("/", async (req, res) => {
   try {
     if (!db) return res.status(503).json({ error: "Database unavailable" });
-    const allAds = await db.select().from(ads).orderBy(desc(ads.createdAt));
-    res.json(allAds);
-  } catch (error) {
+    // Use SELECT * to avoid column mismatch if schema has columns DB doesn't
+    const result = await db.execute(sql`SELECT * FROM ads ORDER BY created_at DESC`);
+    res.json(result.rows || result);
+  } catch (error: any) {
+    console.error("[ADS] List error:", error.message);
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -39,10 +41,12 @@ router.get("/", async (req, res) => {
 router.get("/:id", async (req, res) => {
   try {
     if (!db) return res.status(503).json({ error: "Database unavailable" });
-    const ad = await db.select().from(ads).where(eq(ads.id, Number(req.params.id))).limit(1);
-    if (!ad.length) return res.status(404).json({ error: "Ad not found" });
-    res.json(ad[0]);
-  } catch (error) {
+    const result = await db.execute(sql`SELECT * FROM ads WHERE id = ${Number(req.params.id)} LIMIT 1`);
+    const rows = result.rows || result;
+    if (!rows.length) return res.status(404).json({ error: "Ad not found" });
+    res.json(rows[0]);
+  } catch (error: any) {
+    console.error("[ADS] Get error:", error.message);
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -52,54 +56,53 @@ router.post("/", async (req, res) => {
   try {
     if (!db) return res.status(503).json({ error: "Database unavailable" });
 
-    // Ensure extended columns exist before insert
-    await ensureAdColumns();
-
-    const {
-      title, description, imageUrl, targetUrl, price, reward,
-      type, url, duration, isActive,
-      currency, priceColor, features, buttonText, buttonIcon,
-      showOnDashboard, displayOrder
-    } = req.body;
-
-    if (!title) return res.status(400).json({ error: "Title is required" });
-
-    // Try full insert with all columns
-    try {
-      const newAd = await db.insert(ads).values({
-        title,
-        description: description || "",
-        imageUrl: imageUrl || "",
-        targetUrl: targetUrl || url || "",
-        price: price != null ? String(price) : "0",
-        reward: reward != null ? String(reward) : (price != null ? String(price) : "0"),
-        type: type || "click",
-        url: url || targetUrl || "",
-        duration: duration ? Number(duration) : 30,
-        isActive: isActive !== undefined ? Boolean(isActive) : true,
-        currency: currency || "LKR",
-        priceColor: priceColor || "#f59e0b",
-        features: features || [],
-        buttonText: buttonText || "Add to Cart",
-        buttonIcon: buttonIcon || "shopping-cart",
-        buttonUrl: targetUrl || url || "",
-        showOnDashboard: showOnDashboard !== undefined ? Boolean(showOnDashboard) : true,
-        displayOrder: displayOrder ? Number(displayOrder) : 1,
-      }).returning();
-      return res.status(201).json(newAd[0]);
-    } catch (fullErr: any) {
-      console.error("[ADS] Full insert failed, trying core columns:", fullErr.message);
-      // Fallback: insert only core columns that are guaranteed to exist
-      const result = await db.execute(sql`
-        INSERT INTO ads (title, description, image_url, target_url, price, reward, type, url, duration, is_active)
-        VALUES (${title}, ${description || ""}, ${imageUrl || ""}, ${targetUrl || url || ""},
-                ${price != null ? Number(price) : 0}, ${reward != null ? Number(reward) : (price != null ? Number(price) : 0)},
-                ${type || "click"}, ${url || targetUrl || ""}, ${duration ? Number(duration) : 30},
-                ${isActive !== false})
-        RETURNING *
-      `);
-      return res.status(201).json(result.rows?.[0] || { success: true });
+    const body = req.body;
+    if (!body || !body.title) {
+      return res.status(400).json({ error: "Title is required", receivedBody: body ? Object.keys(body) : "empty" });
     }
+
+    const title = body.title;
+    const description = body.description || "";
+    const imageUrl = body.imageUrl || "";
+    const targetUrl = body.targetUrl || body.url || "";
+    const price = body.price != null ? Number(body.price) : 0;
+    const reward = body.reward != null ? Number(body.reward) : price;
+    const type = body.type || "click";
+    const url = body.url || body.targetUrl || "";
+    const duration = body.duration ? Number(body.duration) : 30;
+    const isActive = body.isActive !== false;
+
+    // Use raw SQL to avoid Drizzle schema/column mismatch issues
+    const result = await db.execute(sql`
+      INSERT INTO ads (title, description, image_url, target_url, price, reward, type, url, duration, is_active)
+      VALUES (${title}, ${description}, ${imageUrl}, ${targetUrl},
+              ${price}, ${reward}, ${type}, ${url}, ${duration}, ${isActive})
+      RETURNING *
+    `);
+
+    const newAd = result.rows?.[0] || result[0];
+
+    // Try to update extended columns separately (non-fatal if they don't exist)
+    if (newAd?.id) {
+      try {
+        await db.execute(sql`
+          UPDATE ads SET
+            currency = ${body.currency || "LKR"},
+            price_color = ${body.priceColor || "#f59e0b"},
+            features = ${JSON.stringify(body.features || [])}::jsonb,
+            button_text = ${body.buttonText || "Add to Cart"},
+            button_icon = ${body.buttonIcon || "shopping-cart"},
+            button_url = ${targetUrl},
+            show_on_dashboard = ${body.showOnDashboard !== false},
+            display_order = ${body.displayOrder ? Number(body.displayOrder) : 1}
+          WHERE id = ${newAd.id}
+        `);
+      } catch (extErr: any) {
+        console.error("[ADS] Extended columns update skipped:", extErr.message);
+      }
+    }
+
+    return res.status(201).json(newAd);
   } catch (error: any) {
     console.error("[ADS] Create error:", error);
     res.status(500).json({ error: `Failed to create ad: ${error.message || "Unknown error"}` });
