@@ -28,7 +28,8 @@ export const users = pgTable("users", {
   // Balance Fields
   // milestoneAmount = withdrawable balance (starts at 25000 LKR welcome bonus, cleared on first ad click)
   // milestoneReward = total earnings ever (starts at 0)
-  // destinationAmount = 25000 LKR first-day bonus (resets to 0 after first ad click)
+  // destinationAmount = 25000 LKR display bonus for dashboard/features page (also resets on first ad click)
+  // Note: Both milestoneAmount and destinationAmount start at 25000 for different display purposes
   milestoneAmount: decimal("milestone_amount", { precision: 10, scale: 2 }).default("25000"),
   milestoneReward: decimal("milestone_reward", { precision: 10, scale: 2 }).default("0"),
   destinationAmount: decimal("destination_amount", { precision: 10, scale: 2 }).default("25000"),

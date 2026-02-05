@@ -622,11 +622,12 @@ export function registerMongoRoutes(app: Express) {
         // Normal ad click (no restriction)
         
         // Check if this is first ad click with welcome bonus
-        // If milestoneAmount = 25000 AND totalAdsCompleted = 0, clear the bonus
+        // If milestoneAmount ≈ 25000 AND totalAdsCompleted = 0, clear the bonus
         const currentMilestoneAmount = parseFloat(user.milestoneAmount || "0");
         const currentTotalAds = user.totalAdsCompleted || 0;
         
-        if (currentMilestoneAmount === 25000 && currentTotalAds === 0) {
+        // Use tolerance-based comparison for floating point (within 0.01)
+        if (Math.abs(currentMilestoneAmount - 25000) < 0.01 && currentTotalAds === 0) {
           await mongoStorage.updateUser(req.session.userId, { milestoneAmount: "0" });
         }
 
