@@ -425,19 +425,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (!user) {
-        return res.status(401).json({ error: "Invalid username or password" });
+        return res.status(401).json({ error: "Invalid credentials" });
       }
 
       const isPasswordValid = await verifyPassword(password, user.password);
       if (!isPasswordValid) {
-        return res.status(401).json({ error: "Invalid username or password" });
+        return res.status(401).json({ error: "Invalid credentials" });
       }
 
+      // Check user status
       if (user.status !== "active") {
         if (user.status === "pending") {
-          return res.status(403).json({ error: "Your account is pending admin approval" });
+          return res.status(403).json({ error: "Account pending admin approval" });
         } else if (user.status === "frozen") {
-          return res.status(403).json({ error: "Your account has been suspended" });
+          return res.status(403).json({ error: "Account suspended" });
         }
         return res.status(403).json({ error: "Account access denied" });
       }

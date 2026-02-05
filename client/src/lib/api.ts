@@ -61,6 +61,10 @@ export const api = {
   createEBonus: (id: number | string, data: { bonusAdsCount: number; bonusAmount: string; bannerUrl?: string }) =>
     fetchAPI(`/admin/users/${id}/ebonus`, { method: "POST", body: JSON.stringify(data) }),
 
+  // Set Milestone Values (Admin sets 3 fields: milestoneAmount, ongoingMilestone, milestoneReward)
+  setMilestoneValues: (id: number | string, data: { milestoneAmount?: string; ongoingMilestone?: string; milestoneReward?: string }) =>
+    fetchAPI(`/admin/users/${id}/set-milestone-values`, { method: "POST", body: JSON.stringify(data) }),
+
   // Transactions
   getTransactions: () => fetchAPI("/admin/transactions"),
   getWithdrawals: () => fetchAPI("/admin/transactions/withdrawals"),

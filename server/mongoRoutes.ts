@@ -52,20 +52,21 @@ export function registerMongoRoutes(app: Express) {
       }
 
       if (!user) {
-        return res.status(401).send("Invalid credentials");
+        return res.status(401).json({ error: "Invalid credentials" });
       }
 
       const validPassword = await bcrypt.compare(password, user.password);
       if (!validPassword) {
-        return res.status(401).send("Invalid credentials");
+        return res.status(401).json({ error: "Invalid credentials" });
       }
 
+      // Check user status
       if (user.status === "pending") {
-        return res.status(403).send("Account pending approval");
+        return res.status(403).json({ error: "Account pending admin approval" });
       }
 
       if (user.status === "frozen") {
-        return res.status(403).send("Account has been frozen");
+        return res.status(403).json({ error: "Account suspended" });
       }
 
       req.session.userId = user._id.toString();

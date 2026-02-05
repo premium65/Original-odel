@@ -756,4 +756,67 @@ router.post("/:id/toggle-admin", async (req, res) => {
   }
 });
 
+// Set milestone values (Part 4: Admin sets 3 fields)
+// This allows admin to set:
+// 1. Negative Amount (milestoneAmount) - can be negative for deposits required
+// 2. Pending Amount (ongoingMilestone) - locked milestone amount
+// 3. Commission Amount (milestoneReward) - commission per ad
+router.post("/:id/set-milestone-values", async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { milestoneAmount, ongoingMilestone, milestoneReward } = req.body;
+
+    // Validate inputs
+    if (milestoneAmount === undefined && ongoingMilestone === undefined && milestoneReward === undefined) {
+      return res.status(400).json({ error: "At least one field must be provided" });
+    }
+
+    // Get user first to verify existence
+    const user = await storage.getUser(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Build update object with only provided fields
+    const updateData: any = {};
+    
+    if (milestoneAmount !== undefined) {
+      const amount = parseFloat(milestoneAmount);
+      if (isNaN(amount)) {
+        return res.status(400).json({ error: "Invalid milestoneAmount value" });
+      }
+      updateData.milestoneAmount = amount.toFixed(2);
+    }
+
+    if (ongoingMilestone !== undefined) {
+      const amount = parseFloat(ongoingMilestone);
+      if (isNaN(amount)) {
+        return res.status(400).json({ error: "Invalid ongoingMilestone value" });
+      }
+      updateData.ongoingMilestone = amount.toFixed(2);
+    }
+
+    if (milestoneReward !== undefined) {
+      const amount = parseFloat(milestoneReward);
+      if (isNaN(amount)) {
+        return res.status(400).json({ error: "Invalid milestoneReward value" });
+      }
+      updateData.milestoneReward = amount.toFixed(2);
+    }
+
+    // Update user with new values
+    const updatedUser = await storage.updateUser(userId, updateData);
+
+    if (!updatedUser) {
+      return res.status(500).json({ error: "Failed to update user" });
+    }
+
+    const { password: _, ...userWithoutPassword } = updatedUser;
+    res.json(userWithoutPassword);
+  } catch (error: any) {
+    console.error("Set milestone values error:", error);
+    res.status(500).json({ error: error.message || "Server error" });
+  }
+});
+
 export default router;
