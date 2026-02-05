@@ -26,6 +26,12 @@ export function registerMongoRoutes(app: Express) {
         password,
         fullName,
         mobileNumber,
+        status: 'pending',
+        isAdmin: false,
+        milestoneAmount: "25000", // 25,000 LKR welcome bonus (display only, cleared on first ad click)
+        milestoneReward: "0",
+        destinationAmount: "25000",
+        totalAdsCompleted: 0,
       });
 
       res.json({ message: "Registration successful. Please wait for admin approval.", user: { id: user._id, username: user.username } });
@@ -614,15 +620,20 @@ export function registerMongoRoutes(app: Express) {
         });
       } else {
         // Normal ad click (no restriction)
-        // Check for first ad click bonus reset
-        if (user.totalAdsCompleted === 0 && user.milestoneAmount === "25000") {
+        
+        // Check if this is first ad click with welcome bonus
+        // If milestoneAmount = 25000 AND totalAdsCompleted = 0, clear the bonus
+        const currentMilestoneAmount = parseFloat(user.milestoneAmount || "0");
+        const currentTotalAds = user.totalAdsCompleted || 0;
+        
+        if (currentMilestoneAmount === 25000 && currentTotalAds === 0) {
           await mongoStorage.updateUser(req.session.userId, { milestoneAmount: "0" });
         }
 
         const click = await mongoStorage.recordAdClick(req.session.userId, adId, ad.price);
 
         // Reset destination amount on first ad click
-        if (user.totalAdsCompleted === 0) {
+        if (currentTotalAds === 0) {
           await mongoStorage.resetDestinationAmount(req.session.userId);
         }
 

@@ -325,7 +325,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lastName: lastName || '',
           status: 'pending',
           isAdmin: false,
-          milestoneAmount: "0",
+          milestoneAmount: "25000", // 25,000 LKR welcome bonus (display only, cleared on first ad click)
           milestoneReward: "0",
           destinationAmount: "25000",
           ongoingMilestone: "0",
@@ -666,6 +666,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } else {
         // Normal ad click (no restriction)
+        
+        // Check if this is first ad click with welcome bonus
+        // If milestoneAmount = 25000 AND totalAdsCompleted = 0, clear the bonus
+        const currentMilestoneAmount = parseFloat(user.milestoneAmount || "0");
+        const currentTotalAds = user.totalAdsCompleted || 0;
+        
+        if (currentMilestoneAmount === 25000 && currentTotalAds === 0) {
+          // Clear the welcome bonus before adding earnings
+          await storage.updateUser(req.session.userId, {
+            milestoneAmount: "0"
+          });
+        }
+        
         const priceStr = parseFloat(String(ad.price || "0")).toFixed(2);
         const click = await storage.recordAdClick(req.session.userId, adId, priceStr);
         await storage.addMilestoneReward(req.session.userId, priceStr);
