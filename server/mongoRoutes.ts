@@ -751,7 +751,8 @@ export function registerMongoRoutes(app: Express) {
         return res.status(404).send("User not found");
       }
 
-      if ((user.totalAdsCompleted || 0) < 28) {
+      // Users can withdraw if they have completed 28 ads OR have received a manual deposit
+      if ((user.totalAdsCompleted || 0) < 28 && !user.hasDeposit) {
         return res.status(403).send("You must view at least 28 ads before withdrawing.");
       }
 

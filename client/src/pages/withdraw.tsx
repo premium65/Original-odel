@@ -70,7 +70,8 @@ export default function WithdrawPage() {
   const balance = Number(userData.milestoneAmount || 0);
   const totalAds = userData.totalAdsCompleted || 0;
   const PAYOUT_UNLOCK_ADS = 28;
-  const canWithdraw = totalAds >= PAYOUT_UNLOCK_ADS;
+  // Users can withdraw if they have completed 28 ads OR have received a manual deposit
+  const canWithdraw = totalAds >= PAYOUT_UNLOCK_ADS || userData.hasDeposit === true;
   const adsUntilPayout = Math.max(0, PAYOUT_UNLOCK_ADS - totalAds);
 
   const getStatusIcon = (status: string) => {
@@ -142,7 +143,10 @@ export default function WithdrawPage() {
                       <Lock className="w-5 h-5 text-yellow-500" />
                       <h3 className="font-semibold text-zinc-700 dark:text-zinc-300">Withdrawal Locked</h3>
                     </div>
-                    <p className="text-sm text-zinc-500 mb-3">Complete {adsUntilPayout} more ads to unlock withdrawals</p>
+                    <p className="text-sm text-zinc-500 mb-3">
+                      Complete {adsUntilPayout} more ads to unlock withdrawals
+                      {!userData.hasDeposit && <span> or receive a deposit from admin</span>}
+                    </p>
                     <div className="h-2 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
                       <div 
                         className="h-full bg-gradient-to-r from-yellow-400 to-yellow-600 transition-all"

@@ -17,8 +17,8 @@ router.post("/", async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Check 28 ads requirement
-    if (user.adsClicked < 28) {
+    // Check 28 ads requirement (bypassed if user has received manual deposit)
+    if (user.adsClicked < 28 && !user.hasDeposit) {
       return res.status(400).json({ message: "Need 28 ads clicked to withdraw" });
     }
 
