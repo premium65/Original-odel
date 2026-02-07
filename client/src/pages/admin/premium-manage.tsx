@@ -159,7 +159,7 @@ export default function AdminPremiumManage() {
 
   // AD RESET Mutation
   const adResetMutation = useMutation({
-    mutationFn: () => api.resetUserField(selectedUserId!, "totalAdsCompleted"),
+    mutationFn: () => api.resetUserField(selectedUserId!, "booking"),
     onSuccess: () => {
       toast({ title: "Ads Reset!", description: "User's ad count is now 0." });
       refetchUser();
