@@ -456,8 +456,8 @@ export default function AdminPremiumManage() {
               ))}
             </div>
 
-            {/* 10 Action Buttons Grid */}
-            <h4 className="text-white font-semibold mb-4">Quick Actions (10 Options)</h4>
+            {/* 11 Action Buttons Grid */}
+            <h4 className="text-white font-semibold mb-4">Quick Actions (11 Options)</h4>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               {actionButtons.map((btn) => (
                 <button
@@ -499,10 +499,11 @@ export default function AdminPremiumManage() {
               </div>
             </div>
           </>
-        ) : !isLoadingUser && (
+        ) : !isLoadingUser && !selectedUserId && (
           <div className="text-center py-12 text-[#9ca3af]">
             <Crown className="h-12 w-12 mx-auto mb-4 text-[#f59e0b]/30" />
-            <p>Search and select a user to manage</p>
+            <p className="text-lg font-semibold text-white mb-2">Select a User to Manage</p>
+            <p className="text-sm">Click on any username above to view management options</p>
           </div>
         )}
       </div>
