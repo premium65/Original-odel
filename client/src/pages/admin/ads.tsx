@@ -117,8 +117,15 @@ export default function AdminAds() {
       toast({ title: "Ad created successfully!" });
       setIsCreating(false);
     },
-    onError: () => {
-      toast({ title: "Failed to create ad", variant: "destructive" });
+    onError: (error: any) => {
+      const errorMessage = error?.message || "Unknown error";
+      toast({ 
+        title: "Failed to create ad", 
+        description: errorMessage.includes("Admin access") || errorMessage.includes("Unauthorized")
+          ? "Admin access required. Try logging out and back in."
+          : errorMessage,
+        variant: "destructive" 
+      });
     },
   });
 
@@ -128,8 +135,15 @@ export default function AdminAds() {
       queryClient.invalidateQueries({ queryKey: ["admin-ads"] });
       toast({ title: "Ad updated successfully!" });
     },
-    onError: () => {
-      toast({ title: "Failed to update ad", variant: "destructive" });
+    onError: (error: any) => {
+      const errorMessage = error?.message || "Unknown error";
+      toast({ 
+        title: "Failed to update ad", 
+        description: errorMessage.includes("Admin access") || errorMessage.includes("Unauthorized")
+          ? "Admin access required. Try logging out and back in."
+          : errorMessage,
+        variant: "destructive" 
+      });
     },
   });
 
@@ -140,8 +154,15 @@ export default function AdminAds() {
       toast({ title: "Ad deleted successfully!" });
       setCurrentAd(null);
     },
-    onError: () => {
-      toast({ title: "Failed to delete ad", variant: "destructive" });
+    onError: (error: any) => {
+      const errorMessage = error?.message || "Unknown error";
+      toast({ 
+        title: "Failed to delete ad", 
+        description: errorMessage.includes("Admin access") || errorMessage.includes("Unauthorized")
+          ? "Admin access required. Try logging out and back in."
+          : errorMessage,
+        variant: "destructive" 
+      });
     },
   });
 
