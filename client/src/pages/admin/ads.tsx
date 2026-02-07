@@ -71,12 +71,13 @@ export default function AdminAds() {
     description: ad.description || "",
     image: ad.imageUrl || ad.image || "",
     currency: ad.currency || "LKR",
+    // Price can be from price field or reward field (for click ads)
     price: Number(ad.price) || Number(ad.reward) || 0,
     priceColor: ad.priceColor || "#f59e0b",
-    features: ad.features || [],
-    buttonText: ad.buttonText || "Add to Cart",
-    buttonIcon: ad.buttonIcon || "shopping-cart",
-    buttonUrl: ad.buttonUrl || ad.targetUrl || "",
+    features: ad.features || (ad.description ? [ad.description] : []),
+    buttonText: ad.buttonText || "Watch Ad",
+    buttonIcon: ad.buttonIcon || "play",
+    buttonUrl: ad.buttonUrl || ad.targetUrl || ad.url || "",
     isActive: ad.isActive ?? true,
     showOnDashboard: ad.showOnDashboard ?? true,
     displayOrder: ad.displayOrder || ad.id || 1

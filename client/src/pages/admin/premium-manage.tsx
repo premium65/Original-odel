@@ -65,9 +65,11 @@ export default function AdminPremiumManage() {
   });
 
   // Fetch all users (always load all members)
-  const { data: users = [], isLoading: isLoadingUsers } = useQuery({
+  const { data: users = [], isLoading: isLoadingUsers, error: usersError, refetch: refetchUsers } = useQuery({
     queryKey: ["admin-users-all"],
-    queryFn: api.getUsers
+    queryFn: api.getUsers,
+    retry: 2,
+    refetchOnMount: true
   });
 
   // Fetch selected user details
