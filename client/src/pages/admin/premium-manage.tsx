@@ -101,7 +101,14 @@ export default function AdminPremiumManage() {
       refetchUser();
     },
     onError: (error: any) => {
-      toast({ title: "Failed to create E-Voucher", description: error.message, variant: "destructive" });
+      const errorMessage = error?.message || "Unknown error";
+      toast({ 
+        title: "Failed to create E-Voucher", 
+        description: errorMessage.includes("Admin access") || errorMessage.includes("Unauthorized")
+          ? "Admin access required. Try logging out and back in."
+          : errorMessage,
+        variant: "destructive" 
+      });
     }
   });
 
@@ -113,7 +120,14 @@ export default function AdminPremiumManage() {
       refetchUser();
     },
     onError: (error: any) => {
-      toast({ title: "Failed to unlock", description: error.message, variant: "destructive" });
+      const errorMessage = error?.message || "Unknown error";
+      toast({ 
+        title: "Failed to unlock", 
+        description: errorMessage.includes("Admin access") || errorMessage.includes("Unauthorized")
+          ? "Admin access required. Try logging out and back in."
+          : errorMessage,
+        variant: "destructive" 
+      });
     }
   });
 
@@ -132,7 +146,14 @@ export default function AdminPremiumManage() {
       refetchUser();
     },
     onError: (error: any) => {
-      toast({ title: "Failed to set E-Bonus", description: error.message, variant: "destructive" });
+      const errorMessage = error?.message || "Unknown error";
+      toast({ 
+        title: "Failed to set E-Bonus", 
+        description: errorMessage.includes("Admin access") || errorMessage.includes("Unauthorized")
+          ? "Admin access required. Try logging out and back in."
+          : errorMessage,
+        variant: "destructive" 
+      });
     }
   });
 
@@ -144,7 +165,14 @@ export default function AdminPremiumManage() {
       refetchUser();
     },
     onError: (error: any) => {
-      toast({ title: "Failed to reset ads", description: error.message, variant: "destructive" });
+      const errorMessage = error?.message || "Unknown error";
+      toast({ 
+        title: "Failed to reset ads", 
+        description: errorMessage.includes("Admin access") || errorMessage.includes("Unauthorized")
+          ? "Admin access required. Try logging out and back in."
+          : errorMessage,
+        variant: "destructive" 
+      });
     }
   });
 
@@ -179,7 +207,14 @@ export default function AdminPremiumManage() {
       refetchUser();
     },
     onError: (error: any) => {
-      toast({ title: "Failed to set ads", description: error.message, variant: "destructive" });
+      const errorMessage = error?.message || "Unknown error";
+      toast({ 
+        title: "Failed to set ads", 
+        description: errorMessage.includes("Admin access") || errorMessage.includes("Unauthorized")
+          ? "Admin access required. Try logging out and back in."
+          : errorMessage,
+        variant: "destructive" 
+      });
     }
   });
 
@@ -200,7 +235,14 @@ export default function AdminPremiumManage() {
       refetchUser();
     },
     onError: (error: any) => {
-      toast({ title: "Failed to update rewards", description: error.message, variant: "destructive" });
+      const errorMessage = error?.message || "Unknown error";
+      toast({ 
+        title: "Failed to update rewards", 
+        description: errorMessage.includes("Admin access") || errorMessage.includes("Unauthorized")
+          ? "Admin access required. Try logging out and back in."
+          : errorMessage,
+        variant: "destructive" 
+      });
     }
   });
 
@@ -213,7 +255,14 @@ export default function AdminPremiumManage() {
       refetchUser();
     },
     onError: (error: any) => {
-      toast({ title: "Failed to update bank details", description: error.message, variant: "destructive" });
+      const errorMessage = error?.message || "Unknown error";
+      toast({ 
+        title: "Failed to update bank details", 
+        description: errorMessage.includes("Admin access") || errorMessage.includes("Unauthorized")
+          ? "Admin access required. Try logging out and back in."
+          : errorMessage,
+        variant: "destructive" 
+      });
     }
   });
 
@@ -226,7 +275,14 @@ export default function AdminPremiumManage() {
       refetchUser();
     },
     onError: (error: any) => {
-      toast({ title: "Failed to update profile", description: error.message, variant: "destructive" });
+      const errorMessage = error?.message || "Unknown error";
+      toast({ 
+        title: "Failed to update profile", 
+        description: errorMessage.includes("Admin access") || errorMessage.includes("Unauthorized")
+          ? "Admin access required. Try logging out and back in."
+          : errorMessage,
+        variant: "destructive" 
+      });
     }
   });
 
@@ -241,7 +297,14 @@ export default function AdminPremiumManage() {
       refetchUser();
     },
     onError: (error: any) => {
-      toast({ title: "Failed to update status", description: error.message, variant: "destructive" });
+      const errorMessage = error?.message || "Unknown error";
+      toast({ 
+        title: "Failed to update status", 
+        description: errorMessage.includes("Admin access") || errorMessage.includes("Unauthorized")
+          ? "Admin access required. Try logging out and back in."
+          : errorMessage,
+        variant: "destructive" 
+      });
     }
   });
 
@@ -256,7 +319,14 @@ export default function AdminPremiumManage() {
       queryClient.invalidateQueries({ queryKey: ["admin-users-search"] });
     },
     onError: (error: any) => {
-      toast({ title: "Failed to delete user", description: error.message, variant: "destructive" });
+      const errorMessage = error?.message || "Unknown error";
+      toast({ 
+        title: "Failed to delete user", 
+        description: errorMessage.includes("Admin access") || errorMessage.includes("Unauthorized")
+          ? "Admin access required. Try logging out and back in."
+          : errorMessage,
+        variant: "destructive" 
+      });
     }
   });
 
@@ -271,7 +341,14 @@ export default function AdminPremiumManage() {
       refetchUser();
     },
     onError: (error: any) => {
-      toast({ title: "Failed to add value", description: error.message, variant: "destructive" });
+      const errorMessage = error?.message || "Unknown error";
+      toast({ 
+        title: "Failed to add value", 
+        description: errorMessage.includes("Admin access") || errorMessage.includes("Unauthorized")
+          ? "Admin access required. Try logging out and back in."
+          : errorMessage,
+        variant: "destructive" 
+      });
     }
   });
 
@@ -283,7 +360,14 @@ export default function AdminPremiumManage() {
       refetchUser();
     },
     onError: (error: any) => {
-      toast({ title: "Failed to reset field", description: error.message, variant: "destructive" });
+      const errorMessage = error?.message || "Unknown error";
+      toast({ 
+        title: "Failed to reset field", 
+        description: errorMessage.includes("Admin access") || errorMessage.includes("Unauthorized")
+          ? "Admin access required. Try logging out and back in."
+          : errorMessage,
+        variant: "destructive" 
+      });
     }
   });
 
