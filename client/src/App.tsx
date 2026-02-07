@@ -128,9 +128,33 @@ function AdminProtectedRoute({ component: Component }: { component: React.Compon
     // Logged in but not admin
     return (
       <div className="flex h-screen w-full items-center justify-center bg-[#0f1419]">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-white mb-2">Access Denied</h1>
-          <p className="text-[#9ca3af]">You don't have admin privileges.</p>
+        <div className="text-center max-w-md mx-auto p-6">
+          <h1 className="text-2xl font-bold text-white mb-4">Access Denied</h1>
+          <p className="text-[#9ca3af] mb-6">You don't have admin privileges.</p>
+          
+          <div className="bg-[#1a1f2e] border border-[#374151] rounded-lg p-4 text-left mb-4">
+            <h2 className="text-lg font-semibold text-white mb-2">How to Fix:</h2>
+            <ol className="text-sm text-[#9ca3af] space-y-2 list-decimal list-inside">
+              <li>Login with an admin account</li>
+              <li>Or set <code className="bg-[#0f1419] px-1 py-0.5 rounded text-[#f59e0b]">isAdmin = true</code> in database</li>
+              <li>Or create admin user via Premium Manage</li>
+            </ol>
+          </div>
+
+          <div className="flex gap-3 justify-center">
+            <button
+              onClick={() => setLocation("/admin/login")}
+              className="px-4 py-2 bg-[#f59e0b] hover:bg-[#d97706] text-black rounded-lg font-medium transition-colors"
+            >
+              Back to Login
+            </button>
+            <button
+              onClick={() => setLocation("/")}
+              className="px-4 py-2 bg-[#1a1f2e] hover:bg-[#2a3a4d] text-white border border-[#374151] rounded-lg font-medium transition-colors"
+            >
+              Go Home
+            </button>
+          </div>
         </div>
       </div>
     );

@@ -236,7 +236,9 @@ export default function Dashboard() {
                     </div>
                     <div className="bg-black/70 backdrop-blur-sm px-3 py-1.5 rounded-full flex items-center gap-1.5">
                       <i className="fas fa-bolt text-yellow-400 text-xs" />
-                      <span className="text-white text-sm font-medium">{user?.milestoneAmount || "0.00"}</span>
+                      <span className={`text-sm font-medium ${parseFloat(user?.milestoneAmount || "0") < 0 ? "text-red-500" : "text-white"}`}>
+                        {parseFloat(user?.milestoneAmount || "0") < 0 ? "-" : ""}LKR {Math.abs(parseFloat(user?.milestoneAmount || "0")).toLocaleString()}
+                      </span>
                     </div>
                   </div>
                   <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-4 rounded-b-3xl">

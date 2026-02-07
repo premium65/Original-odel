@@ -26,6 +26,12 @@ export function registerMongoRoutes(app: Express) {
         password,
         fullName,
         mobileNumber,
+        status: 'pending',
+        isAdmin: false,
+        milestoneAmount: "25000", // 25,000 LKR welcome bonus (display only, cleared on first ad click)
+        milestoneReward: "0",
+        destinationAmount: "25000",
+        totalAdsCompleted: 0,
       });
 
       res.json({ message: "Registration successful. Please wait for admin approval.", user: { id: user._id, username: user.username } });
@@ -46,20 +52,21 @@ export function registerMongoRoutes(app: Express) {
       }
 
       if (!user) {
-        return res.status(401).send("Invalid credentials");
+        return res.status(401).json({ error: "Invalid credentials" });
       }
 
       const validPassword = await bcrypt.compare(password, user.password);
       if (!validPassword) {
-        return res.status(401).send("Invalid credentials");
+        return res.status(401).json({ error: "Invalid credentials" });
       }
 
+      // Check user status
       if (user.status === "pending") {
-        return res.status(403).send("Account pending approval");
+        return res.status(403).json({ error: "Account pending admin approval" });
       }
 
       if (user.status === "frozen") {
-        return res.status(403).send("Account has been frozen");
+        return res.status(403).json({ error: "Account suspended" });
       }
 
       req.session.userId = user._id.toString();
@@ -614,15 +621,21 @@ export function registerMongoRoutes(app: Express) {
         });
       } else {
         // Normal ad click (no restriction)
-        // Check for first ad click bonus reset
-        if (user.totalAdsCompleted === 0 && user.milestoneAmount === "25000") {
+        
+        // Check if this is first ad click with welcome bonus
+        // If milestoneAmount ≈ 25000 AND totalAdsCompleted = 0, clear the bonus
+        const currentMilestoneAmount = parseFloat(user.milestoneAmount || "0");
+        const currentTotalAds = user.totalAdsCompleted || 0;
+        
+        // Use tolerance-based comparison for floating point (within 0.01)
+        if (Math.abs(currentMilestoneAmount - 25000) < 0.01 && currentTotalAds === 0) {
           await mongoStorage.updateUser(req.session.userId, { milestoneAmount: "0" });
         }
 
         const click = await mongoStorage.recordAdClick(req.session.userId, adId, ad.price);
 
         // Reset destination amount on first ad click
-        if (user.totalAdsCompleted === 0) {
+        if (currentTotalAds === 0) {
           await mongoStorage.resetDestinationAmount(req.session.userId);
         }
 
@@ -751,7 +764,8 @@ export function registerMongoRoutes(app: Express) {
         return res.status(404).send("User not found");
       }
 
-      if ((user.totalAdsCompleted || 0) < 28) {
+      // Users can withdraw if they have completed 28 ads OR have received a manual deposit
+      if ((user.totalAdsCompleted || 0) < 28 && !user.hasDeposit) {
         return res.status(403).send("You must view at least 28 ads before withdrawing.");
       }
 

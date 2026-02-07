@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
+import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
 export default function Login() {
   const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -15,6 +17,8 @@ export default function Login() {
     setError("");
     try {
       await api.login({ username, password });
+      // Invalidate the admin auth cache to force refetch after login
+      queryClient.invalidateQueries({ queryKey: ["admin-auth"] });
       setLocation("/admin");
     } catch (err: any) {
       setError(err.message || "Login failed");

@@ -325,7 +325,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lastName: lastName || '',
           status: 'pending',
           isAdmin: false,
-          milestoneAmount: "0",
+          milestoneAmount: "25000", // 25,000 LKR welcome bonus (display only, cleared on first ad click)
           milestoneReward: "0",
           destinationAmount: "25000",
           ongoingMilestone: "0",
@@ -425,19 +425,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (!user) {
-        return res.status(401).json({ error: "Invalid username or password" });
+        return res.status(401).json({ error: "Invalid credentials" });
       }
 
       const isPasswordValid = await verifyPassword(password, user.password);
       if (!isPasswordValid) {
-        return res.status(401).json({ error: "Invalid username or password" });
+        return res.status(401).json({ error: "Invalid credentials" });
       }
 
+      // Check user status
       if (user.status !== "active") {
         if (user.status === "pending") {
-          return res.status(403).json({ error: "Your account is pending admin approval" });
+          return res.status(403).json({ error: "Account pending admin approval" });
         } else if (user.status === "frozen") {
-          return res.status(403).json({ error: "Your account has been suspended" });
+          return res.status(403).json({ error: "Account suspended" });
         }
         return res.status(403).json({ error: "Account access denied" });
       }
@@ -666,6 +667,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } else {
         // Normal ad click (no restriction)
+        
+        // Check if this is first ad click with welcome bonus
+        // If milestoneAmount ≈ 25000 AND totalAdsCompleted = 0, clear the bonus
+        const currentMilestoneAmount = parseFloat(user.milestoneAmount || "0");
+        const currentTotalAds = user.totalAdsCompleted || 0;
+        
+        // Use tolerance-based comparison for floating point (within 0.01)
+        if (Math.abs(currentMilestoneAmount - 25000) < 0.01 && currentTotalAds === 0) {
+          // Clear the welcome bonus before adding earnings
+          await storage.updateUser(req.session.userId, {
+            milestoneAmount: "0"
+          });
+        }
+        
         const priceStr = parseFloat(String(ad.price || "0")).toFixed(2);
         const click = await storage.recordAdClick(req.session.userId, adId, priceStr);
         await storage.addMilestoneReward(req.session.userId, priceStr);
