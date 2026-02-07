@@ -14,6 +14,8 @@ cd /path/to/Original-odel
 npm run dev
 ```
 
+> **📖 Need detailed help?** See [WHERE_TO_RUN_COMMANDS.md](WHERE_TO_RUN_COMMANDS.md) for comprehensive visual guide with diagrams, step-by-step instructions, and troubleshooting.
+
 ### How to Find Project Root
 
 The project root is the directory containing these files:
@@ -290,6 +292,13 @@ ls package.json        # Should exist
 npm run dev            # Now run the command
 ```
 
+**📖 Comprehensive Guide:** See [WHERE_TO_RUN_COMMANDS.md](WHERE_TO_RUN_COMMANDS.md) for:
+- Visual directory diagrams
+- Step-by-step navigation (Windows/Mac/Linux)
+- 4 verification methods
+- Common mistakes and solutions
+- Platform-specific instructions
+
 **Visual Guide:**
 ```
 YOUR COMPUTER
@@ -311,11 +320,17 @@ YOUR COMPUTER
 
 ## 📖 Documentation
 
-- **Quick Start for Ads:** [QUICK_START_ADS.md](QUICK_START_ADS.md)
-- **Visual Ads Catalog:** [ADS_VISUAL_PREVIEW.md](ADS_VISUAL_PREVIEW.md)
-- **Technical Setup:** [server/SEED_ADS_README.md](server/SEED_ADS_README.md)
-- **AI Assistant Guide:** [CLAUDE.md](CLAUDE.md)
-- **Complete System Guide:** [FULL_SYSTEM_GUIDE.md](FULL_SYSTEM_GUIDE.md)
+### Getting Started Guides
+- **🚀 Main Setup Guide:** [README.md](README.md) (this file)
+- **📍 Where to Run Commands:** [WHERE_TO_RUN_COMMANDS.md](WHERE_TO_RUN_COMMANDS.md) - Visual guide
+- **⚡ Quick Start for Ads:** [QUICK_START_ADS.md](QUICK_START_ADS.md)
+- **👁️ Visual Ads Catalog:** [ADS_VISUAL_PREVIEW.md](ADS_VISUAL_PREVIEW.md)
+
+### Technical Documentation
+- **🔧 Database Seeding:** [server/SEED_ADS_README.md](server/SEED_ADS_README.md)
+- **🤖 AI Assistant Guide:** [CLAUDE.md](CLAUDE.md)
+- **📚 Complete System Guide:** [FULL_SYSTEM_GUIDE.md](FULL_SYSTEM_GUIDE.md)
+- **🏗️ Project Structure:** [PROJECT_STRUCTURE_COMPLETE.md](PROJECT_STRUCTURE_COMPLETE.md)
 
 ## 🎨 Features
 
