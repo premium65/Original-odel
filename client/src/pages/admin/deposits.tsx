@@ -31,17 +31,22 @@ export default function Deposits() {
     queryFn: api.getUsers
   });
 
-  const filteredUsersForModal = users.filter((u: any) =>
-    userSearch &&
+  // Show all active users by default, filter by search if provided
+  const activeUsers = users.filter((u: any) => u.status === "active");
+  const filteredUsersForModal = activeUsers.filter((u: any) =>
+    !userSearch ||
     (u.username?.toLowerCase().includes(userSearch.toLowerCase()) ||
      u.email?.toLowerCase().includes(userSearch.toLowerCase()))
-  ).slice(0, 5);
+  ).slice(0, 10); // Show up to 10 users
 
   const manualDepositMutation = useMutation({
     mutationFn: (data: { userId: string; amount: string; description?: string }) =>
       api.createManualDeposit(data),
     onSuccess: () => {
-      toast({ title: "Deposit Added!", description: "Manual deposit has been added successfully." });
+      toast({ 
+        title: "Deposit Added!", 
+        description: `Added LKR ${depositAmount} to user's milestoneAmount (withdrawable balance), milestoneReward (lifetime), and balance.` 
+      });
       queryClient.invalidateQueries({ queryKey: ["admin-deposits"] });
       queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
       setShowManualModal(false);
@@ -51,7 +56,11 @@ export default function Deposits() {
       setUserSearch("");
     },
     onError: (error: any) => {
-      toast({ title: "Failed to add deposit", description: error.message, variant: "destructive" });
+      toast({ 
+        title: "Failed to add deposit", 
+        description: error.message || "Admin access required. Try logging out and back in.", 
+        variant: "destructive" 
+      });
     }
   });
 
@@ -214,9 +223,16 @@ export default function Deposits() {
               </button>
             </div>
             <div className="p-6 space-y-4">
+              {/* Description */}
+              <p className="text-sm text-[#9ca3af]">
+                This adds money to the user's <strong>milestoneAmount</strong> (withdrawable balance), 
+                <strong> milestoneReward</strong> (lifetime earnings), and <strong>balance</strong>. 
+                Same as Premium Manage ADD $ option.
+              </p>
+              
               {/* User Selection */}
               <div>
-                <label className="block text-sm text-[#9ca3af] mb-2">Select User</label>
+                <label className="block text-sm text-[#9ca3af] mb-2">Select Active User</label>
                 {selectedUser ? (
                   <div className="flex items-center justify-between p-3 bg-[#10b981]/10 border border-[#10b981]/30 rounded-xl">
                     <div className="flex items-center gap-3">
@@ -241,12 +257,15 @@ export default function Deposits() {
                       <Search className="h-5 w-5 text-[#6b7280]" />
                       <input
                         type="text"
-                        placeholder="Search by username or email..."
+                        placeholder="Search active users by username or email..."
                         className="bg-transparent border-none outline-none text-white w-full placeholder:text-[#6b7280]"
                         value={userSearch}
                         onChange={(e) => setUserSearch(e.target.value)}
                       />
                     </div>
+                    <p className="text-xs text-[#6b7280] mt-1">
+                      {activeUsers.length} active users available
+                    </p>
                     {filteredUsersForModal.length > 0 && (
                       <div className="absolute top-full left-0 right-0 mt-2 bg-[#1a2332] border border-[#2a3a4d] rounded-xl overflow-hidden z-10 shadow-lg">
                         {filteredUsersForModal.map((user: any) => (
