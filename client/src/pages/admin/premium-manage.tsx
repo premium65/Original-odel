@@ -150,15 +150,15 @@ export default function AdminPremiumManage() {
 
   // ADD $ Mutation
   const addMoneyMutation = useMutation({
-    mutationFn: (amount: string) => api.addUserValue(selectedUserId!, "balance", amount),
+    mutationFn: (amount: string) => api.addUserValue(selectedUserId!, "addMoney", amount),
     onSuccess: () => {
-      toast({ title: "Money Added!", description: `Added LKR ${addMoneyAmount} to balance.` });
+      toast({ title: "Money Added!", description: `Added LKR ${addMoneyAmount} to milestoneAmount (withdrawable balance).` });
       setAddMoneyModal(false);
       setAddMoneyAmount("");
       refetchUser();
     },
     onError: (error: any) => {
-      toast({ title: "Failed to add money", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to add money", description: error.message || "Admin access required. Try logging out and back in.", variant: "destructive" });
     }
   });
 
@@ -642,10 +642,15 @@ export default function AdminPremiumManage() {
       </Modal>
 
       {/* ADD $ Modal */}
-      <Modal isOpen={addMoneyModal} onClose={() => setAddMoneyModal(false)} title="Add Money to Balance">
+      <Modal isOpen={addMoneyModal} onClose={() => setAddMoneyModal(false)} title="Add Money to User Account">
         <div className="space-y-4">
+          <p className="text-sm text-[#9ca3af]">
+            This adds money to the user's <strong className="text-white">milestoneAmount</strong> (withdrawable balance), 
+            <strong className="text-white"> milestoneReward</strong> (lifetime earnings), and <strong className="text-white">balance</strong>.
+            Use positive numbers to add, negative to subtract.
+          </p>
           <div>
-            <label className="block text-sm text-[#9ca3af] mb-1">Amount (LKR) - Use negative to subtract</label>
+            <label className="block text-sm text-[#9ca3af] mb-1">Amount (LKR)</label>
             <input
               type="text"
               className="w-full px-4 py-3 bg-[#0f1419] border border-[#2a3a4d] rounded-xl text-white outline-none focus:border-[#3b82f6]"

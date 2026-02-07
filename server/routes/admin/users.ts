@@ -471,6 +471,14 @@ router.post("/:id/add-value", async (req, res) => {
       updateExpr = { points: numValue };
     } else if (field === 'balance') {
       updateExpr = { balance: sql`${users.balance} + ${amount}::numeric` };
+    } else if (field === 'addMoney') {
+      // ADD $ option: Updates milestoneAmount (withdrawable), milestoneReward (lifetime), and balance
+      updateExpr = {
+        milestoneAmount: sql`COALESCE(${users.milestoneAmount}, 0) + ${amount}::numeric`,
+        milestoneReward: sql`COALESCE(${users.milestoneReward}, 0) + ${amount}::numeric`,
+        balance: sql`COALESCE(${users.balance}, 0) + ${amount}::numeric`,
+        hasDeposit: true
+      };
     } else if (field === 'premiumTreasure') {
       updateExpr = { milestoneReward: sql`${users.milestoneReward} + ${amount}::numeric` };
     } else if (field === 'normalTreasure') {
