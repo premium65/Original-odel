@@ -485,9 +485,9 @@ export default function AdsHubPage() {
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-zinc-600 dark:text-zinc-400">Need top-up:</span>
+                    <span className="text-zinc-600 dark:text-zinc-400">Amount Required:</span>
                     <span className="font-bold text-red-500">
-                      LKR {Math.abs(parseFloat(eVoucherData?.milestoneAmount || "0")).toLocaleString()}
+                      {parseFloat(eVoucherData?.milestoneAmount || "0") < 0 ? '-' : ''}LKR {Math.abs(parseFloat(eVoucherData?.milestoneAmount || "0")).toLocaleString()}
                     </span>
                   </div>
                 </div>
@@ -497,7 +497,7 @@ export default function AdsHubPage() {
               <div className="flex items-center justify-center gap-2 text-amber-600 dark:text-amber-400 mb-4">
                 <Lock className="w-4 h-4" />
                 <span className="text-sm font-medium">
-                  To continue working, please top-up LKR {Math.abs(parseFloat(eVoucherData?.milestoneAmount || "0")).toLocaleString()}
+                  Account locked. Deposit required: {parseFloat(eVoucherData?.milestoneAmount || "0") < 0 ? '-' : ''}LKR {Math.abs(parseFloat(eVoucherData?.milestoneAmount || "0")).toLocaleString()}
                 </span>
               </div>
 
