@@ -1,5 +1,7 @@
 # Quick Start: 27 Sample Ads Added ✅
 
+> **📍 WHERE TO RUN COMMANDS:** All commands below should be run from the **project root directory** (where `package.json` is located). See [README.md](README.md) for detailed setup instructions.
+
 ## What Was Added
 
 **27 diverse product ads** across 6 categories are now available in your ODEL ADS platform!
@@ -9,6 +11,12 @@
 The ads are **pre-loaded** and ready to use:
 
 ```bash
+# IMPORTANT: Navigate to project root first!
+cd /path/to/Original-odel
+
+# Verify you're in the right place
+ls package.json    # Should show: package.json
+
 # 1. Start your development server
 npm run dev
 
@@ -24,6 +32,8 @@ Click "Admin" → "Ads" in the menu
 # 5. See all 27 ads immediately!
 No database setup needed - they're already there!
 ```
+
+**Need help finding the project root?** See the [Where to Run Commands](README.md#-where-to-run-commands) section in README.md
 
 ## What You'll See
 
