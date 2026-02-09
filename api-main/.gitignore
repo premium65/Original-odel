@@ -1,0 +1,7 @@
+/node_modules
+package-lock.json
+yarn.lock
+sample.js
+local.env
+prod.env
+dev.env
