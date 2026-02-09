@@ -4,7 +4,12 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const http = require('http');
 
-require('dotenv').config();
+// Load environment variables
+try {
+  require('dotenv').config();
+} catch (e) {
+  console.log('dotenv not available, using process.env directly');
+}
 
 const app = express();
 const PORT = process.env.PORT || 5000;

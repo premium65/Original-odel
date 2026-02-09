@@ -10,6 +10,10 @@ services:
         value: production
       - key: DATABASE_URI
         value: mongodb://localhost:27017/travelpartner
+      - key: JWT_SECRET
+        value: your_jwt_secret_key_here
+      - key: PORT
+        value: 5000
 
   - type: web
     name: travelpartner-user-panel
