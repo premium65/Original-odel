@@ -3,15 +3,11 @@ services:
     name: travelpartner-api
     runtime: node
     rootDir: api-main
-    buildCommand: npm install
+    buildCommand: echo "No build needed"
     startCommand: node simple-server.js
     envVars:
       - key: NODE_ENV
         value: production
-      - key: DATABASE_URI
-        value: mongodb://localhost:27017/travelpartner
-      - key: JWT_SECRET
-        value: your_jwt_secret_key_here
 
   - type: web
     name: travelpartner-user-panel
@@ -32,11 +28,3 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-```
-git add render.yaml
-```
-```
-git commit -m "Add Render Blueprint"
-```
-```
-git push origin main
