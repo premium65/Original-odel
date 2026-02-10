@@ -8,3 +8,13 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+
+  - type: web
+    name: travelpartner-user-panel
+    runtime: node
+    rootDir: user-panel-main
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
