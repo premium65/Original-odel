@@ -1,0 +1,316 @@
+===============================================================================
+  PREMIUM MANAGEMENT - QUICK REFERENCE GUIDE
+  ACCOR Travel Booking Platform
+===============================================================================
+
+This is a quick reference guide for the Premium Management system.
+For detailed documentation, see: PREMIUM_MANAGEMENT_DOCUMENTATION.txt
+
+===============================================================================
+QUICK OVERVIEW
+===============================================================================
+
+The Premium Management system allows admins to assign premium hotel booking
+tasks to users. When users complete these tasks, they earn commission fees
+that are added to their wallet.
+
+===============================================================================
+KEY FEATURES
+===============================================================================
+
+1. Three User Tiers:
+   - TRIAL: Cannot receive premium tasks from admin
+   - GOLD: Full premium task access
+   - DIAMOND: Premium tier with full access
+
+2. Commission System:
+   - Admin sets commission percentage (e.g., 5%)
+   - Commission = (percentage × hotel_price) / 100
+   - Added to user's wallet upon task completion
+
+3. Admin Controls:
+   - Assign premium tasks to users
+   - View active premium tasks
+   - View premium task history
+   - Cancel premium tasks
+
+===============================================================================
+ADMIN WORKFLOW (3 SIMPLE STEPS)
+===============================================================================
+
+Step 1: Navigate to User
+   - Go to User List in admin panel
+   - Find target user
+   - Click "Add Premium Booking"
+
+Step 2: Configure Task
+   - Enter hotel price to filter hotels
+   - Select hotel from filtered list
+   - Set commission % (min: 1)
+   - Set task number (1-30)
+   - Click Submit
+
+Step 3: Task Assigned
+   - User can now see task in their panel
+   - Track in Premium List or Premium History
+
+===============================================================================
+COMMISSION CALCULATION (SIMPLE FORMULA)
+===============================================================================
+
+Formula:
+  Commission Fee = (Commission % × Hotel Price) / 100
+
+Examples:
+  
+  Example 1:
+    Hotel Price: $1000
+    Commission: 5%
+    Result: $50 commission
+  
+  Example 2:
+    Hotel Price: $500
+    Commission: 10%
+    Result: $50 commission
+  
+  Example 3:
+    Hotel Price: $2000
+    Commission: 2.5%
+    Result: $50 commission
+
+===============================================================================
+VALIDATION RULES
+===============================================================================
+
+✓ Hotel Price: Must be greater than 0
+✓ Commission: Must be at least 1%
+✓ Task Number: Must be between 1-30
+✓ User Badge: Cannot be "trial"
+✓ User Balance: Must maintain minimum of 10,000
+
+===============================================================================
+ADMIN PANEL PAGES
+===============================================================================
+
+1. Add Premium Booking: /premium-list (from user list action)
+2. Premium List: /premium-list (view active tasks)
+3. Premium History: /premium-history (view all tasks)
+
+===============================================================================
+API ENDPOINTS (FOR DEVELOPERS)
+===============================================================================
+
+Admin Endpoints:
+  GET  /api/admin/get-user-asset?userId={id}
+  GET  /api/admin/get-bookings-by-filter?price={price}
+  PUT  /api/admin/pre-booking-update
+  GET  /api/admin/premium-history
+  DELETE /api/admin/premium-booking-cancel
+
+User Endpoints:
+  POST /api/user/complete-task
+
+===============================================================================
+DATABASE MODELS
+===============================================================================
+
+PremiumTask:
+  - userId (reference to User)
+  - name (hotel name)
+  - description
+  - commissionFee
+  - taskNo
+  - amount
+  - status ("new", "completed")
+  - images (hotelImages, locationImage, landScapeImage)
+
+User:
+  - badge ("trial", "gold", "diamond")
+  - taskCount
+  - commissionFee
+
+Wallet:
+  - totalBalance
+  - pendingAmount
+  - todayCommission
+  - totalCommission
+
+===============================================================================
+CONFIGURATION
+===============================================================================
+
+Located in: /api-main/config/index.js
+
+MINIMUM_BALANCE: 10000
+
+PREMIUM_TASK (Production):
+  HOTEL_NAMES: ["Finch inn", "Four Seasons", "Atlas Hotel", "Azure Inn"]
+  DESCRIPTION: Standard hotel description text
+  HOTEL_IMAGES: Array of 6 hotel image paths
+  LANDSCAPE_IMAGE: Landscape image path
+  LOCATION_IMAGE: Map image path
+
+PREMIUM_TASK (Development):
+  HOTEL_NAMES: ["HOTEL_1", "HOTEL_2", "HOTEL_3"]
+  DESCRIPTION: Same as production
+  HOTEL_IMAGES: []
+  LANDSCAPE_IMAGE: ""
+  LOCATION_IMAGE: ""
+
+===============================================================================
+CALCULATION UTILITIES
+===============================================================================
+
+File: /api-main/lib/calculation.js
+
+Available Functions:
+
+1. percentageCalculation(price, percentage)
+   Returns: price - (price × percentage / 100)
+   
+2. commissionFeeCalculate(actualAmount, amount)
+   Returns: { commissionFee: actualAmount - amount, amount }
+   
+3. precentConvetPrice(price, percentage)
+   Returns: price × (percentage / 100)
+   
+4. interestByDays(price, rate, days)
+   Returns: ((price × rate / 100) / days)
+   
+5. withoutServiceFee({ price, serviceFee })
+   Returns: price - (price × serviceFee / 100)
+   
+6. calculateServiceFee({ price, serviceFee })
+   Returns: price × (serviceFee / 100)
+
+===============================================================================
+ERROR MESSAGES
+===============================================================================
+
+When assigning premium tasks, you may encounter:
+
+✗ "you can't add premium task to this user"
+  Cause: User has "trial" badge
+  Fix: User must upgrade to gold or diamond
+
+✗ "Please fill the commissionFee field"
+  Cause: Commission not provided
+  Fix: Enter commission percentage
+
+✗ "Invalid Value"
+  Cause: Commission or price is 0 or negative
+  Fix: Enter valid positive number
+
+✗ "Please select the hotel"
+  Cause: No hotel selected from list
+  Fix: Select a hotel using radio button
+
+✗ "You need to maintain at least 10000 as your balance"
+  Cause: User balance below minimum
+  Fix: User needs to deposit funds
+
+===============================================================================
+WALLET BALANCE UPDATES
+===============================================================================
+
+When Premium Task Exists:
+  1. Deduct premium task amount from total balance
+  2. Add to pending amount
+  3. Add commission to today's commission
+  4. Add commission to total commission
+
+When No Premium Task:
+  1. Add commission to total balance
+  2. Add commission to today's commission
+  3. Add commission to total commission
+
+Passbook Entry Created for All Transactions
+
+===============================================================================
+SECURITY FEATURES
+===============================================================================
+
+✓ JWT Authentication Required
+✓ Admin Role Authorization
+✓ Input Validation (Frontend & Backend)
+✓ User Badge Verification
+✓ Minimum Balance Enforcement
+✓ Admin Audit Logging
+✓ Task Number Range Validation
+
+===============================================================================
+ADMIN AUDIT LOGGING
+===============================================================================
+
+Every premium task action creates an audit log entry:
+- Admin email
+- User ID
+- Task type (e.g., "PREMIUM_TASK_ASSIGNED")
+- Timestamp
+- Details (hotel name, commission, task number)
+
+View logs in: Admin Logs section
+
+===============================================================================
+TESTING CHECKLIST
+===============================================================================
+
+Before Production:
+☐ Test form validation with invalid inputs
+☐ Test hotel filtering by different prices
+☐ Test commission calculation accuracy
+☐ Test with trial user (should reject)
+☐ Test with gold/diamond user (should succeed)
+☐ Test wallet balance updates
+☐ Verify admin log creation
+☐ Test task cancellation
+☐ Test premium history display
+☐ Test minimum balance enforcement
+
+===============================================================================
+TROUBLESHOOTING
+===============================================================================
+
+Problem: Hotels not appearing in list
+Solution: Check that hotel price entered matches existing hotels
+
+Problem: Cannot assign to user
+Solution: Verify user badge is not "trial"
+
+Problem: Form won't submit
+Solution: Check all validation errors displayed
+
+Problem: Commission not calculated correctly
+Solution: Verify formula: (commission% × price) / 100
+
+Problem: User balance not updating
+Solution: Check passbook entries and wallet logs
+
+===============================================================================
+SUPPORT & DOCUMENTATION
+===============================================================================
+
+Full Documentation: PREMIUM_MANAGEMENT_DOCUMENTATION.txt
+- Complete API reference
+- Detailed code examples
+- Calculation formulas
+- Component documentation
+- Database schemas
+
+Key Files to Reference:
+- Backend: /api-main/controllers/package.controller.js
+- Models: /api-main/models/premiumTask.js
+- Calculations: /api-main/lib/calculation.js
+- Admin Form: /admin-panel-main/components/defaults/PreBookingAddForm/
+- Config: /api-main/config/index.js
+
+===============================================================================
+VERSION INFORMATION
+===============================================================================
+
+Document Version: 1.0
+Last Updated: 2024-02-14
+Platform: ACCOR Travel Booking Platform
+Technology: Node.js + Next.js + MongoDB
+
+===============================================================================
