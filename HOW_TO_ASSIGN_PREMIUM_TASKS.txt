@@ -1,0 +1,307 @@
+===============================================================================
+  HOW TO ASSIGN PREMIUM TASKS - STEP BY STEP GUIDE FOR ADMINS
+===============================================================================
+
+This guide shows you how to assign premium hotel booking tasks to users.
+
+===============================================================================
+STEP-BY-STEP INSTRUCTIONS
+===============================================================================
+
+STEP 1: ACCESS USER LIST
+-------------------------
+1. Log in to the Admin Panel
+2. Navigate to "User List" from the sidebar menu
+3. You will see a list of all registered users
+
+STEP 2: SELECT A USER
+---------------------
+1. Find the user you want to assign a premium task to
+2. You can use the search or filter options to find specific users
+3. Click the "Add Premium Booking" button for that user
+   (Usually appears as an action button in the user row)
+
+STEP 3: ENTER HOTEL PRICE
+--------------------------
+1. In the "Hotel Price" field, enter the price you want to filter by
+   Example: Enter 1000 to see all hotels priced at 1000
+2. As you type, the system will automatically filter and display matching hotels
+3. Make sure to enter a valid number greater than 0
+
+STEP 4: SELECT A HOTEL
+-----------------------
+1. Review the filtered list of hotels displayed in the table
+2. The table shows:
+   - Hotel Name
+   - Commission Fee
+   - Price
+3. Click the radio button next to the hotel you want to assign
+4. Only one hotel can be selected at a time
+
+STEP 5: SET COMMISSION PERCENTAGE
+----------------------------------
+1. In the "Commission" field, enter the commission percentage
+   Example: Enter 5 for 5% commission
+2. This is the percentage of the hotel price that the user will earn
+3. Minimum value: 1
+4. The commission will be calculated as: (commission% × price) / 100
+
+STEP 6: SET TASK NUMBER
+------------------------
+1. In the "Task Number" field, enter a task number between 1 and 30
+2. This identifies the order of the task for the user
+3. Usually you would assign sequential numbers (1, 2, 3, etc.)
+
+STEP 7: REVIEW AND SUBMIT
+--------------------------
+1. Review all the information you've entered:
+   ✓ Hotel Price
+   ✓ Selected Hotel
+   ✓ Commission Percentage
+   ✓ Task Number
+2. If everything looks correct, click the "Submit" button
+3. Wait for the confirmation message
+
+STEP 8: CONFIRMATION
+--------------------
+1. If successful, you'll see a success message
+2. You'll be redirected back to the User List
+3. The premium task is now assigned to the user
+4. The user can see this task in their panel
+
+===============================================================================
+WHAT HAPPENS AFTER ASSIGNMENT
+===============================================================================
+
+1. Premium Task Created:
+   - A new premium task record is created in the database
+   - Task is linked to the selected user
+   - Status is set to "new"
+
+2. User Notification:
+   - User can now see the premium task in their panel
+   - Task shows hotel details, images, and commission
+
+3. Admin Tracking:
+   - Task appears in "Premium List" (active tasks)
+   - Task appears in "Premium History" (all tasks)
+   - Admin log entry created for audit trail
+
+4. User Completion:
+   - When user completes the task, commission is added to their wallet
+   - Task status changes to "completed"
+   - You can see completion in Premium History
+
+===============================================================================
+EXAMPLE SCENARIO
+===============================================================================
+
+Let's say you want to assign a premium task to user "John Doe":
+
+1. You find John Doe in the User List
+2. Click "Add Premium Booking" for John
+3. Enter Hotel Price: 2000
+4. System shows hotels priced at 2000
+5. You select "Four Seasons Hotel" from the list
+6. Enter Commission: 5 (meaning 5%)
+7. Enter Task Number: 1 (his first task)
+8. Click Submit
+
+Result:
+- John gets a premium task for Four Seasons Hotel
+- Hotel price: 2000
+- Commission he'll earn: (5 × 2000) / 100 = 100
+- When he completes this task, 100 will be added to his wallet
+
+===============================================================================
+IMPORTANT RULES TO REMEMBER
+===============================================================================
+
+✗ CANNOT assign premium tasks to TRIAL users
+  - Only GOLD and DIAMOND badge users can receive premium tasks
+  - System will show error if you try to assign to trial user
+
+✓ Hotel Price must be greater than 0
+
+✓ Commission must be at least 1%
+
+✓ Task Number must be between 1 and 30
+
+✓ Must select a hotel from the filtered list
+
+✓ User must maintain minimum balance of 10,000
+
+===============================================================================
+HOW TO VIEW ASSIGNED TASKS
+===============================================================================
+
+PREMIUM LIST (Active Tasks):
+1. Navigate to "Premium List" from sidebar
+2. See all currently active/pending premium tasks
+3. Shows: User, Hotel, Commission, Status
+4. Can cancel tasks from here if needed
+
+PREMIUM HISTORY (All Tasks):
+1. Navigate to "Premium History" from sidebar
+2. See all premium tasks (completed, cancelled, active)
+3. Full historical record with dates
+4. Can filter and search
+
+===============================================================================
+HOW TO CANCEL A PREMIUM TASK
+===============================================================================
+
+If you need to cancel a premium task:
+
+1. Go to "Premium List"
+2. Find the task you want to cancel
+3. Click the "Cancel" or "Delete" button for that task
+4. Confirm the cancellation
+5. Task is removed from the system
+6. Admin log entry created for audit
+
+===============================================================================
+COMMISSION CALCULATION EXAMPLES
+===============================================================================
+
+Example 1:
+  Hotel Price: 1000
+  Commission: 5%
+  User Earns: (5 × 1000) / 100 = 50
+
+Example 2:
+  Hotel Price: 500
+  Commission: 10%
+  User Earns: (10 × 500) / 100 = 50
+
+Example 3:
+  Hotel Price: 3000
+  Commission: 3%
+  User Earns: (3 × 3000) / 100 = 90
+
+Example 4:
+  Hotel Price: 1500
+  Commission: 8%
+  User Earns: (8 × 1500) / 100 = 120
+
+===============================================================================
+COMMON ERRORS AND SOLUTIONS
+===============================================================================
+
+Error: "you can't add premium task to this user"
+Problem: User has trial badge
+Solution: User needs to upgrade to gold or diamond tier first
+
+Error: "Please fill the commissionFee field"
+Problem: Commission field is empty
+Solution: Enter a commission percentage (minimum 1)
+
+Error: "Invalid Value"
+Problem: Commission or price is 0 or negative
+Solution: Enter a positive number
+
+Error: "Please select the hotel"
+Problem: No hotel selected
+Solution: Click the radio button next to a hotel in the list
+
+Error: No hotels appearing in list
+Problem: No hotels match the entered price
+Solution: Try a different price value
+
+Error: Form won't submit (button disabled)
+Problem: Form validation errors
+Solution: Check for red error messages under fields and fix them
+
+===============================================================================
+TIPS FOR SUCCESS
+===============================================================================
+
+✓ Start with lower commission percentages for new users
+✓ Assign task numbers sequentially (1, 2, 3, etc.)
+✓ Regularly check Premium History to monitor completion rates
+✓ Use realistic hotel prices that match your available hotels
+✓ Keep track of which users have which task numbers
+✓ Monitor user badges and upgrade trial users when appropriate
+✓ Check Admin Logs regularly for audit trail
+✓ Test with a small group before mass assignment
+
+===============================================================================
+FREQUENTLY ASKED QUESTIONS
+===============================================================================
+
+Q: Can I assign multiple tasks to one user?
+A: Yes, use different task numbers (1, 2, 3, etc.) for each task
+
+Q: What happens if user doesn't complete the task?
+A: Task remains in "new" status, visible in Premium List and History
+
+Q: Can I change commission after assignment?
+A: You would need to cancel and create a new task
+
+Q: How do I know which users completed their tasks?
+A: Check Premium History, filter by status "completed"
+
+Q: What if I assigned wrong hotel?
+A: Cancel the task and create a new one with correct hotel
+
+Q: Can users see the commission before completing?
+A: Yes, task details including commission are visible to users
+
+Q: Is there a limit to how many tasks I can assign?
+A: Task numbers range from 1-30, so maximum 30 tasks per user
+
+Q: What about minimum balance requirement?
+A: Users need at least 10,000 balance to complete tasks
+
+===============================================================================
+ADMIN BEST PRACTICES
+===============================================================================
+
+1. PLANNING:
+   - Plan task assignments in advance
+   - Know which users are eligible (not trial)
+   - Prepare list of hotels and commissions
+
+2. ASSIGNMENT:
+   - Double-check user badge before assigning
+   - Verify commission calculation is correct
+   - Use sequential task numbers for tracking
+
+3. MONITORING:
+   - Regularly check Premium List for pending tasks
+   - Review Premium History for completion rates
+   - Monitor Admin Logs for audit trail
+
+4. MAINTENANCE:
+   - Cancel tasks that are no longer relevant
+   - Update user badges as appropriate
+   - Keep hotel list updated with current prices
+
+5. COMMUNICATION:
+   - Inform users when premium tasks are assigned
+   - Set expectations for task completion
+   - Be available for user questions
+
+===============================================================================
+SUPPORT RESOURCES
+===============================================================================
+
+For detailed technical information, see:
+- PREMIUM_MANAGEMENT_DOCUMENTATION.txt (Full documentation)
+- PREMIUM_MANAGEMENT_QUICK_REFERENCE.txt (Quick reference guide)
+
+For technical support:
+- Contact your system administrator
+- Check application logs
+- Review admin logs for audit trail
+
+===============================================================================
+VERSION INFORMATION
+===============================================================================
+
+Guide Version: 1.0
+Last Updated: 2024-02-14
+Platform: ACCOR Travel Booking Platform
+Audience: Admin Users
+
+===============================================================================

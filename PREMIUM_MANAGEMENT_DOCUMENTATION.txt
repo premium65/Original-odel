@@ -1,0 +1,882 @@
+===============================================================================
+  ADMIN SITE PREMIUM MANAGEMENT - COMPLETE DOCUMENTATION
+  ACCOR Travel Booking Platform
+===============================================================================
+
+TABLE OF CONTENTS
+=================
+1. Overview
+2. Premium Task Management System
+3. Calculation Formulas
+4. Database Models & Schema
+5. API Endpoints & Controllers
+6. Admin Panel Components
+7. User Flow & Process
+8. Security & Validation
+9. Code References
+
+===============================================================================
+1. OVERVIEW
+===============================================================================
+
+The ACCOR Travel Booking Platform includes a comprehensive premium task 
+management system that allows administrators to assign premium hotel booking 
+tasks to users. The system includes:
+
+- User badge tiers (trial, gold, diamond)
+- Commission-based reward system
+- Premium task assignment and tracking
+- Wallet management with balance calculations
+- Admin audit trails and history tracking
+
+Technology Stack:
+- Backend: Node.js + Express + MongoDB (Mongoose)
+- Admin Panel: Next.js 14 + TypeScript + Mantine UI
+- User Panel: Next.js 14 + TypeScript + NextUI
+
+===============================================================================
+2. PREMIUM TASK MANAGEMENT SYSTEM
+===============================================================================
+
+2.1 USER BADGE TIERS
+--------------------
+Three user tiers control access to premium tasks:
+
+a) TRIAL: 
+   - Limited access to premium tasks
+   - Cannot be assigned premium tasks by admin
+   - Completes trial phase after reaching TASK_COUNT limit
+
+b) GOLD:
+   - Full access to premium tasks
+   - Can be assigned premium tasks by admin
+   - Standard commission rates apply
+
+c) DIAMOND:
+   - Premium tier with full access
+   - Can be assigned premium tasks
+   - May have enhanced commission rates
+
+2.2 PREMIUM TASK WORKFLOW
+--------------------------
+
+Step 1: Admin Assignment
+   - Admin selects user from user list
+   - Navigates to "Add Premium Booking" form
+   - Enters hotel price to filter available hotels
+   - Selects hotel from filtered list
+   - Sets commission percentage (e.g., 5%)
+   - Assigns task number (1-30)
+   - System validates user is not "trial" badge
+
+Step 2: Task Creation
+   - System creates PremiumTask record with:
+     * Random hotel name from config
+     * Hotel description, images, location
+     * Commission fee amount
+     * Task number
+     * User ID reference
+     * Status: "new"
+
+Step 3: User Completion
+   - User views assigned premium task
+   - User completes hotel booking task
+   - System processes commission calculation
+   - Wallet balance updated
+   - Task status changed to "completed"
+
+Step 4: Admin Tracking
+   - View premium task history
+   - Cancel premium tasks if needed
+   - Monitor user wallet balances
+   - Review admin logs for audit trail
+
+===============================================================================
+3. CALCULATION FORMULAS
+===============================================================================
+
+3.1 COMMISSION FEE CALCULATION
+------------------------------
+
+Formula: commissionFee = (commission% × hotelPrice) / 100
+
+Example:
+  Hotel Price: 1000
+  Commission %: 5
+  Commission Fee = (5 × 1000) / 100 = 50
+
+Code Location: /api-main/controllers/package.controller.js (Line 1172-1173)
+
+let commissionFee = 
+  (parseFloat(reqBody.commissionFee) * parseFloat(reqBody.price)) / 100
+
+3.2 WALLET BALANCE CALCULATIONS
+--------------------------------
+
+A. WITH PREMIUM TASK ASSIGNED:
+   Pending Balance = totalBalance + commissionFee + premiumTaskAmount
+   New Total Balance = totalBalance - premiumTaskAmount
+   New Pending Amount = pendingAmount + pending
+   Today Commission = todayCommission + commissionFee
+   Total Commission = totalCommission + commissionFee
+
+B. WITHOUT PREMIUM TASK:
+   New Total Balance = totalBalance + commissionFee
+   Today Commission = todayCommission + commissionFee
+   Total Commission = totalCommission + commissionFee
+
+Code Location: /api-main/controllers/package.controller.js (Lines 1182-1234)
+
+3.3 OTHER CALCULATION FUNCTIONS
+--------------------------------
+
+Location: /api-main/lib/calculation.js
+
+a) percentageCalculation(price, percentage)
+   Returns: price - (price × (percentage / 100))
+   Use: Apply percentage discount to price
+
+b) commissionFeeCalculate(actualAmount, amount)
+   Returns: { commissionFee: actualAmount - amount, amount }
+   Use: Calculate commission fee from actual vs discounted amount
+
+c) precentConvetPrice(price, percentage)
+   Returns: price × (percentage / 100)
+   Use: Convert percentage to price value
+
+d) interestByDays(price, rate, days)
+   Returns: ((price × (rate / 100)) / days)
+   Use: Calculate daily interest rate
+
+e) withoutServiceFee({ price, serviceFee })
+   Returns: price - (price × (serviceFee / 100))
+   Use: Calculate price without service fee
+
+f) calculateServiceFee({ price, serviceFee })
+   Returns: price × (serviceFee / 100)
+   Use: Calculate service fee amount
+
+===============================================================================
+4. DATABASE MODELS & SCHEMA
+===============================================================================
+
+4.1 PREMIUM TASK MODEL
+-----------------------
+File: /api-main/models/premiumTask.js
+
+Schema Fields:
+{
+  userId: {
+    type: ObjectId,
+    required: true,
+    ref: "user"
+  },
+  name: {
+    type: String,
+    default: getRandomHotelName()  // From config.PREMIUM_TASK.HOTEL_NAMES
+  },
+  description: {
+    type: String,
+    default: config.PREMIUM_TASK.DESCRIPTION
+  },
+  locationImage: {
+    type: String,
+    default: config.PREMIUM_TASK.LOCATION_IMAGE
+  },
+  landScapeImage: {
+    type: String,
+    default: config.PREMIUM_TASK.LANDSCAPE_IMAGE
+  },
+  hotelImages: {
+    type: Array,
+    default: config.PREMIUM_TASK.HOTEL_IMAGES  // Array of 6 hotel images
+  },
+  commissionFee: {
+    type: Number
+  },
+  taskNo: {
+    type: Number,
+    default: ""
+  },
+  status: {
+    type: String,
+    default: "new"
+  },
+  amount: {
+    type: Number
+  },
+  timestamps: true  // Adds createdAt, updatedAt
+}
+
+4.2 USER MODEL (Badge Field)
+-----------------------------
+File: /api-main/models/User.js
+
+Relevant Fields:
+{
+  badge: {
+    type: String,
+    enum: ["trial", "gold", "diamond"]
+  },
+  taskCount: {
+    type: Number
+  },
+  commissionFee: {
+    type: Number
+  }
+}
+
+4.3 BOOKING MODEL
+-----------------
+File: /api-main/models/booking.js
+
+Relevant Fields:
+{
+  commissionFee: {
+    type: Number
+  },
+  price: {
+    type: Number
+  },
+  name: {
+    type: String  // Hotel name
+  }
+}
+
+4.4 WALLET MODEL
+----------------
+File: /api-main/models/wallet.js (referenced in controller)
+
+Relevant Fields:
+{
+  totalBalance: Number,
+  pendingAmount: Number,
+  todayCommission: Number,
+  totalCommission: Number,
+  levelBonus: Number
+}
+
+===============================================================================
+5. API ENDPOINTS & CONTROLLERS
+===============================================================================
+
+5.1 ADMIN PREMIUM TASK ENDPOINTS
+---------------------------------
+
+File: /api-main/controllers/package.controller.js
+
+A. GET USER ASSET
+   Endpoint: GET /api/admin/get-user-asset?userId={id}
+   Description: Fetch user data for premium task assignment
+   Returns: User asset information
+
+B. GET BOOKINGS BY FILTER
+   Endpoint: GET /api/admin/get-bookings-by-filter?price={hotelPrice}
+   Description: Filter hotels by price for premium task assignment
+   Returns: Array of hotels matching price criteria
+   
+C. PRE-BOOKING UPDATE (Create Premium Task)
+   Endpoint: PUT /api/admin/pre-booking-update
+   
+   Request Payload:
+   {
+     price: Number,           // Selected hotel price
+     hotelPrice: Number,      // Filter price
+     commission: Number,      // Commission percentage
+     taskNo: Number,          // Task number (1-30)
+     hotelId: String,         // Selected hotel ID
+     name: String,            // Hotel name
+     userId: String,          // Target user ID
+     hotelLength: Number      // Number of hotels in filtered list
+   }
+   
+   Validation Rules:
+   - hotelPrice: Required, must be > 0
+   - commission: Required, must be > 0
+   - taskNo: Required, 1-30 range
+   - User badge: Cannot be "trial"
+   
+   Process:
+   1. Validate input fields
+   2. Check user badge (reject if trial)
+   3. Create PremiumTask record
+   4. Create AdminLog for audit trail
+   5. Return success response
+   
+   Code Reference: Lines 645-920
+
+D. PREMIUM BOOKING CANCEL
+   Endpoint: DELETE /api/admin/premium-booking-cancel
+   Description: Cancel assigned premium task
+   Process:
+   1. Delete PremiumTask record
+   2. Log admin action
+   3. Return success message
+
+E. PREMIUM HISTORY
+   Endpoint: GET /api/admin/premium-history
+   Description: View all premium task assignments with pagination
+   Returns: Paginated list of premium tasks with user details
+
+5.2 USER PREMIUM TASK ENDPOINTS
+--------------------------------
+
+A. COMPLETE PREMIUM TASK
+   Endpoint: POST /api/user/complete-task
+   
+   Process:
+   1. Calculate commission fee
+   2. Check for existing premium task
+   3. Update wallet balances:
+      - With premium: Deduct premium amount, add to pending
+      - Without premium: Add commission to balance
+   4. Create passbook entries
+   5. Check trial completion
+   6. Update task count
+   
+   Code Reference: Lines 1172-1350
+
+B. COMMISSION FEE RESET (Cron Job)
+   Function: commissionZero()
+   Schedule: Configurable via cron
+   Purpose: Reset commission fees at scheduled intervals
+   
+   Code Location:
+   - /api-main/controllers/package.controller.js (Line 1365)
+   - /api-main/config/cron.js (commissionFeeZeroCron)
+
+===============================================================================
+6. ADMIN PANEL COMPONENTS
+===============================================================================
+
+6.1 PRE-BOOKING ADD FORM
+-------------------------
+File: /admin-panel-main/components/defaults/PreBookingAddForm/prebookingadd-form.tsx
+
+Features:
+- Formik form with Yup validation
+- Hotel price input with dynamic filtering
+- Commission percentage input (min: 1)
+- Task number input (1-30 range)
+- Hotel selection table with radio buttons
+- Real-time hotel filtering based on price
+
+Form Fields:
+1. Hotel Price (Number, Required, Min: 1)
+   - Triggers hotel list filtering on change
+   
+2. Commission (Number, Required, Min: 1)
+   - Commission percentage for task
+   
+3. Task Number (Number, Required, Range: 1-30)
+   - Unique task identifier for user
+   
+4. Hotel Selection (Radio, Required)
+   - Displays: Hotel Name, Commission Fee, Price
+   - User selects from filtered list
+
+Validation Schema:
+const validationSchema = Yup.object({
+  hotelPrice: Yup.number()
+    .typeError('Hotel Price must be a number')
+    .min(1, 'Hotel Price must be at least 1')
+    .required('Hotel Price is required'),
+  taskNo: Yup.number()
+    .typeError('Task Number must be a number')
+    .min(1, 'Task Number must be at least 1')
+    .max(30, 'Task Number must be less than or equal to 30')
+    .required('Task Number is required'),
+  commission: Yup.number()
+    .typeError('Commission Fee must be a number')
+    .min(1, 'Commission Fee must be at least 1')
+    .required('Commission Fee is required'),
+});
+
+Submit Handler:
+async function handleEditSubmit(values) {
+  const payload = {
+    price: selectedHotel?.price,
+    hotelPrice: values.hotelPrice,
+    commission: values.commission,
+    taskNo: values.taskNo,
+    hotelId: selectedHotel?._id,
+    name: selectedHotel?.name,
+    userId: id,
+    hotelLength: hotelListData.length,
+  };
+  
+  // API Call: PUT /api/admin/pre-booking-update
+  // On Success: Redirect to /userList
+}
+
+6.2 PREMIUM BOOKING LIST
+-------------------------
+File: /admin-panel-main/components/defaults/PremiumBookingList/premium-booking-list-datatables.tsx
+
+Features:
+- Data table with Mantine DataTable
+- View all assigned premium tasks
+- Filter and search capabilities
+- Action buttons (View, Cancel)
+- Pagination support
+
+Display Columns:
+- User ID
+- Hotel Name
+- Task Number
+- Commission Fee
+- Amount
+- Status
+- Created Date
+- Actions
+
+6.3 PREMIUM HISTORY
+--------------------
+File: /admin-panel-main/components/defaults/PremiumHistory/premium-history-datatables.tsx
+
+Features:
+- Historical view of all premium tasks
+- Includes completed and cancelled tasks
+- Admin audit trail
+- Export functionality
+- Date range filtering
+
+Display Columns:
+- User Details
+- Hotel Information
+- Task Number
+- Commission Details
+- Status
+- Assignment Date
+- Completion Date
+- Admin User
+
+6.4 ADMIN PAGES
+----------------
+
+A. Premium List Page
+   Path: /admin-panel-main/app/(defaults)/premium-list/page.tsx
+   URL: /premium-list
+   Description: Main page for viewing active premium tasks
+
+B. Premium History Page
+   Path: /admin-panel-main/app/(defaults)/premium-history/page.tsx
+   URL: /premium-history
+   Description: Historical view of all premium tasks
+
+===============================================================================
+7. USER FLOW & PROCESS
+===============================================================================
+
+7.1 COMPLETE PREMIUM TASK FLOW
+--------------------------------
+
+Step 1: User Login & Dashboard
+   - User logs in to user panel
+   - Views assigned premium tasks
+   - Checks task details (hotel info, commission)
+
+Step 2: Task Selection
+   - User selects premium task to complete
+   - Views hotel details, images, location
+   - Confirms task requirements
+
+Step 3: Task Completion
+   - User completes booking action
+   - API endpoint: POST /api/user/complete-task
+   - System processes:
+     a. Validate user session
+     b. Calculate commission fee
+     c. Check for existing premium task assignment
+     d. Update wallet balances
+     e. Create passbook entry for audit
+     f. Update task count
+     g. Check trial completion status
+
+Step 4: Wallet Update
+   - Commission added to wallet
+   - Balance updated in real-time
+   - Transaction recorded in passbook
+   - Notification sent to user
+
+Step 5: Task History
+   - Task marked as completed
+   - Visible in user's task history
+   - Commission details logged
+   - Admin can view in premium history
+
+7.2 ADMIN ASSIGNMENT FLOW
+--------------------------
+
+Step 1: User Selection
+   - Admin navigates to User List
+   - Searches/filters for target user
+   - Clicks "Add Premium Booking" action
+
+Step 2: Hotel Selection
+   - Admin enters desired hotel price
+   - System filters hotels by price
+   - Admin reviews filtered hotel list
+   - Admin selects specific hotel
+
+Step 3: Task Configuration
+   - Admin sets commission percentage
+   - Admin assigns task number (1-30)
+   - System validates all inputs
+   - Form displays validation errors if any
+
+Step 4: Task Assignment
+   - Admin submits form
+   - System validates:
+     * User is not trial badge
+     * All required fields present
+     * Task number within range
+     * Hotel price is valid
+   - System creates premium task record
+   - Admin log created for audit
+   - Success message displayed
+
+Step 5: Confirmation
+   - Admin redirected to user list
+   - Premium task visible in premium list
+   - User can now see task in their panel
+   - Admin can track in premium history
+
+===============================================================================
+8. SECURITY & VALIDATION
+===============================================================================
+
+8.1 INPUT VALIDATION
+---------------------
+
+Backend Validation:
+File: /api-main/controllers/package.controller.js
+
+// Commission Fee Validation
+if (isEmpty(reqBody.commissionFee)) {
+  err.commission = "Please fill the commissionFee field"
+}
+if (reqBody.commissionFee !== "" && parseInt(reqBody.commissionFee) <= 0) {
+  err["commission"] = "Invalid Value"
+}
+
+// Hotel Price Validation
+if (isEmpty(reqBody.hotelPrice)) {
+  err.hotelPrice = "Please fill the hotelPrice field"
+}
+if (reqBody.hotelPrice !== "" && parseInt(reqBody.hotelPrice) <= 0) {
+  err["hotelPrice"] = "Invalid Value"
+}
+
+// Task Number Validation
+if (isEmpty(reqBody.taskNo)) {
+  err.taskNo = "Please fill the taskNo field"
+}
+
+Frontend Validation:
+File: /admin-panel-main/components/defaults/PreBookingAddForm/prebookingadd-form.tsx
+
+Uses Yup validation schema (see Section 6.1)
+
+8.2 USER BADGE RESTRICTIONS
+----------------------------
+
+// Trial users cannot be assigned premium tasks
+if (userData.badge === "trial") {
+  return res.status(400).json({
+    success: false,
+    message: "Trial users cannot be assigned premium tasks"
+  })
+}
+
+8.3 MINIMUM BALANCE CHECK
+--------------------------
+
+Configuration: config.MINIMUM_BALANCE = 10000
+
+// Check minimum balance before task completion
+if (walletData.totalBalance < config.MINIMUM_BALANCE) {
+  return res.status(400).json({
+    success: false,
+    message: `You need to maintain at least ${config.MINIMUM_BALANCE} as your balance.`
+  })
+}
+
+8.4 AUTHENTICATION & AUTHORIZATION
+-----------------------------------
+
+All admin endpoints require:
+- Valid JWT authentication token
+- Admin role authorization
+- Passport.js authentication middleware
+
+Example:
+headers: {
+  Authorization: `${token}`
+}
+
+8.5 ADMIN AUDIT LOGGING
+------------------------
+
+Every premium task action is logged:
+
+AdminLog Schema:
+{
+  adminEmail: String,
+  userId: ObjectId,
+  taskType: String,  // e.g., "PREMIUM_TASK_ASSIGNED"
+  timestamp: Date,
+  details: Object
+}
+
+Code Reference:
+// Create admin log entry
+const adminLog = new AdminLog({
+  adminEmail: req.user.email,
+  userId: reqBody.userId,
+  taskType: "PREMIUM_TASK_ASSIGNED",
+  timestamp: new Date(),
+  details: {
+    hotelName: reqBody.name,
+    commission: reqBody.commission,
+    taskNo: reqBody.taskNo
+  }
+})
+await adminLog.save()
+
+===============================================================================
+9. CODE REFERENCES
+===============================================================================
+
+9.1 BACKEND FILES
+------------------
+
+A. Models:
+   /api-main/models/premiumTask.js - Premium task schema
+   /api-main/models/User.js - User schema with badge field
+   /api-main/models/booking.js - Booking schema
+   /api-main/models/wallet.js - Wallet schema
+   /api-main/models/package.js - Package schema
+
+B. Controllers:
+   /api-main/controllers/package.controller.js
+   - Lines 645-920: preBookingUpdate (Create premium task)
+   - Lines 1172-1350: completeTask (Complete premium task)
+   - Line 1365: commissionZero (Reset commission cron)
+
+C. Utilities:
+   /api-main/lib/calculation.js - All calculation functions
+   /api-main/lib/isEmpty.js - Validation helper
+
+D. Configuration:
+   /api-main/config/index.js - Premium task config
+   /api-main/config/cron.js - Cron job configuration
+
+E. Routes:
+   /api-main/routes/admin.routes.js - Admin endpoints
+   /api-main/routes/user.routes.js - User endpoints
+
+9.2 ADMIN PANEL FILES
+----------------------
+
+A. Components:
+   /admin-panel-main/components/defaults/PreBookingAddForm/
+     - prebookingadd-form.tsx (Main form component)
+   
+   /admin-panel-main/components/defaults/PremiumBookingList/
+     - premium-booking-list-datatables.tsx (List view)
+   
+   /admin-panel-main/components/defaults/PremiumHistory/
+     - premium-history-datatables.tsx (History view)
+
+B. Pages:
+   /admin-panel-main/app/(defaults)/premium-list/page.tsx
+   /admin-panel-main/app/(defaults)/premium-history/page.tsx
+
+C. Utilities:
+   /admin-panel-main/lib/api.ts - API client functions
+   /admin-panel-main/utils/validation.ts - Form validation
+
+9.3 USER PANEL FILES
+---------------------
+
+A. Components:
+   /user-panel-main/components/booking/ - Premium booking components
+
+B. Pages:
+   /user-panel-main/app/(defaults)/tasks/ - Task pages
+
+9.4 KEY CONFIGURATION VALUES
+-----------------------------
+
+Environment Variables:
+- NEXT_PUBLIC_API_BASE_URL - API base URL
+- TASK_COUNT - Number of tasks before trial completion
+- MINIMUM_BALANCE - Minimum wallet balance (10000)
+
+Premium Task Config (config.PREMIUM_TASK):
+- HOTEL_NAMES: Array of hotel names (e.g., "Finch inn", "Four Seasons")
+- DESCRIPTION: Default hotel description
+- LOCATION_IMAGE: Default location image URL
+- LANDSCAPE_IMAGE: Default landscape image URL
+- HOTEL_IMAGES: Array of 6 hotel image URLs
+
+===============================================================================
+APPENDIX A: CALCULATION EXAMPLES
+===============================================================================
+
+Example 1: Basic Commission Calculation
+----------------------------------------
+Given:
+  Hotel Price: 500
+  Commission %: 10
+  
+Calculation:
+  Commission Fee = (10 × 500) / 100 = 50
+  
+Result:
+  User earns 50 in commission
+  Total Balance += 50
+  Today Commission += 50
+  Total Commission += 50
+
+Example 2: Premium Task with Balance Deduction
+-----------------------------------------------
+Given:
+  Current Balance: 1000
+  Hotel Price: 800
+  Commission %: 5
+  Premium Task Amount: 200
+  
+Calculation:
+  Commission Fee = (5 × 800) / 100 = 40
+  Pending = 1000 + 40 + 200 = 1240
+  New Balance = 1000 - 200 = 800
+  
+Result:
+  Total Balance: 800 (deducted premium amount)
+  Pending Amount: += 1240
+  Today Commission: += 40
+  Total Commission: += 40
+
+Example 3: Service Fee Calculation
+-----------------------------------
+Given:
+  Price: 1000
+  Service Fee: 2.5%
+  
+Calculation:
+  Service Fee Amount = 1000 × (2.5 / 100) = 25
+  Price Without Service Fee = 1000 - 25 = 975
+  
+Result:
+  Customer pays: 1000
+  Service fee: 25
+  Net amount: 975
+
+===============================================================================
+APPENDIX B: ERROR CODES & MESSAGES
+===============================================================================
+
+Error Code 400 (Bad Request):
+- "Please fill the commissionFee field"
+- "Invalid Value" (commission <= 0)
+- "Please fill the hotelPrice field"
+- "Invalid Value" (hotelPrice <= 0)
+- "Please fill the taskNo field"
+- "Trial users cannot be assigned premium tasks"
+- "You need to maintain at least {MINIMUM_BALANCE} as your balance"
+
+Error Code 401 (Unauthorized):
+- "Invalid authentication token"
+- "Token expired"
+
+Error Code 403 (Forbidden):
+- "Insufficient permissions"
+- "Admin access required"
+
+Error Code 404 (Not Found):
+- "User not found"
+- "Hotel not found"
+- "Premium task not found"
+
+Error Code 500 (Server Error):
+- "Internal server error"
+- "Database connection failed"
+
+===============================================================================
+APPENDIX C: TESTING CHECKLIST
+===============================================================================
+
+Frontend Testing:
+☐ Form validation with invalid inputs
+☐ Hotel filtering by price
+☐ Commission calculation display
+☐ Hotel selection radio buttons
+☐ Form submission with valid data
+☐ Error message display
+☐ Success redirection to user list
+
+Backend Testing:
+☐ User badge validation (reject trial users)
+☐ Input validation for all fields
+☐ Commission fee calculation accuracy
+☐ Wallet balance updates
+☐ Premium task creation
+☐ Admin log creation
+☐ Minimum balance enforcement
+☐ Task number range validation (1-30)
+
+Integration Testing:
+☐ End-to-end premium task assignment
+☐ User task completion flow
+☐ Wallet synchronization
+☐ Admin history tracking
+☐ Passbook entry creation
+☐ Cron job execution
+
+===============================================================================
+APPENDIX D: DEPLOYMENT NOTES
+===============================================================================
+
+Prerequisites:
+- Node.js 18.12.1 or higher
+- MongoDB instance running
+- Redis instance (for caching)
+- AWS S3 (for image storage)
+- Environment variables configured
+
+Build Commands:
+
+Admin Panel:
+  cd admin-panel-main
+  npm install
+  npm run build
+  npm run start
+
+API Server:
+  cd api-main
+  npm install
+  npm run start
+
+User Panel:
+  cd user-panel-main
+  npm install
+  npm run build
+  npm run start
+
+Environment Variables Required:
+- DATABASE_URL
+- REDIS_URL
+- AWS_ACCESS_KEY_ID
+- AWS_SECRET_ACCESS_KEY
+- JWT_SECRET
+- NEXT_PUBLIC_API_BASE_URL
+- TASK_COUNT
+- MINIMUM_BALANCE
+
+===============================================================================
+DOCUMENT VERSION: 1.0
+LAST UPDATED: 2024-02-14
+CREATED BY: System Documentation Generator
+===============================================================================
