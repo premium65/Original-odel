@@ -6,9 +6,26 @@ This repository now includes comprehensive documentation for the Admin Site
 Premium Management system. Below is a guide to help you find the right 
 documentation for your needs.
 
+📥 **HOW TO DOWNLOAD THESE FILES?**
+   → See: HOW_TO_DOWNLOAD_DOCUMENTATION.txt for complete instructions
+   → Quick: Click "Code" button → "Download ZIP" on GitHub
+
 ===============================================================================
-DOCUMENTATION FILES (4 files, 1,687 total lines)
+DOCUMENTATION FILES (7 files, 2,500+ total lines)
 ===============================================================================
+
+0. HOW_TO_DOWNLOAD_DOCUMENTATION.txt (400+ lines) 📥 NEW!
+   Purpose: Complete guide on downloading documentation files
+   Format: Plain Text
+   Audience: Everyone
+   
+   Contains 6 different methods to download files:
+   - Individual file downloads from GitHub
+   - Download entire repository as ZIP
+   - Clone repository with Git
+   - Direct download links
+   - Command-line methods (wget/curl)
+   - GitHub CLI method
 
 1. PREMIUM_DOCUMENTATION_README.md (182 lines)
    Purpose: Navigation and Quick Start Guide
